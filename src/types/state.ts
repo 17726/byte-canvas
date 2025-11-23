@@ -58,7 +58,7 @@ export interface ViewportState {
   isSnapToGrid: boolean; // 是否开启吸附到网格
 }
 
-//具体节点 State 类型
+// 具体节点 State 类型
 /** 1. 形状节点 State (包含矩形/圆形/三角形) */
 export interface ShapeState extends BaseNodeState {
   type: NodeType.RECT | NodeType.CIRCLE; // 简化 MVP 仅支持 rect/circle
