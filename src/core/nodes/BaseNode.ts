@@ -2,7 +2,7 @@ import type { CSSProperties } from 'vue';
 import type { BaseNodeState } from '@/types/state';
 
 export abstract class CanvasNode {
-  constructor(public state: BaseNodeState) {}
+  constructor(public state: BaseNodeState) {}//??
 
   /**
    * 核心方法：生成 Vue 组件所需的样式对象
@@ -31,6 +31,7 @@ export abstract class CanvasNode {
    * 业务逻辑：移动
    */
   move(dx: number, dy: number) {
+    //检查是否锁定??
     this.state.transform.x += dx;
     this.state.transform.y += dy;
   }

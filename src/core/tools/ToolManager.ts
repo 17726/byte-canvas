@@ -119,7 +119,7 @@ export class ToolManager {
     };
 
     this.store.addNode(newRect);
-    this.store.setActive([id]);
+    this.store.setActive([id]);// 默认选中新创建的节点
   }
 
   /**

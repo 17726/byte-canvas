@@ -45,7 +45,7 @@ export interface ShapeState extends BaseNodeState {
   type: NodeType.RECT | NodeType.CIRCLE; // 简化 MVP 仅支持 rect/circle
   shapeType: 'rect' | 'circle';
   props: {
-    cornerRadius?: number; // 矩形特有
+    cornerRadius?: number; // 矩形特有圆角
   };
 }
 

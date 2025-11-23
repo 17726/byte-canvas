@@ -32,6 +32,7 @@ const hasSelection = computed(() => store.activeElementIds.size > 0);
 
 // 添加矩形
 const addRect = () => {
+  
   toolManager.createRect();
 };
 
