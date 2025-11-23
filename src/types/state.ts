@@ -16,7 +16,7 @@ export interface TransformState {
   rotation: number; // 角度 deg
 }
 
-/** 样式定义 (对应 CSS Style) */
+/**  样式定义 (对应 CSS Style) */
 export interface StyleState {
   backgroundColor: string; // 填充色
   borderWidth: number; // 边框宽
@@ -26,7 +26,7 @@ export interface StyleState {
   zIndex: number; // 层级
 }
 
-/** 节点数据基类 */
+/** 节点数据基类（核心） */
 export interface BaseNodeState {
   readonly id: string;
   readonly type: NodeType;
@@ -39,7 +39,26 @@ export interface BaseNodeState {
   isLocked: boolean;
   isVisible: boolean;
 }
+/** 画布（视口）状态：控制画布的平移、缩放、尺寸等全局操作 */
+export interface ViewportState {
+  // 画布容器的物理尺寸（对应 DOM 容器的宽高）
+  canvasWidth: number;
+  canvasHeight: number;
 
+  // 视口变换核心：平移（pan）+ 缩放（zoom）
+  zoom: number; // 缩放比例（1=100%，0.5=50%，2=200%）
+  offsetX: number; // 水平平移偏移（画布向左/右移动的距离）
+  offsetY: number; // 垂直平移偏移（画布向上/下移动的距离）
+
+  // 画布辅助配置（可选）
+  rotation: number; // 画布整体旋转角度（deg，较少用，多数场景节点单独旋转）
+  backgroundColor: string; // 画布背景色
+  isGridVisible: boolean; // 是否显示网格
+  gridSize: number; // 网格大小（px）
+  isSnapToGrid: boolean; // 是否开启吸附到网格
+}
+
+//具体节点 State 类型
 /** 1. 形状节点 State (包含矩形/圆形/三角形) */
 export interface ShapeState extends BaseNodeState {
   type: NodeType.RECT | NodeType.CIRCLE; // 简化 MVP 仅支持 rect/circle
@@ -83,3 +102,4 @@ export interface GroupState extends BaseNodeState {
 
 /** 5. 所有 State 类型的联合 */
 export type NodeState = ShapeState | TextState | ImageState | GroupState;
+

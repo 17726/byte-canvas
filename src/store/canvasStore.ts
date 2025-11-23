@@ -11,9 +11,19 @@ export const useCanvasStore = defineStore('canvas', () => {
   const version = ref(0); //脏标记计数器，可以理解为版本号，每次Node改动都要将其+1
   // 2. 视口状态 (应用在容器层，不传递给单个 Node)
   const viewport = reactive({
+    canvasWidth: 0,
+    canvasHeight: 0,
     zoom: 1,
     offsetX: 0,
     offsetY: 0,
+
+    // --- 辅助 (并给出默认值) ---
+    rotation: 0,              // 默认不旋转
+    backgroundColor: '#ffffff', // 默认白底
+    isGridVisible: true,      // 默认显示网格
+    gridSize: 20,             // 默认 20px 网格
+    isSnapToGrid: true        // 默认开启吸附
+
   });
 
   // 3. 交互状态

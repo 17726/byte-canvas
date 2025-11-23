@@ -31,6 +31,7 @@ export abstract class CanvasNode {
    * 业务逻辑：移动
    */
   move(dx: number, dy: number) {
+    if (this.state.isLocked) return; // 锁定节点不允许移动
     this.state.transform.x += dx;
     this.state.transform.y += dy;
   }
@@ -42,6 +43,7 @@ export abstract class CanvasNode {
    * 业务逻辑：调整大小
    */
   resize(width: number, height: number) {
+    if (this.state.isLocked) return; // 锁定节点不允许调整大小
     this.state.transform.width = width;
     this.state.transform.height = height;
   }
