@@ -4,6 +4,9 @@
     "vitest.explorer",
     "dbaeumer.vscode-eslint",
     "EditorConfig.EditorConfig",
-    "esbenp.prettier-vscode"
+    "esbenp.prettier-vscode",
+    // --- 团队协作 (新增) ---
+    "redjue.git-commit-plugin", //  方便大家写出符合规范的 Commit Message
+    "mhutchie.git-graph" //  可视化查看 git 分支提交记录
   ]
 }

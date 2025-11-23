@@ -17,6 +17,7 @@
     "format": "prettier --write src/"
   },
   "dependencies": {
+    "@arco-design/web-vue": "^2.57.0",
     "lodash-es": "^4.17.21",
     "pinia": "^3.0.3",
     "sass": "^1.94.2",

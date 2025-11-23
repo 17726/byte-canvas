@@ -24,7 +24,7 @@ export const useCanvasStore = defineStore('canvas', () => {
   const isInteracting = ref(false);
 
   // Getters
-  // 获取排序后的渲染列表，供 v-for 使用
+  // 获取排序后的渲染列表，供 v-for 使用？？
   const renderList = computed(() => {
     return nodeOrder.value.map((id) => nodes.value[id]).filter(Boolean);
   });
