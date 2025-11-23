@@ -16,7 +16,7 @@
         :key="node!.id"
         :is="getComponentType(node!.type)"
         :node="node"
-        @mousedown.stop="handleNodeDown(node!.id)"
+        @mousedown="handleNodeDown($event, node!.id)"
       />
     </div>
 
@@ -28,7 +28,6 @@
     </div>
   </div>
 </template>
-
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
@@ -94,33 +93,6 @@ onUnmounted(() => {
   window.removeEventListener('mouseup', handleMouseUp);
 });
 </script>
-
-<template>
-  <div class="canvas-stage" ref="stageRef" @mousedown="handleMouseDown" @wheel="handleWheel">
-    <!--
-      视口层 (Viewport Layer)
-    -->
-    <div class="canvas-viewport" :style="viewportStyle">
-      <!--
-        图元渲染层 (Node Rendering Layer)
-      -->
-      <component
-        v-for="node in store.renderList"
-        :key="node!.id"
-        :is="getComponentType(node!.type)"
-        :node="node"
-        @mousedown="handleNodeDown($event, node!.id)"
-      />
-    </div>
-
-    <!-- 辅助信息：显示当前视口状态 -->
-    <div class="debug-info">
-      Zoom: {{ (store.viewport.zoom * 100).toFixed(0) }}% <br />
-      X: {{ store.viewport.offsetX.toFixed(0) }} <br />
-      Y: {{ store.viewport.offsetY.toFixed(0) }}
-    </div>
-  </div>
-</template>
 
 <style scoped>
 .canvas-stage {
