@@ -16,7 +16,7 @@ export interface TransformState {
   rotation: number; // 角度 deg
 }
 
-/**  样式定义 (对应 CSS Style) */
+/** 样式定义 (对应 CSS Style) */
 export interface StyleState {
   backgroundColor: string; // 填充色
   borderWidth: number; // 边框宽
