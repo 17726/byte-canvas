@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'vue';
-import type { INodeRenderer } from '../index';
+import type { INodeRenderer } from '../types';
 import type { BaseNodeState, ShapeState } from '@/types/state';
 
 /**
