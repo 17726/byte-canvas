@@ -65,6 +65,66 @@ export const useCanvasStore = defineStore('canvas', () => {
     activeElementIds.value.delete(id); // 清除选中态
     version.value++; // 触发更新
   }
+  // 4. 新增：拖拽缩放→物理拉伸的核心方法（替代原错误的dragResize）
+  function dragResizeNode(
+    nodeId: string,
+    dx: number,
+    dy: number,
+    anchor: 'top-left' | 'center' | 'bottom-right'
+  ) {
+    const node = nodes.value[nodeId];
+    // 边界判断：节点不存在/锁定则返回
+    if (!node || node.isLocked || !node.transform) return;
+
+    // 灵敏度 + 尺寸变化量（非等比拉伸：dx/dy分别计算）
+    const sizeStep = 1; // 每移动1px，尺寸变化1px（更精准）
+    let widthDelta = dx * sizeStep;
+    let heightDelta = dy * sizeStep;
+
+    // 锚点适配：不同锚点的尺寸/坐标变化逻辑
+    const originWidth = node.originWidth || node.transform.width;
+    const originHeight = node.originHeight || node.transform.height;
+    let newWidth = originWidth + widthDelta;
+    let newHeight = originHeight + heightDelta;
+
+    // 最小尺寸限制（避免负数/过小）
+    newWidth = Math.max(newWidth, 50); // 最小宽度50px
+    newHeight = Math.max(newHeight, 30); // 最小高度30px
+
+    // 计算新坐标（核心：保证锚点位置固定）
+    let newX = node.transform.x;
+    let newY = node.transform.y;
+    const widthDiff = newWidth - originWidth;
+    const heightDiff = newHeight - originHeight;
+
+    switch (anchor) {
+      case 'center':
+        newX -= widthDiff / 2;
+        newY -= heightDiff / 2;
+        break;
+      case 'top-left':
+        newX -= widthDiff;
+        newY -= heightDiff;
+        break;
+      case 'bottom-right':
+        // 右下锚点：坐标不变，尺寸向右下延伸（和resize原有逻辑对齐）
+        break;
+    }
+
+    // 直接更新store中的节点（替代原node.resize调用，因为store中是纯数据）
+    updateNode(nodeId, {
+      transform: {
+        ...node.transform,
+        x: newX,
+        y: newY,
+        width: newWidth,
+        height: newHeight
+      }
+    });
+    // 更新原始尺寸（保证下次缩放基于最新物理尺寸）
+    node.originWidth = newWidth;
+    node.originHeight = newHeight;
+  }
 
   function setActive(ids: string[]) {
     activeElementIds.value = new Set(ids);
@@ -78,6 +138,9 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
   }
 
+
+
+  
   return {
     nodes,
     nodeOrder,
@@ -89,7 +152,10 @@ export const useCanvasStore = defineStore('canvas', () => {
     updateNode,
     addNode,
     deleteNode,
+    dragResizeNode,
     setActive,
     toggleSelection,
   };
+
+
 });

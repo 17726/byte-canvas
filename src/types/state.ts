@@ -33,11 +33,14 @@ export interface BaseNodeState {
   name: string;
 
   transform: TransformState;
+
   style: StyleState;
 
   parentId: string | null;
   isLocked: boolean;
   isVisible: boolean;
+  originWidth?: number; // 原始宽度（用于拖拽缩放计算）
+  originHeight?: number; // 原始高度（用于拖拽缩放计算）
 }
 /** 画布（视口）状态：控制画布的平移、缩放、尺寸等全局操作 */
 export interface ViewportState {

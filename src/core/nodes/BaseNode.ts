@@ -42,9 +42,14 @@ export abstract class CanvasNode {
   /**
    * 业务逻辑：调整大小
    */
-  resize(width: number, height: number) {
-    if (this.state.isLocked) return; // 锁定节点不允许调整大小
-    this.state.transform.width = width;
-    this.state.transform.height = height;
-  }
+  resize(newWidth: number, newHeight: number, newX?: number, newY?: number): void {
+  if (this.state.isLocked) return;
+  
+  this.state.transform.width = newWidth;
+  this.state.transform.height = newHeight;
+  
+  // 只有传入了新坐标才更新，否则默认 x,y 不动（即向右下延伸）
+  if (newX !== undefined) this.state.transform.x = newX;
+  if (newY !== undefined) this.state.transform.y = newY;
 }
+} 
