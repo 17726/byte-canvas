@@ -38,6 +38,7 @@ export interface BaseNodeState {
   parentId: string | null;
   isLocked: boolean;
   isVisible: boolean;
+
 }
 /** 画布（视口）状态：控制画布的平移、缩放、尺寸等全局操作 */
 export interface ViewportState {
@@ -102,4 +103,3 @@ export interface GroupState extends BaseNodeState {
 
 /** 5. 所有 State 类型的联合 */
 export type NodeState = ShapeState | TextState | ImageState | GroupState;
-
