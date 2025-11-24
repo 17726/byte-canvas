@@ -17,7 +17,7 @@ export function getDomStyle(node: BaseNodeState): CSSProperties {
       return rectRenderer.render(node);
     // case NodeType.TEXT: return textRenderer.render(node);
     default:
-      // 默认回退到矩形渲染，或者返回空样式
-      return rectRenderer.render(node);
+      // 如果加了新类型忘了写渲染器，控制台会报错
+      throw new Error(`[ByteCanvas] Unsupported node type: ${node.type}`);
   }
 }
