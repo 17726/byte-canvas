@@ -6,7 +6,9 @@
         <template #icon><icon-plus /></template>
         矩形
       </a-button>
-      <a-button>文本</a-button>
+      <a-button type="primary" @click="addText">
+        文本
+      </a-button>
       <a-button>图片</a-button>
 
       <a-divider direction="vertical" />
@@ -34,7 +36,10 @@ const hasSelection = computed(() => store.activeElementIds.size > 0);
 const addRect = () => {
   toolManager.createRect();
 };
-
+//添加文本
+const addText = () => {
+  toolManager.createText();
+};
 // 删除选中
 const deleteSelected = () => {
   toolManager.deleteSelected();

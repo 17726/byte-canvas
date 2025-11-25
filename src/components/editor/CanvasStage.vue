@@ -33,6 +33,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
 import { NodeType } from '@/types/state';
 import RectLayer from './layers/RectLayer.vue';
+import TextLayer from './layers/TextLayer.vue';
 import { ToolManager } from '@/core/tools/ToolManager';
 
 const store = useCanvasStore();
@@ -52,7 +53,8 @@ const getComponentType = (type: NodeType) => {
       return RectLayer;
     case NodeType.CIRCLE:
       return RectLayer; // 暂时用 Rect 代替
-    // case NodeType.TEXT: return TextLayer;
+    case NodeType.TEXT:
+      return TextLayer;
     default:
       return 'div';
   }

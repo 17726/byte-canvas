@@ -123,6 +123,47 @@ export class ToolManager {
   }
 
   /**
+   * 业务逻辑：创建文本
+   */
+  createText() {
+    const id = uuidv4();
+    // 随机位置
+    const x = Math.random() * 800;
+    const y = Math.random() * 600;
+
+    const newRect: ShapeState = {
+      id,
+      type: NodeType.RECT,
+      name: 'Rectangle',
+      transform: {
+        x,
+        y,
+        width: 100,
+        height: 100,
+        rotation: 0,
+      },
+      style: {
+        backgroundColor: '#fff0',
+        borderWidth: 1,
+        borderStyle: 'dashed',
+        borderColor: '#ff4d4f',
+        opacity: 1,
+        zIndex: 1,
+      },
+      props: {
+        cornerRadius: 0,
+      },
+      parentId: null,
+      isLocked: false,
+      isVisible: true,
+      shapeType: 'rect',
+    };
+
+    this.store.addNode(newRect);
+    this.store.setActive([id]);
+  }
+
+  /**
    * 业务逻辑：删除选中元素
    */
   deleteSelected() {
