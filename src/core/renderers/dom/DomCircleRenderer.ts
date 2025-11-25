@@ -25,7 +25,7 @@ export class DomCircleRenderer implements INodeRenderer<CSSProperties> {
       // --- 布局属性 ---
       position: 'absolute',
       // 应用位置偏移确保圆形居中
-      left: `${transform.x }px`,
+      left: `${transform.x}px`,
       top: `${transform.y}px`,
       width: `${transform.width}px`,
       height: `${transform.height}px`,
