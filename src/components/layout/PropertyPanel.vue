@@ -3,13 +3,18 @@
 <template>
   <a-space direction="vertical" size="large">
     <a-space>
-      <a-color-picker  @change="fillColorChange" v-model="fillColor" defaultValue="#165DFF" showText disabledAlpha/>
-      <a-color-picker  @change="viceColorChange" v-model="borderColor" defaultValue="#165DFF" showText disabledAlpha/>
+      <a-color-picker  @change="fillColorChange" v-model="fillColor" disabledAlpha/>
+      <a-color-picker  @change="viceColorChange" v-model="viceColor" disabledAlpha/>
       <a-input-number value = "x" :disabled="!hasSelection" v-model="x" :style="{width:'80px'}" placeholder="X" class="input-demo"/>
       <a-input-number value = "y" :disabled="!hasSelection" v-model="y" :style="{width:'80px'}" placeholder="Y" class="input-demo"/>
       <a-button-group>
       <a-button @click="moveLayerUp" type="primary">上移</a-button>
       <a-button @click="moveLayerDown" type="primary">下移</a-button>
+      <a-button @click="toggleFontBold" type="primary" style="background-color: white;color: black;border: 0;">B</a-button>
+      <a-button @click="toggleFontStrikethrough" type="primary" style="background-color: white;color: black;border: 0;">S</a-button>
+      <a-button @click="setFontItalic" type="primary" style="background-color: white;color: black;border: 0;">I</a-button>
+      <a-button @click="toggleFontUnderline" type="primary" style="background-color: white;color: black;border: 0;">U</a-button>
+      <a-input-number  @change="updateBorderWidth" v-model="activeStyleValue" :style="{width:'120px'}" placeholder="Please Enter" class="input-demo" :min="10" :max="100"/>
       </a-button-group>
     </a-space>
   </a-space>
@@ -20,24 +25,14 @@ import { ref, computed, watch } from 'vue'
 import { useCanvasStore } from '@/store/canvasStore'
 const canvasStore = useCanvasStore()
   const fillColor = ref('#ffccc7')
-  const borderColor = ref('#ff4d4f')
+  const viceColor = ref('#ff4d4f')
   const hasSelection = computed(() => canvasStore.activeElements.length > 0)
   const x = ref(0)
   const y = ref(0)
-
-  // 监听选中元素变化，更新坐标输入框
-  watch(() => canvasStore.activeElements, (newElements) => {
-    if (newElements.length > 0) {
-      const firstElement = newElements[0]
-      if (firstElement && firstElement.transform) {
-        x.value = firstElement.transform.x
-        y.value = firstElement.transform.y
-      }
-    }
-  },{ immediate: true, deep: true })
+  const activeStyleValue = ref(16)
   const fillColorChange = (val: string) => {
     canvasStore.activeElements.forEach(element => {
-      if (element && element.id) {
+      if (element && element.id && element.style) {
         canvasStore.updateNode(element.id, {
           style: {
             ...element.style,
@@ -49,24 +44,22 @@ const canvasStore = useCanvasStore()
   }
   const viceColorChange = (val: string) => {
     canvasStore.activeElements.forEach(element => {
-      if (element && element.id) {
-        console.log(element)
-        if(element.type === 'rect'){
-          console.log(element.type)
+      if (element && element.id && element.style) {
+        if(element.type === 'rect' || element.type === 'circle'){
           canvasStore.updateNode(element.id, {
-          style: {
-            ...element.style,
-            borderColor: val
-          }
-        })
+            style: {
+              ...element.style,
+              borderColor: val
+            }
+          });
         }else{
-          console.log(element.type)
           canvasStore.updateNode(element.id, {
-          style: {
-            ...element.style,
-            color: val
-          }
-        })}
+            style: {
+              ...element.style,
+              color: val
+            }
+          });
+        }
       }
     });
   }
@@ -94,28 +87,87 @@ const canvasStore = useCanvasStore()
       }
     })
   }
+  const toggleFontBold = () => {
+    console.log('字体加粗')
+  }
+  const toggleFontStrikethrough = () => {
+    console.log('字体删除线')
+  }
+  const setFontItalic = () => {
+    console.log('字体斜体')
+  }
+  const toggleFontUnderline = () => {
+    console.log('字体下划线')
+  }
+  const updateBorderWidth = () => {
+    canvasStore.activeElements.forEach(element => {
+      if (element && element.id) {
+        canvasStore.updateNode(element.id, {
+          style: {
+            ...element.style,
+            borderWidth: activeStyleValue.value
+          }
+        });
+      }
+    });
+  }
+  // 监听选中元素变化，更新所有属性
+  watch(() => canvasStore.activeElements, (newElements) => {
+    if (newElements.length > 0) {
+      const firstElement = newElements[0];
+      if (firstElement) {
+        // 更新坐标
+        if (firstElement.transform) {
+          x.value = firstElement.transform.x;
+          y.value = firstElement.transform.y;
+        }
+        // 更新颜色
+        if (firstElement.style) {
+          // 设置填充色（背景色）
+          if (firstElement.style.backgroundColor) {
+            fillColor.value = firstElement.style.backgroundColor;
+          }
+          // 设置边框色或文字颜色
+          if (firstElement.type === 'rect' || firstElement.type === 'circle') {
+            // 形状元素使用边框色
+            if (firstElement.style.borderColor) {
+              viceColor.value = firstElement.style.borderColor;
+            }
+          } else {
+            // 其他元素（如文本）使用文字颜色
+            if (firstElement.style.color) {
+              viceColor.value = firstElement.style.color;
+            }
+          }
+          if(firstElement.style.borderWidth){
+            activeStyleValue.value = firstElement.style.borderWidth;
+          }
+        }
+      }
+    }
+  }, { immediate: true, deep: true })
   watch(x, (newX) => {
-    const activeElement = canvasStore.activeElements[0]
-      if (activeElement && activeElement.id) {
-        canvasStore.updateNode(activeElement.id, {
+    canvasStore.activeElements.forEach(element => {
+      if (element && element.id && element.transform) {
+        canvasStore.updateNode(element.id, {
           transform: {
-            ...activeElement.transform,
+            ...element.transform,
             x: newX
           }
         });
-      };
+      }
+    });
   });
-
-  // 监听y坐标变化，更新选中元素
   watch(y, (newY) => {
-    const activeElement = canvasStore.activeElements[0]
-      if (activeElement && activeElement.id) {
-        canvasStore.updateNode(activeElement.id, {
+    canvasStore.activeElements.forEach(element => {
+      if (element && element.id && element.transform) {
+        canvasStore.updateNode(element.id, {
           transform: {
-            ...activeElement.transform,
+            ...element.transform,
             y: newY
           }
         });
-      };
+      }
+    });
   });
 </script>

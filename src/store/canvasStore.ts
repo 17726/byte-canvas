@@ -42,6 +42,7 @@ export const useCanvasStore = defineStore('canvas', () => {
   const activeElements = computed(() => {
     return Array.from(activeElementIds.value).map(id => nodes.value[id]).filter(Boolean);
   });
+
   // Actions
   // 1. 更新节点
   function updateNode(id: string, patch: Partial<BaseNodeState>) {

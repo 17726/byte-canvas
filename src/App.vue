@@ -14,10 +14,10 @@ import CanvasToolbar from '@/components/layout/CanvasToolbar.vue';
       <!-- 右侧占位，保持 Logo 左对齐 -->
       <div class="header-right"></div>
     </a-layout-header>
-
     <a-layout-content class="main-content">
       <CanvasStage />
     </a-layout-content>
+
   </a-layout>
 </template>
 
