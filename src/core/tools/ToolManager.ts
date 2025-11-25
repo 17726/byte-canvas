@@ -121,6 +121,49 @@ export class ToolManager {
 
     this.store.addNode(newRect);
     this.store.setActive([id]);
+    console.log('矩形创建完成');
+  }
+  /**
+   * 业务逻辑：创建圆形
+   */
+  createCircle() {
+    const id = uuidv4();
+    // 随机位置
+    const x = Math.random() * 800;
+    const y = Math.random() * 600;
+
+    const newCircle: ShapeState = {
+      id,
+      type: NodeType.CIRCLE,
+      name: 'Circle',
+      transform: {
+        x,
+        y,
+        width: 100,
+        height: 100,
+        rotation: 0,
+      },
+      style: {
+        backgroundColor: '#ADD8E6',
+        borderWidth: 1,
+        borderStyle: 'solid',
+        borderColor: '#87CEEB',
+        opacity: 1,
+        zIndex: 1,
+      },
+      props: {
+        // cornerRadius is rectangle-specific; set to 0 for circles for interface compliance
+        cornerRadius: 0,
+      },
+      parentId: null,
+      isLocked: false,
+      isVisible: true,
+      shapeType: 'circle',
+    };
+
+    this.store.addNode(newCircle);
+    this.store.setActive([id]);
+    console.log('圆形创建完成');
   }
 
   /**
