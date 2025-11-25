@@ -1,31 +1,7 @@
-import type { CSSProperties } from 'vue';
 import type { BaseNodeState } from '@/types/state';
 
 export abstract class CanvasNode {
   constructor(public state: BaseNodeState) {}
-
-  /**
-   * 核心方法：生成 Vue 组件所需的样式对象
-   * 对应 DOM 的 style 属性
-   */
-  getStyle(): CSSProperties {
-    const { transform, style } = this.state;
-    return {
-      position: 'absolute',
-      left: `${transform.x}px`,
-      top: `${transform.y}px`,
-      width: `${transform.width}px`,
-      height: `${transform.height}px`,
-      transform: `rotate(${transform.rotation}deg)`,
-      backgroundColor: style.backgroundColor,
-      borderWidth: `${style.borderWidth}px`,
-      borderStyle: style.borderStyle,
-      borderColor: style.borderColor,
-      opacity: style.opacity,
-      zIndex: style.zIndex,
-      display: this.state.isVisible ? 'block' : 'none',
-    };
-  }
 
   /**
    * 业务逻辑：移动
