@@ -114,6 +114,7 @@ handleMouseMove(e: MouseEvent) {
    * 处理节点鼠标按下事件 (选中)
    */
   handleNodeDown(e: MouseEvent, id: string) {
+
     // 1.阻止事件冒泡，避免触发画布的 handleMouseDown (导致取消选中)
     // 注意：在 Vue 中可以使用 @mousedown.stop，如果移到这里，需要手动调用
     // 但为了保持"Vue仅转发"，建议在Vue层就 .stop，或者在这里调用 e.stopPropagation()
@@ -147,6 +148,14 @@ handleMouseMove(e: MouseEvent) {
 handleNodeMove(e: MouseEvent) {
   // 1. 非拖拽状态，直接返回
   if (!this.dragState.isDragging || !this.dragState.nodeId) return;
+
+
+
+  // 如果没有按住鼠标，强制结束拖拽****
+  if ((e.buttons & 1) === 0) {
+    this.handleNodeUp();
+    return;
+  }
 
   // 2. 获取视口状态（画布缩放/平移/网格配置）
   const viewport = this.store.viewport as ViewportState;

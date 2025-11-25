@@ -16,7 +16,7 @@
         :key="node!.id"
         :is="getComponentType(node!.type)"
         :node="node"
-        @mousedown="handleNodeDown($event, node!.id)"
+        @mousedown.stop="handleNodeDown($event, node!.id)"
       />
     </div>
 
