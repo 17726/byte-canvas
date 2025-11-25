@@ -6,7 +6,7 @@ import type { BaseNodeState } from '@/types/state';
 export const useCanvasStore = defineStore('canvas', () => {
   // 1. 核心数据
   // 使用 Record 存储，对应调研报告中的 "State/Node分离" 思想
-  const nodes = ref<Record<string, BaseNodeState>>({});
+   const nodes = ref<Record<string, BaseNodeState | undefined>>({});
   const nodeOrder = ref<string[]>([]); // 决定渲染顺序
   const version = ref(0); //脏标记计数器，可以理解为版本号，每次Node改动都要将其+1
   // 2. 视口状态 (应用在容器层，不传递给单个 Node)

@@ -1,6 +1,7 @@
 <template>
   <div class="node-rect" :style="style" :class="{ 'is-selected': isSelected }">
     <!-- 矩形内部可以有内容，或者只是纯色块 -->
+     
   </div>
 </template>
 
