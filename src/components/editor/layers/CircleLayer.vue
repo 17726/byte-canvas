@@ -37,7 +37,7 @@ const isSelected = computed(() => store.activeElementIds.has(props.node.id));
 .node-circle {
   /* 基础样式由 style 绑定控制 */
   box-sizing: border-box;
-  transition: all 0.2s ease;
+  transition: outline 0.2s, box-shadow 0.2s;
   /* 确保元素可以正确显示为圆形 */
   display: flex;
   align-items: center;
