@@ -23,7 +23,6 @@ const style = computed(() => {
   // 确保圆形样式：宽高相等，border-radius 为 50%
   return {
     ...baseStyle,
-    borderRadius: '50%',
     // 防止宽高不一致
     width: baseStyle.width,
     height: baseStyle.width, // 使用宽度作为基准，确保宽高相等
