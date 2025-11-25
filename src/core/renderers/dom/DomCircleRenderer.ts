@@ -46,6 +46,6 @@ export class DomCircleRenderer implements INodeRenderer<CSSProperties> {
 
       // --- 交互属性 ---
       display: node.isVisible ? 'block' : 'none',
-    }
+    };
   }
 }
