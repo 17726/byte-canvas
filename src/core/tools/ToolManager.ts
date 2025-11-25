@@ -1,5 +1,5 @@
 import { useCanvasStore } from '@/store/canvasStore';
-import { NodeType, type ShapeState } from '@/types/state';
+import { NodeType, type ShapeState,type TextState } from '@/types/state';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
@@ -169,15 +169,16 @@ export class ToolManager {
    * 业务逻辑：创建文本
    */
   createText() {
+
     const id = uuidv4();
     // 随机位置
     const x = Math.random() * 800;
     const y = Math.random() * 600;
 
-    const newRect: ShapeState = {
+    const newText: TextState = {
       id,
-      type: NodeType.RECT,
-      name: 'Rectangle',
+      type: NodeType.TEXT,
+      name: 'Text',
       transform: {
         x,
         y,
@@ -187,23 +188,28 @@ export class ToolManager {
       },
       style: {
         backgroundColor: '#fff0',
-        borderWidth: 1,
-        borderStyle: 'dashed',
-        borderColor: '#ff4d4f',
+        borderWidth: 2,
+        borderStyle: 'solid',
+        borderColor: '#fff0', //边框透明
         opacity: 1,
         zIndex: 1,
       },
       props: {
-        cornerRadius: 0,
+        content: "这里采用了vue绑定,内容会响应式改变.但编辑功能暂时没实现,mvp版本中先写死",
+        fontFamily: 'Segoe UI',
+        fontSize: 16,
+        fontWeight: 400, // B (加粗)
+        fontStyle: 'normal' , // I (斜体)
+        color: '#0000',
       },
       parentId: null,
       isLocked: false,
       isVisible: true,
-      shapeType: 'rect',
     };
 
-    this.store.addNode(newRect);
+    this.store.addNode(newText);
     this.store.setActive([id]);
+    console.log('文本创建完成');
   }
 
   /**

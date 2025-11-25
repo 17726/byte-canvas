@@ -19,7 +19,7 @@ export class DomTextRenderer implements INodeRenderer<CSSProperties> {
     // 我们确信传入给 RectRenderer 的一定是 ShapeState，所以强制告诉 TS "相信我"
     // 这样我们才能访问 props.cornerRadius 等特有属性
     const shape = node as TextState;
-    const { transform, style } = shape;
+    const { transform, style,props } = shape;
     // 2. 样式映射 (Mapping)
     return {
       // --- 布局属性 ---
@@ -33,12 +33,22 @@ export class DomTextRenderer implements INodeRenderer<CSSProperties> {
       transform: `rotate(${transform.rotation}deg)`,
 
       // --- 外观属性 ---
-      backgroundColor: style.backgroundColor,
+      backgroundColor: style.backgroundColor || '#fff0',
       borderWidth: `${style.borderWidth}px`,
       borderStyle: style.borderStyle,
       borderColor: style.borderColor,
       opacity: style.opacity,
       zIndex: style.zIndex,
+
+      // 文本相关CSS变量
+      '--text-content':props.content, //css不能设置文本内容只能设置样式 这里没用 后面开发编辑功能再改
+      '--font-family':props.fontFamily,
+      '--text-size': props.fontSize,
+      '--font-weight':props.fontWeight,
+      '--font-style':props.fontStyle,
+      '--text-color': props.color || '#000000',
+      '--line-height': 1.6,
+      '--text-scale': 1
 
       // --- 交互属性 ---
       // 这里的 display 控制显隐

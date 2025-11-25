@@ -1,24 +1,20 @@
 <template>
   <!-- 透明矩形内部写文字，即文本框 -->
   <div class="textBox" :style="style" :class="{ 'is-selected': isSelected } " >
-        <!-- 文本本身 -->
-        <div class="container-text">
-          <h3>响应式简单文本</h3>
-          <p>这段文本的样式由CSS变量控制，而这些变量将会根据容器尺寸和用户设置动态变化。</p>
-      </div>
+    {{node.props.content}}
   </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue';
-import type { ShapeState } from '@/types/state';
+import type { TextState } from '@/types/state';
 import { useCanvasStore } from '@/store/canvasStore';
 import { getDomStyle } from '@/core/renderers/dom';
 
 
 
 const props = defineProps<{
-  node: ShapeState;
+  node: TextState;
 }>();
 
 const store = useCanvasStore();
@@ -47,11 +43,6 @@ const isSelected = computed(() => store.activeElementIds.has(props.node.id));
   min-height: 80px;
   min-width: 150px;
   background: transparent;
-
-  /* 文本样式 */
-  font-size: calc(var(--text-size) * var(--text-scale));
-  color: var(--text-color);
-  line-height: var(--line-height);
 
   /* 布局样式 */
   box-sizing: border-box;
