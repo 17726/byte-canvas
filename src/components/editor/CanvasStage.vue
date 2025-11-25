@@ -34,6 +34,8 @@ import { useCanvasStore } from '@/store/canvasStore';
 import { NodeType } from '@/types/state';
 import RectLayer from './layers/RectLayer.vue';
 import TextLayer from './layers/TextLayer.vue';
+import CircleLayer from './layers/CircleLayer.vue';
+// import TextLayer from './layers/TextLayer.vue';
 import { ToolManager } from '@/core/tools/ToolManager';
 
 const store = useCanvasStore();
@@ -55,6 +57,8 @@ const getComponentType = (type: NodeType) => {
       return RectLayer; // 暂时用 Rect 代替
     case NodeType.TEXT:
       return TextLayer;
+      return CircleLayer;
+    // case NodeType.TEXT: return TextLayer;
     default:
       return 'div';
   }

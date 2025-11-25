@@ -3,11 +3,14 @@ import type { BaseNodeState } from '@/types/state';
 import { NodeType } from '@/types/state';
 import { DomRectRenderer } from './DomRectRenderer';
 import { DomTextRenderer } from './DomTextRenderer';
+import { DomCircleRenderer } from './DomCircleRenderer';
 
 // 【单例模式】
 // 实例化渲染器缓存起来，避免每次渲染都 new 一个新对象，提升性能
 const rectRenderer = new DomRectRenderer();
 const textRenderer=new DomTextRenderer();
+const cirRenderer = new DomCircleRenderer();
+
 /**
  * 【工厂模式 - 分发中心】
  * 样式生成工厂函数
@@ -19,9 +22,9 @@ const textRenderer=new DomTextRenderer();
 export function getDomStyle(node: BaseNodeState): CSSProperties {
   switch (node.type) {
     case NodeType.RECT:
-    case NodeType.CIRCLE:
-      // MVP 阶段：圆形和矩形结构一致，复用同一个渲染器
       return rectRenderer.render(node);
+    case NodeType.CIRCLE:
+      return cirRenderer.render(node);
     // 未来扩展点：
     case NodeType.TEXT:
       return textRenderer.render(node);

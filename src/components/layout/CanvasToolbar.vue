@@ -2,9 +2,13 @@
   <div class="canvas-toolbar">
     <!-- 使用 Arco Design 按钮 -->
     <a-space>
-      <a-button type="primary" @click="addRect">
+      <a-button type="primary" shape="square" @click="addRect">
         <template #icon><icon-plus /></template>
         矩形
+      </a-button>
+      <a-button type="primary" shape="square" @click="addCircle">
+        <template #icon><icon-plus /></template>
+        圆形
       </a-button>
       <a-button type="primary" @click="addText">
         文本
@@ -34,12 +38,20 @@ const hasSelection = computed(() => store.activeElementIds.size > 0);
 
 // 添加矩形
 const addRect = () => {
+  console.log("矩形被点击");
   toolManager.createRect();
 };
 //添加文本
 const addText = () => {
   toolManager.createText();
 };
+
+// 添加圆形
+const addCircle = () => {
+  console.log("圆被点击");
+  toolManager.createCircle();
+};
+
 // 删除选中
 const deleteSelected = () => {
   toolManager.deleteSelected();
