@@ -22,7 +22,6 @@ export function getDomStyle(node: BaseNodeState): CSSProperties {
     case NodeType.RECT:
       return rectRenderer.render(node);
     case NodeType.CIRCLE:
-      // MVP 阶段：圆形和矩形结构一致，复用同一个渲染器
       return cirRenderer.render(node);
     // 未来扩展点：
     // case NodeType.TEXT: return textRenderer.render(node);
