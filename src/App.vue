@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import CanvasStage from '@/components/editor/CanvasStage.vue';
-// import CanvasToolbar from '@/components/layout/CanvasToolbar.vue';
 import CanvasHeader from '@/components/layout/CanvasHeader.vue';
 import CanvasToolbar2 from '@/components/layout/CanvasToolbar2.vue';
 </script>
@@ -8,10 +7,14 @@ import CanvasToolbar2 from '@/components/layout/CanvasToolbar2.vue';
 <template>
   <a-layout class="app-container">
 
+    <!-- 页头 -->
     <CanvasHeader />
 
+    <!-- 页面内容 -->
     <a-layout-content class="main-content">
+      <!-- 工具栏 -->
       <CanvasToolbar2/>
+      <!-- 画板组件 -->
       <CanvasStage />
     </a-layout-content>
   </a-layout>
