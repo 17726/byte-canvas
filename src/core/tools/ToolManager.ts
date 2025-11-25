@@ -1,5 +1,6 @@
 import { useCanvasStore } from '@/store/canvasStore';
-import { NodeType, type ShapeState ,type InternalDragState} from '@/types/state';
+import { NodeType, type ShapeState } from '@/types/state';
+import type { InternalDragState } from '@/types/editor';
 import { v4 as uuidv4 } from 'uuid';
 import type { ViewportState } from '@/types/state';
 import { clientToWorld  } from '@/core/utils/geometry';
