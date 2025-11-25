@@ -12,7 +12,7 @@ const rectRenderer = new DomRectRenderer();
  * 样式生成工厂函数
  * * 职责：根据节点类型 (NodeType)，自动分发给对应的渲染器去处理。
  * 视图层 (Vue) 只需要调用这个函数，不需要知道具体用了哪个 Renderer 类。
- * * @param node 节点数据
+ * @param node 节点数据
  * @returns 计算好的 CSS 样式对象
  */
 export function getDomStyle(node: BaseNodeState): CSSProperties {
