@@ -16,6 +16,7 @@
         删除
       </a-button>
     </a-space>
+    <PropertyPanel></PropertyPanel>
   </div>
 </template>
 
@@ -24,7 +25,7 @@ import { computed } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
 import { IconPlus, IconDelete } from '@arco-design/web-vue/es/icon';
 import { ToolManager } from '@/core/tools/ToolManager';
-
+import PropertyPanel from '@/components/layout/PropertyPanel.vue';
 const store = useCanvasStore();
 const toolManager = new ToolManager();
 
