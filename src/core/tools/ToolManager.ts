@@ -1,26 +1,6 @@
 import { useCanvasStore } from '@/store/canvasStore';
-import { NodeType, type ShapeState } from '@/types/state';
+import { NodeType, type ShapeState, type ResizeHandle, type ResizeState } from '@/types/state';
 import { v4 as uuidv4 } from 'uuid';
-
-/**
- * 缩放控制点类型
- */
-export type ResizeHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
-
-/**
- * 缩放状态
- */
-interface ResizeState {
-  isResizing: boolean;
-  handle: ResizeHandle | null;
-  nodeId: string | null;
-  startX: number;
-  startY: number;
-  startWidth: number;
-  startHeight: number;
-  startNodeX: number;
-  startNodeY: number;
-}
 
 /**
  * 逻辑层：工具管理器

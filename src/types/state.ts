@@ -38,7 +38,6 @@ export interface BaseNodeState {
   parentId: string | null;
   isLocked: boolean;
   isVisible: boolean;
-
 }
 /** 画布（视口）状态：控制画布的平移、缩放、尺寸等全局操作 */
 export interface ViewportState {
@@ -57,6 +56,24 @@ export interface ViewportState {
   isGridVisible: boolean; // 是否显示网格
   gridSize: number; // 网格大小（px）
   isSnapToGrid: boolean; // 是否开启吸附到网格
+}
+
+/** 缩放控制点类型 */
+export type ResizeHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
+
+/**
+ * 缩放状态
+ */
+export interface ResizeState {
+  isResizing: boolean;
+  handle: ResizeHandle | null;
+  nodeId: string | null;
+  startX: number;
+  startY: number;
+  startWidth: number;
+  startHeight: number;
+  startNodeX: number;
+  startNodeY: number;
 }
 
 // 具体节点 State 类型
