@@ -151,6 +151,7 @@ export class ToolManager {
         zIndex: 1,
       },
       props: {
+        // cornerRadius is rectangle-specific; set to 0 for circles for interface compliance
         cornerRadius: 0,
       },
       parentId: null,
