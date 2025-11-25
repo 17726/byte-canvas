@@ -9,10 +9,8 @@
 <script setup lang="ts">
 import { computed, inject } from 'vue';
 import type { ShapeState } from '@/types/state';
-import { RectNode } from '@/core/nodes/RectNode';
 import { useCanvasStore } from '@/store/canvasStore';
-import ResizeHandles from '../ResizeHandles.vue';
-import { ToolManager, type ResizeHandle } from '@/core/tools/ToolManager';
+import { getDomStyle } from '@/core/renderers/dom';
 
 const props = defineProps<{
   node: ShapeState;
@@ -22,12 +20,8 @@ const store = useCanvasStore();
 // 注入父组件提供的 toolManager 实例
 const toolManager = inject<ToolManager>('toolManager')!;
 
-// 实例化逻辑类 (注意：这里每次渲染都会 new，对于 MVP 来说性能可接受)
-// 优化方案：在 Store 中缓存 Node 实例，或者使用享元模式
-const nodeLogic = computed(() => new RectNode(props.node));
-
-// 获取样式
-const style = computed(() => nodeLogic.value.getStyle());
+// 获取样式 (使用策略模式分离的渲染器)
+const style = computed(() => getDomStyle(props.node));
 
 // 选中状态
 const isSelected = computed(() => store.activeElementIds.has(props.node.id));
