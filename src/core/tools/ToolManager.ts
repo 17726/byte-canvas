@@ -292,13 +292,15 @@ export class ToolManager {
       }
     }
 
-    // 更新节点的变换状态
-    node.transform.width = newWidth;
-    node.transform.height = newHeight;
-    node.transform.x = newX;
-    node.transform.y = newY;
-
-    // 触发版本更新
-    this.store.version++;
+    // 使用 updateNode 方法更新节点的变换状态
+    this.store.updateNode(nodeId, {
+      transform: {
+        ...node.transform,
+        width: newWidth,
+        height: newHeight,
+        x: newX,
+        y: newY,
+      },
+    });
   }
 }

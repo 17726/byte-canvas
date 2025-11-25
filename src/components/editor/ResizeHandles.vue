@@ -11,7 +11,7 @@
 </template>
 
 <script setup lang="ts">
-import type { ResizeHandle } from '@/core/tools/ToolManager';
+import type { ResizeHandle } from '@/types/state';
 
 /**
  * 缩放控制点组件

@@ -11,7 +11,8 @@ import { computed, inject } from 'vue';
 import type { ShapeState } from '@/types/state';
 import { useCanvasStore } from '@/store/canvasStore';
 import { getDomStyle } from '@/core/renderers/dom';
-import { ToolManager, type ResizeHandle } from '@/core/tools/ToolManager';
+import { ToolManager } from '@/core/tools/ToolManager';
+import type { ResizeHandle } from '@/types/state';
 import ResizeHandles from '../ResizeHandles.vue';
 
 const props = defineProps<{
