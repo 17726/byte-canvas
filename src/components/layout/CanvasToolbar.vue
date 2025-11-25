@@ -16,6 +16,8 @@
         删除
       </a-button>
     </a-space>
+  </div>
+  <div class="property-panel">
     <PropertyPanel></PropertyPanel>
   </div>
 </template>
@@ -49,5 +51,8 @@ const deleteSelected = () => {
   /* 移除阴影和背景，使其融入 Header */
   background: transparent;
   border-radius: 4px;
+}
+.property-panel {
+  padding: 4px;
 }
 </style>
