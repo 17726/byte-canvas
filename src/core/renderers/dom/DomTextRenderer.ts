@@ -4,7 +4,7 @@ import type { BaseNodeState, TextState } from '@/types/state';
 
 /**
  * 【策略模式 - 具体策略】
- * 矩形/圆形 DOM 渲染器
+ * 文本 DOM 渲染器
  * * 职责：
  * 1. 充当“翻译官”：将 Store 中的几何数据 (x, y, color) 翻译成 Vue 能用的 CSS 样式。
  * 2. 实现数据解耦：Vue 组件不需要知道数据怎么变样式，只管应用这个样式。
@@ -16,8 +16,8 @@ export class DomTextRenderer implements INodeRenderer<CSSProperties> {
    */
   render(node: BaseNodeState): CSSProperties {
     // 1. 类型断言 (Type Assertion)
-    // 我们确信传入给 RectRenderer 的一定是 ShapeState，所以强制告诉 TS "相信我"
-    // 这样我们才能访问 props.cornerRadius 等特有属性
+    // 我们确信传入给 TextRenderer 的一定是 TextState，所以强制告诉 TS "相信我"
+    // 这样我们才能访问 props.content、props.fontFamily 等特有属性
     const shape = node as TextState;
     const { transform, style,props } = shape;
     // 2. 样式映射 (Mapping)
@@ -41,13 +41,12 @@ export class DomTextRenderer implements INodeRenderer<CSSProperties> {
       zIndex: style.zIndex,
 
       // 文本相关CSS变量
-      '--text-content':props.content, //css不能设置文本内容只能设置样式 这里没用 后面开发编辑功能再改
-      '--font-family':props.fontFamily,
-      '--text-size': props.fontSize,
-      '--font-weight':props.fontWeight,
-      '--font-style':props.fontStyle,
-      '--text-color': props.color || '#0000',
-      '--line-height': 1.6,
+      '--font-family':props.fontFamily || 'sans-serif',
+      '--text-size': `${props.fontSize || 16}px` ,
+      '--font-weight':props.fontWeight || 'normal',
+      '--font-style':props.fontStyle || 'normal',
+      '--text-color': props.color || '#000000',
+      '--line-height': props.lineHeight || 1.6,
       '--text-scale': 1
 
       // --- 交互属性 ---
