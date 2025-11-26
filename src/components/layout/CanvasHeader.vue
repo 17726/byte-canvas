@@ -22,6 +22,6 @@
 .extra{
   width: 100px;
   height: 100%;
-  border-style:dotted;
+  border-style: dotted;
 }
 </style>
