@@ -51,7 +51,7 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { IconPlus, IconEdit, IconImage, IconDelete } from '@arco-design/web-vue/es/icon';
-import { Square , Round } from '@icon-park/vue-next';
+import { Square, Round } from '@icon-park/vue-next';
 import { useCanvasStore } from '@/store/canvasStore';
 import { ToolManager } from '@/core/tools/ToolManager';
 import { Notification } from '@arco-design/web-vue';
