@@ -115,12 +115,18 @@ export class ToolManager {
   handleMouseUp() {
     // 重置画布平移状态
     this.isPanDragging = false;
+
     // 重置节点拖拽状态
-    this.handleNodeUp();
+    this.dragState.isDragging = false;
+    this.dragState.type = null;
+    this.dragState.nodeId = '';
+
     // 重置缩放状态
     this.resizeState.isResizing = false;
     this.resizeState.handle = null;
     this.resizeState.nodeId = null;
+
+    // 统一解除交互锁
     this.store.isInteracting = false;
   }
 
@@ -367,7 +373,240 @@ export class ToolManager {
     let newX = startNodeX;
     let newY = startNodeY;
 
-    // 根据不同的控制点计算新的尺寸和位置
+    // 根据节点类型选择不同的缩放策略
+    switch (node.type) {
+      case NodeType.CIRCLE:
+        // 圆形：等比缩放，保持宽高相等
+        this.resizeCircle(handle, dx, dy, startWidth, startNodeX, startNodeY, (result) => {
+          newWidth = result.width;
+          newHeight = result.height;
+          newX = result.x;
+          newY = result.y;
+        });
+        break;
+
+      case NodeType.RECT:
+        // 矩形：独立缩放宽高
+        this.resizeRect(
+          handle,
+          dx,
+          dy,
+          startWidth,
+          startHeight,
+          startNodeX,
+          startNodeY,
+          (result) => {
+            newWidth = result.width;
+            newHeight = result.height;
+            newX = result.x;
+            newY = result.y;
+          }
+        );
+        break;
+
+      case NodeType.IMAGE:
+        // 图片：等比缩放（保持宽高比）
+        // TODO: 实现图片等比缩放逻辑
+        this.resizeRect(
+          handle,
+          dx,
+          dy,
+          startWidth,
+          startHeight,
+          startNodeX,
+          startNodeY,
+          (result) => {
+            newWidth = result.width;
+            newHeight = result.height;
+            newX = result.x;
+            newY = result.y;
+          }
+        );
+        break;
+
+      case NodeType.TEXT:
+        // 文本：可能需要特殊处理（如只改变容器大小，不缩放字体）
+        // TODO: 实现文本缩放逻辑
+        this.resizeRect(
+          handle,
+          dx,
+          dy,
+          startWidth,
+          startHeight,
+          startNodeX,
+          startNodeY,
+          (result) => {
+            newWidth = result.width;
+            newHeight = result.height;
+            newX = result.x;
+            newY = result.y;
+          }
+        );
+        break;
+
+      case NodeType.GROUP:
+        // 组合：等比缩放所有子元素
+        // TODO: 实现组合缩放逻辑
+        this.resizeRect(
+          handle,
+          dx,
+          dy,
+          startWidth,
+          startHeight,
+          startNodeX,
+          startNodeY,
+          (result) => {
+            newWidth = result.width;
+            newHeight = result.height;
+            newX = result.x;
+            newY = result.y;
+          }
+        );
+        break;
+
+      default:
+        // 默认使用矩形缩放逻辑
+        this.resizeRect(
+          handle,
+          dx,
+          dy,
+          startWidth,
+          startHeight,
+          startNodeX,
+          startNodeY,
+          (result) => {
+            newWidth = result.width;
+            newHeight = result.height;
+            newX = result.x;
+            newY = result.y;
+          }
+        );
+        break;
+    }
+
+    // 限制最小尺寸
+    const minSize = 20;
+    if (node.type === NodeType.CIRCLE) {
+      // 圆形：宽高同时限制
+      if (newWidth < minSize) {
+        const delta = startWidth - minSize;
+        newWidth = minSize;
+        newHeight = minSize;
+        if (handle.includes('w')) {
+          newX = startNodeX + delta;
+        }
+        if (handle.includes('n')) {
+          newY = startNodeY + delta;
+        }
+      }
+    } else {
+      // 矩形：独立限制宽高
+      if (newWidth < minSize) {
+        newWidth = minSize;
+        if (handle.includes('w')) {
+          newX = startNodeX + startWidth - minSize;
+        }
+      }
+      if (newHeight < minSize) {
+        newHeight = minSize;
+        if (handle.includes('n')) {
+          newY = startNodeY + startHeight - minSize;
+        }
+      }
+    }
+
+    // 使用 updateNode 方法更新节点的变换状态
+    this.store.updateNode(nodeId, {
+      transform: {
+        ...node.transform,
+        width: newWidth,
+        height: newHeight,
+        x: newX,
+        y: newY,
+      },
+    });
+  }
+
+  /**
+   * 圆形缩放计算（等比缩放）
+   */
+  private resizeCircle(
+    handle: ResizeHandle,
+    dx: number,
+    dy: number,
+    startWidth: number,
+    startNodeX: number,
+    startNodeY: number,
+    callback: (result: { width: number; height: number; x: number; y: number }) => void
+  ) {
+    let delta = 0;
+
+    // 根据控制点方向选择主要的移动距离
+    switch (handle) {
+      case 'nw': // 左上：取平均值
+        delta = -(dx + dy) / 2;
+        break;
+      case 'n': // 上：使用垂直距离
+        delta = -dy;
+        break;
+      case 'ne': // 右上：取平均值
+        delta = (dx - dy) / 2;
+        break;
+      case 'e': // 右：使用水平距离
+        delta = dx;
+        break;
+      case 'se': // 右下：取平均值
+        delta = (dx + dy) / 2;
+        break;
+      case 's': // 下：使用垂直距离
+        delta = dy;
+        break;
+      case 'sw': // 左下：取平均值
+        delta = (-dx + dy) / 2;
+        break;
+      case 'w': // 左：使用水平距离
+        delta = -dx;
+        break;
+    }
+
+    const newWidth = startWidth + delta * 2; // 直径变化
+    let newX = startNodeX;
+    let newY = startNodeY;
+
+    // 根据控制点调整位置（保持对边固定）
+    if (handle.includes('w')) {
+      newX = startNodeX - delta;
+    }
+    if (handle.includes('n')) {
+      newY = startNodeY - delta;
+    }
+
+    callback({
+      width: newWidth,
+      height: newWidth, // 保持宽高相等
+      x: newX,
+      y: newY,
+    });
+  }
+
+  /**
+   * 矩形缩放计算（独立缩放宽高）
+   */
+  private resizeRect(
+    handle: ResizeHandle,
+    dx: number,
+    dy: number,
+    startWidth: number,
+    startHeight: number,
+    startNodeX: number,
+    startNodeY: number,
+    callback: (result: { width: number; height: number; x: number; y: number }) => void
+  ) {
+    let newWidth = startWidth;
+    let newHeight = startHeight;
+    let newX = startNodeX;
+    let newY = startNodeY;
+
     switch (handle) {
       case 'nw': // 左上
         newWidth = startWidth - dx;
@@ -405,32 +644,11 @@ export class ToolManager {
         break;
     }
 
-    // 限制最小尺寸
-    const minSize = 20;
-    if (newWidth < minSize) {
-      newWidth = minSize;
-      // 如果是从左侧或左上、左下拖动，需要调整位置
-      if (handle.includes('w')) {
-        newX = startNodeX + startWidth - minSize;
-      }
-    }
-    if (newHeight < minSize) {
-      newHeight = minSize;
-      // 如果是从上侧或左上、右上拖动，需要调整位置
-      if (handle.includes('n')) {
-        newY = startNodeY + startHeight - minSize;
-      }
-    }
-
-    // 使用 updateNode 方法更新节点的变换状态
-    this.store.updateNode(nodeId, {
-      transform: {
-        ...node.transform,
-        width: newWidth,
-        height: newHeight,
-        x: newX,
-        y: newY,
-      },
+    callback({
+      width: newWidth,
+      height: newHeight,
+      x: newX,
+      y: newY,
     });
   }
 }
