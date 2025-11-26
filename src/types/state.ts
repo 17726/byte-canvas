@@ -24,6 +24,7 @@ export interface StyleState {
   borderColor: string; // 边框色
   opacity: number; // 透明度
   zIndex: number; // 层级
+  color?: string;// 文本颜色
 }
 
 /** 节点数据基类（核心） */

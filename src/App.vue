@@ -18,7 +18,6 @@ import CanvasToolbar2 from '@/components/layout/CanvasToolbar2.vue';
       <CanvasStage />
     </a-layout-content>
   </a-layout>
-
 </template>
 
 <style scoped>
