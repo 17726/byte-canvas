@@ -2,11 +2,13 @@ import type { CSSProperties } from 'vue';
 import type { BaseNodeState } from '@/types/state';
 import { NodeType } from '@/types/state';
 import { DomRectRenderer } from './DomRectRenderer';
+import { DomTextRenderer } from './DomTextRenderer';
 import { DomCircleRenderer } from './DomCircleRenderer';
 
 // 【单例模式】
 // 实例化渲染器缓存起来，避免每次渲染都 new 一个新对象，提升性能
 const rectRenderer = new DomRectRenderer();
+const textRenderer=new DomTextRenderer();
 const cirRenderer = new DomCircleRenderer();
 
 /**
@@ -24,7 +26,8 @@ export function getDomStyle(node: BaseNodeState): CSSProperties {
     case NodeType.CIRCLE:
       return cirRenderer.render(node);
     // 未来扩展点：
-    // case NodeType.TEXT: return textRenderer.render(node);
+    case NodeType.TEXT:
+      return textRenderer.render(node);
     // case NodeType.IMAGE: return imageRenderer.render(node);
     default:
       // 【Fail Fast 机制】
