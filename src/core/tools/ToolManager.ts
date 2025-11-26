@@ -1,5 +1,5 @@
 import { useCanvasStore } from '@/store/canvasStore';
-import { NodeType, type BaseNodeState, type ShapeState } from '@/types/state';
+import { NodeType, type BaseNodeState, type ShapeState, type TextState } from '@/types/state';
 import type { InternalDragState } from '@/types/editor';
 import { v4 as uuidv4 } from 'uuid';
 import type { ViewportState } from '@/types/state';
@@ -288,6 +288,54 @@ export class ToolManager {
     this.store.addNode(newCircle);
     this.store.setActive([id]);
     console.log('圆形创建完成');
+  }
+
+  /**
+   * 业务逻辑：创建文本
+   */
+  createText() {
+    const id = uuidv4();
+    // 随机位置
+    const x = Math.random() * 800;
+    const y = Math.random() * 600;
+
+    const newText: TextState = {
+      id,
+      type: NodeType.TEXT,
+      name: 'Text',
+      transform: {
+        x,
+        y,
+        width: 100,
+        height: 100,
+        rotation: 0,
+      },
+      style: {
+        backgroundColor: '#fff0', //背景色
+        borderWidth: 2,
+        borderStyle: 'solid',
+        borderColor: '#fff0', //边框透明
+        opacity: 1,
+        zIndex: 1,
+      },
+      props: {
+        content:
+          '这里采用了vue绑定，修改这里，内容会响应式改变。但编辑功能暂时没实现，mvp版本中先写死。',
+        fontFamily: 'Segoe UI',
+        fontSize: 16,
+        fontWeight: 400, // B (加粗)
+        fontStyle: 'normal', // I (斜体)
+        color: '#000',
+        lineHeight: 1.6,
+      },
+      parentId: null,
+      isLocked: false,
+      isVisible: true,
+    };
+
+    this.store.addNode(newText);
+    this.store.setActive([id]);
+    console.log('文本创建完成');
   }
 
   /**

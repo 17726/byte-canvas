@@ -3,8 +3,8 @@
 <template>
   <a-space direction="vertical" size="large">
     <a-space>
-      <a-color-picker  @change="fillColorChange" v-model="fillColor" disabledAlpha/>
-      <a-color-picker  @change="viceColorChange" v-model="viceColor" disabledAlpha/>
+      <a-color-picker  @change="fillColorChange" v-model="fillColor" />
+      <a-color-picker  @change="viceColorChange" v-model="viceColor" />
       <a-input-number value = "x" :disabled="!hasSelection" v-model="x" :style="{width:'80px'}" placeholder="X" class="input-demo"/>
       <a-input-number value = "y" :disabled="!hasSelection" v-model="y" :style="{width:'80px'}" placeholder="Y" class="input-demo"/>
       <a-button-group>
@@ -21,8 +21,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
 import { useCanvasStore } from '@/store/canvasStore'
+import { computed, ref, watch } from 'vue'
 const canvasStore = useCanvasStore()
   const fillColor = ref('#ffccc7')
   const viceColor = ref('#ff4d4f')
@@ -45,21 +45,12 @@ const canvasStore = useCanvasStore()
   const viceColorChange = (val: string) => {
     canvasStore.activeElements.forEach(element => {
       if (element && element.id && element.style) {
-        if(element.type === 'rect' || element.type === 'circle'){
           canvasStore.updateNode(element.id, {
             style: {
               ...element.style,
               borderColor: val
             }
           });
-        }else{
-          canvasStore.updateNode(element.id, {
-            style: {
-              ...element.style,
-              color: val
-            }
-          });
-        }
       }
     });
   }
