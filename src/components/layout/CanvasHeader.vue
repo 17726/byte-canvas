@@ -19,7 +19,7 @@
 </script>
 
 <style scoped>
-.extra{
+.extra {
   width: 100px;
   height: 100%;
   border-style: dotted;
