@@ -67,7 +67,7 @@ enum MenuKey {
 const store = useCanvasStore();
 const hasSelection = computed(() => store.activeElementIds.size > 0);
 
-//元素控制底层组件
+// 元素控制底层组件
 const toolManager = new ToolManager();
 
 // 高亮控制
