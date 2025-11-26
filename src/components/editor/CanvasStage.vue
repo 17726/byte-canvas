@@ -35,7 +35,6 @@ import { NodeType } from '@/types/state';
 import RectLayer from './layers/RectLayer.vue';
 import TextLayer from './layers/TextLayer.vue';
 import CircleLayer from './layers/CircleLayer.vue';
-// import TextLayer from './layers/TextLayer.vue';
 import { ToolManager } from '@/core/tools/ToolManager';
 
 const store = useCanvasStore();

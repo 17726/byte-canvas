@@ -40,15 +40,13 @@ export class DomTextRenderer implements INodeRenderer<CSSProperties> {
       opacity: style.opacity,
       zIndex: style.zIndex,
 
-      // 文本相关CSS变量
-      '--text-content':props.content, //css不能设置文本内容只能设置样式 这里没用 后面开发编辑功能再改
-      '--font-family':props.fontFamily,
-      '--text-size': props.fontSize,
-      '--font-weight':props.fontWeight,
-      '--font-style':props.fontStyle,
-      '--text-color': props.color || '#0000',
-      '--line-height': 1.6,
-      '--text-scale': 1
+      // 文本相关样式
+      fontFamily: props.fontFamily,
+      fontSize: `${props.fontSize}px`,
+      fontWeight: props.fontWeight,
+      fontStyle: props.fontStyle,
+      color: props.color || '#000',
+      lineHeight: 1.6
 
       // --- 交互属性 ---
       // 这里的 display 控制显隐

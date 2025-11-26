@@ -44,7 +44,7 @@ const canvasStore = useCanvasStore()
   }
   const viceColorChange = (val: string) => {
     canvasStore.activeElements.forEach(element => {
-      if (element && element.id && element.style) {
+      if (element && element.id) {
         if(element.type === 'rect' || element.type === 'circle'){
           canvasStore.updateNode(element.id, {
             style: {
@@ -52,10 +52,11 @@ const canvasStore = useCanvasStore()
               borderColor: val
             }
           });
-        }else{
+        } else if (element.type === 'text') {
+          // For text elements, update the color in props
           canvasStore.updateNode(element.id, {
-            style: {
-              ...element.style,
+            props: {
+              ...(element as any).props,
               color: val
             }
           });
@@ -133,10 +134,11 @@ const canvasStore = useCanvasStore()
             if (firstElement.style.borderColor) {
               viceColor.value = firstElement.style.borderColor;
             }
-          } else {
-            // 其他元素（如文本）使用文字颜色
-            if (firstElement.style.color) {
-              viceColor.value = firstElement.style.color;
+          } else if (firstElement.type === 'text') {
+            // 文本元素使用 props.color
+            const textElement = firstElement as any;
+            if (textElement.props && textElement.props.color) {
+              viceColor.value = textElement.props.color;
             }
           }
           if(firstElement.style.borderWidth){

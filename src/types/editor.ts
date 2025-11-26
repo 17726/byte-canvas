@@ -6,4 +6,4 @@ export interface InternalDragState {
   startMouseX: number;//拖拽起始时鼠标坐标
   startMouseY: number;
   startTransform: TransformState; // 拖拽起始的变换数据
-} 
+}
