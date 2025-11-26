@@ -81,7 +81,7 @@ const handleMouseUp = () => {
   toolManager.handleMouseUp();
 };
 
-// 4. 节点交互转发
+// 节点交互转发
 const handleNodeDown = (e: MouseEvent, id: string) => {
   // 注意：这里传入 e，以便 ToolManager 处理 stopPropagation 或其他逻辑
   toolManager.handleNodeDown(e, id);
