@@ -5,8 +5,9 @@
     <a-space>
       <a-color-picker  @change="fillColorChange" v-model="fillColor" />
       <a-color-picker  @change="viceColorChange" v-model="viceColor" />
-      <a-input-number value = "x" :disabled="!hasSelection" v-model="x" :style="{width:'80px'}" placeholder="X" class="input-demo"/>
-      <a-input-number value = "y" :disabled="!hasSelection" v-model="y" :style="{width:'80px'}" placeholder="Y" class="input-demo"/>
+      <!-- 使用 precision 属性控制显示精度，而不是修改底层数据 -->
+      <a-input-number value = "x" :disabled="!hasSelection" v-model="x" :precision="2" :style="{width:'80px'}" placeholder="X" class="input-demo"/>
+      <a-input-number value = "y" :disabled="!hasSelection" v-model="y" :precision="2" :style="{width:'80px'}" placeholder="Y" class="input-demo"/>
       <a-button-group>
       <a-button @click="moveLayerUp" type="primary">上移</a-button>
       <a-button @click="moveLayerDown" type="primary">下移</a-button>
