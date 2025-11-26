@@ -377,12 +377,21 @@ export class ToolManager {
     switch (node.type) {
       case NodeType.CIRCLE:
         // 圆形：等比缩放，保持宽高相等
-        this.resizeCircle(handle, dx, dy, startWidth, startNodeX, startNodeY, (result) => {
-          newWidth = result.width;
-          newHeight = result.height;
-          newX = result.x;
-          newY = result.y;
-        });
+        this.resizeCircle(
+          handle,
+          dx,
+          dy,
+          startWidth,
+          startHeight,
+          startNodeX,
+          startNodeY,
+          (result) => {
+            newWidth = result.width;
+            newHeight = result.height;
+            newX = result.x;
+            newY = result.y;
+          }
+        );
         break;
 
       case NodeType.RECT:
@@ -486,32 +495,18 @@ export class ToolManager {
 
     // 限制最小尺寸
     const minSize = 20;
-    if (node.type === NodeType.CIRCLE) {
-      // 圆形：宽高同时限制
-      if (newWidth < minSize) {
-        const delta = startWidth - minSize;
-        newWidth = minSize;
-        newHeight = minSize;
-        if (handle.includes('w')) {
-          newX = startNodeX + delta;
-        }
-        if (handle.includes('n')) {
-          newY = startNodeY + delta;
-        }
+
+    // 圆形和矩形都使用独立的宽高限制（因为圆形现在可以拉伸成椭圆）
+    if (newWidth < minSize) {
+      newWidth = minSize;
+      if (handle.includes('w')) {
+        newX = startNodeX + startWidth - minSize;
       }
-    } else {
-      // 矩形：独立限制宽高
-      if (newWidth < minSize) {
-        newWidth = minSize;
-        if (handle.includes('w')) {
-          newX = startNodeX + startWidth - minSize;
-        }
-      }
-      if (newHeight < minSize) {
-        newHeight = minSize;
-        if (handle.includes('n')) {
-          newY = startNodeY + startHeight - minSize;
-        }
+    }
+    if (newHeight < minSize) {
+      newHeight = minSize;
+      if (handle.includes('n')) {
+        newY = startNodeY + startHeight - minSize;
       }
     }
 
@@ -528,62 +523,79 @@ export class ToolManager {
   }
 
   /**
-   * 圆形缩放计算（等比缩放）
+   * 圆形缩放计算
+   * - 四个角（nw, ne, se, sw）：等比缩放，保持圆形
+   * - 四条边（n, e, s, w）：独立缩放宽高，可拉伸成椭圆
    */
   private resizeCircle(
     handle: ResizeHandle,
     dx: number,
     dy: number,
     startWidth: number,
+    startHeight: number,
     startNodeX: number,
     startNodeY: number,
     callback: (result: { width: number; height: number; x: number; y: number }) => void
   ) {
-    let delta = 0;
-
-    // 根据控制点方向选择主要的移动距离
-    switch (handle) {
-      case 'nw': // 左上：取平均值
-        delta = -(dx + dy) / 2;
-        break;
-      case 'n': // 上：使用垂直距离
-        delta = -dy;
-        break;
-      case 'ne': // 右上：取平均值
-        delta = (dx - dy) / 2;
-        break;
-      case 'e': // 右：使用水平距离
-        delta = dx;
-        break;
-      case 'se': // 右下：取平均值
-        delta = (dx + dy) / 2;
-        break;
-      case 's': // 下：使用垂直距离
-        delta = dy;
-        break;
-      case 'sw': // 左下：取平均值
-        delta = (-dx + dy) / 2;
-        break;
-      case 'w': // 左：使用水平距离
-        delta = -dx;
-        break;
-    }
-
-    const newWidth = startWidth + delta * 2; // 直径变化
+    let newWidth = startWidth;
+    let newHeight = startHeight;
     let newX = startNodeX;
     let newY = startNodeY;
 
-    // 根据控制点调整位置（保持对边固定）
-    if (handle.includes('w')) {
-      newX = startNodeX - delta;
-    }
-    if (handle.includes('n')) {
-      newY = startNodeY - delta;
+    // 判断是否为角点（等比缩放）还是边点（可拉伸）
+    const isCorner = handle.length === 2; // 'nw', 'ne', 'se', 'sw' 长度为2
+
+    if (isCorner) {
+      // 角点：等比缩放，保持圆形
+      let delta = 0;
+      switch (handle) {
+        case 'nw': // 左上：取平均值
+          delta = -(dx + dy) / 2;
+          break;
+        case 'ne': // 右上：取平均值
+          delta = (dx - dy) / 2;
+          break;
+        case 'se': // 右下：取平均值
+          delta = (dx + dy) / 2;
+          break;
+        case 'sw': // 左下：取平均值
+          delta = (-dx + dy) / 2;
+          break;
+      }
+
+      newWidth = startWidth + delta * 2;
+      newHeight = startHeight + delta * 2 * (startHeight / startWidth);
+
+      // 根据控制点调整位置
+      if (handle.includes('w')) {
+        newX = startNodeX - delta;
+      }
+      if (handle.includes('n')) {
+        newY = startNodeY - delta;
+      }
+    } else {
+      // 边点：独立缩放宽高，可拉伸成椭圆
+      switch (handle) {
+        case 'n': // 上：只改变高度
+          newHeight = startHeight - dy * 2;
+          newY = startNodeY + dy;
+          break;
+        case 'e': // 右：只改变宽度
+          newWidth = startWidth + dx * 2;
+          break;
+        case 's': // 下：只改变高度
+          newHeight = startHeight + dy * 2;
+          break;
+        case 'w': // 左：只改变宽度
+          newWidth = startWidth - dx * 2;
+          newX = startNodeX + dx;
+          break;
+      }
     }
 
     callback({
       width: newWidth,
-      height: newWidth, // 保持宽高相等
+      height: newHeight,
       x: newX,
       y: newY,
     });

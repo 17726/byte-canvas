@@ -27,12 +27,10 @@ const toolManager = inject<ToolManager>('toolManager')!;
 const style = computed(() => {
   const baseStyle = getDomStyle(props.node);
 
-  // 确保圆形样式：宽高相等，border-radius 为 50%
+  // 圆形样式：支持椭圆（宽高可以不同），border-radius 为 50%
   return {
     ...baseStyle,
-    // 防止宽高不一致
-    width: baseStyle.width,
-    height: baseStyle.width, // 使用宽度作为基准，确保宽高相等
+    // 允许宽高不同，可以拉伸成椭圆
   };
 });
 
