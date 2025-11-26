@@ -1,5 +1,5 @@
 import { useCanvasStore } from '@/store/canvasStore';
-import { NodeType, type BaseNodeState, type ShapeState } from '@/types/state';
+import { NodeType, type BaseNodeState, type ShapeState, type TextState } from '@/types/state';
 import type { InternalDragState, InternalResizeState } from '@/types/editor';
 import type { ResizeHandle } from '@/types/editor';
 import { v4 as uuidv4 } from 'uuid';

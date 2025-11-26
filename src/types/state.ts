@@ -97,6 +97,7 @@ export interface TextState extends BaseNodeState {
     fontWeight: string | number; // B (加粗)
     fontStyle: 'normal' | 'italic'; // I (斜体)
     color: string;
+    lineHeight: number;
   };
 }
 
