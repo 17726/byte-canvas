@@ -1,6 +1,7 @@
 import { useCanvasStore } from '@/store/canvasStore';
 import { NodeType, type BaseNodeState, type ShapeState } from '@/types/state';
-import type { InternalDragState } from '@/types/editor';
+import type { InternalDragState, InternalResizeState } from '@/types/editor';
+import type { ResizeHandle } from '@/types/editor';
 import { v4 as uuidv4 } from 'uuid';
 import type { ViewportState } from '@/types/state';
 import { clientToWorld } from '@/core/utils/geometry';
@@ -31,6 +32,18 @@ export class ToolManager {
       height: 0,
       rotation: 0,
     },
+  };
+
+  private resizeState: InternalResizeState = {
+    isResizing: false,
+    handle: null,
+    nodeId: null,
+    startX: 0,
+    startY: 0,
+    startWidth: 0,
+    startHeight: 0,
+    startNodeX: 0,
+    startNodeY: 0,
   };
 
   constructor() {
@@ -78,6 +91,11 @@ export class ToolManager {
       return;
     }
 
+    if (this.resizeState.isResizing) {
+      this.handleResizeMove(e);
+      return;
+    }
+
     // 其次处理画布平移
     if (this.isPanDragging) {
       const dx = e.clientX - this.lastPos.x;
@@ -99,6 +117,11 @@ export class ToolManager {
     this.isPanDragging = false;
     // 重置节点拖拽状态
     this.handleNodeUp();
+    // 重置缩放状态
+    this.resizeState.isResizing = false;
+    this.resizeState.handle = null;
+    this.resizeState.nodeId = null;
+    this.store.isInteracting = false;
   }
 
   /**
@@ -184,14 +207,9 @@ export class ToolManager {
    */
   handleNodeUp() {
     // 1. 重置拖拽状态
-    this.dragState = {
-      isDragging: false,
-      type: null,
-      nodeId: '',
-      startMouseX: 0,
-      startMouseY: 0,
-      startTransform: { x: 0, y: 0, width: 0, height: 0, rotation: 0 },
-    };
+    this.dragState.isDragging = false;
+    this.dragState.type = null;
+    this.dragState.nodeId = '';
 
     // 2. 解除交互锁
     this.store.isInteracting = false;
@@ -302,6 +320,9 @@ export class ToolManager {
     const node = this.store.nodes[nodeId];
     if (!node || node.isLocked) return;
 
+    // 标记交互中
+    this.store.isInteracting = true;
+
     this.resizeState = {
       isResizing: true,
       handle,
@@ -323,6 +344,15 @@ export class ToolManager {
       this.resizeState;
 
     if (!handle || !nodeId) return;
+
+    // 如果没有按住鼠标左键，强制结束缩放
+    if ((e.buttons & 1) === 0) {
+      this.resizeState.isResizing = false;
+      this.resizeState.handle = null;
+      this.resizeState.nodeId = null;
+      this.store.isInteracting = false;
+      return;
+    }
 
     const node = this.store.nodes[nodeId];
     if (!node) return;
