@@ -3,8 +3,8 @@
 <template>
   <a-space direction="vertical" size="large">
     <a-space>
-      <a-color-picker  @change="fillColorChange" v-model="fillColor" disabledAlpha/>
-      <a-color-picker  @change="viceColorChange" v-model="viceColor" disabledAlpha/>
+      <a-color-picker  @change="fillColorChange" v-model="fillColor" />
+      <a-color-picker  @change="viceColorChange" v-model="viceColor" />
       <a-input-number value = "x" :disabled="!hasSelection" v-model="x" :style="{width:'80px'}" placeholder="X" class="input-demo"/>
       <a-input-number value = "y" :disabled="!hasSelection" v-model="y" :style="{width:'80px'}" placeholder="Y" class="input-demo"/>
       <a-button-group>
@@ -14,7 +14,7 @@
       <a-button @click="toggleFontStrikethrough" type="primary" style="background-color: white;color: black;border: 0;">S</a-button>
       <a-button @click="setFontItalic" type="primary" style="background-color: white;color: black;border: 0;">I</a-button>
       <a-button @click="toggleFontUnderline" type="primary" style="background-color: white;color: black;border: 0;">U</a-button>
-      <a-input-number  @change="updateBorderWidth" v-model="activeStyleValue" :style="{width:'120px'}" placeholder="Please Enter" class="input-demo"/>
+      <a-input-number  @change="updateBorderWidth" v-model="activeStyleValue" :style="{width:'120px'}" placeholder="Please Enter" class="input-demo" :min="0"/>
       </a-button-group>
     </a-space>
   </a-space>
