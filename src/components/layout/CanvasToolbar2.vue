@@ -82,21 +82,25 @@ function onMenuItemClick(key: string) {
       console.log("矩形被点击");
       toolManager.createRect();
       selectedKeys.value = [key];
+      setTimeout(() => { selectedKeys.value = []; }, 200);
       break;
     case MenuKey.AddCircle:
       console.log("圆被点击");
       toolManager.createCircle();
       selectedKeys.value = [key];
+      setTimeout(() => { selectedKeys.value = []; }, 200);
       break;
     case MenuKey.AddText:
       console.log("文本被点击");
       toolManager.createText();
       selectedKeys.value = [key];
+      setTimeout(() => { selectedKeys.value = []; }, 200);
       break;
     case MenuKey.AddImage:
       console.log("照片被点击");
       // toolManager.createImage();
       selectedKeys.value = [key];
+      setTimeout(() => { selectedKeys.value = []; }, 200);
       break;
     case MenuKey.Delete:
       if (!hasSelection.value) return;
