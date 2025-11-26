@@ -48,6 +48,7 @@ const addRect = () => {
 };
 //添加文本
 const addText = () => {
+  console.log('文本被点击');
   toolManager.createText();
 };
 

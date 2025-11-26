@@ -33,7 +33,7 @@ export class DomTextRenderer implements INodeRenderer<CSSProperties> {
       transform: `rotate(${transform.rotation}deg)`,
 
       // --- 外观属性 ---
-      backgroundColor: style.backgroundColor || '#fff0',
+      backgroundColor: style.backgroundColor,
       borderWidth: `${style.borderWidth}px`,
       borderStyle: style.borderStyle,
       borderColor: style.borderColor,
@@ -46,7 +46,7 @@ export class DomTextRenderer implements INodeRenderer<CSSProperties> {
       '--text-size': props.fontSize,
       '--font-weight':props.fontWeight,
       '--font-style':props.fontStyle,
-      '--text-color': props.color || '#000000',
+      '--text-color': props.color || '#0000',
       '--line-height': 1.6,
       '--text-scale': 1
 
