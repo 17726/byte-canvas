@@ -3,8 +3,7 @@ import { NodeType, type BaseNodeState,type ShapeState } from '@/types/state';
 import type { InternalDragState } from '@/types/editor';
 import { v4 as uuidv4 } from 'uuid';
 import type { ViewportState } from '@/types/state';
-import { clientToWorld  } from '@/core/utils/geometry';
-  
+import { clientToWorld } from '@/core/utils/geometry';
 
 /**
  * 逻辑层：工具管理器
@@ -76,7 +75,7 @@ export class ToolManager {
   /**
    * 处理全局鼠标移动事件 (平移中)
    */
-handleMouseMove(e: MouseEvent) {
+  handleMouseMove(e: MouseEvent) {
     // 优先处理节点拖拽
     if (this.dragState.isDragging) {
       this.handleNodeMove(e); // 调用节点拖拽计算逻辑
@@ -118,7 +117,7 @@ handleMouseMove(e: MouseEvent) {
     // 1.阻止事件冒泡，避免触发画布的 handleMouseDown (导致取消选中)
     // 注意：在 Vue 中可以使用 @mousedown.stop，如果移到这里，需要手动调用
     // 但为了保持"Vue仅转发"，建议在Vue层就 .stop，或者在这里调用 e.stopPropagation()
-  e.stopPropagation();
+   e.stopPropagation();
   // 2. 基础选中逻辑（TODO: 后续扩展Shift/Ctrl多选）
    // TODO: 支持多选 (Shift/Ctrl)
   this.store.setActive([id]);
@@ -151,7 +150,7 @@ handleNodeMove(e: MouseEvent) {
 
 
 
-  // 如果没有按住鼠标，强制结束拖拽****
+  // 如果没有按住鼠标，强制结束拖拽
   if ((e.buttons & 1) === 0) {
     this.handleNodeUp();
     return;
@@ -174,17 +173,13 @@ handleNodeMove(e: MouseEvent) {
   let newX = this.dragState.startTransform.x + deltaX;
   let newY = this.dragState.startTransform.y + deltaY;
 
-  // 6. 网格吸附（可选，根据画布配置）
-/**
- *   // 6. 网格吸附（可选，根据画布配置）
-  if (viewport.isSnapToGrid) {
-    const snapped = snapToGrid(viewport, newX, newY);
-    newX = snapped.x;
-    newY = snapped.y;
-  }
- */
-
-
+  // TODO: Implement grid snapping logic here if viewport.isSnapToGrid is true.
+  // Example:
+  // if (viewport.isSnapToGrid) {
+  //   const snapped = snapToGrid(viewport, newX, newY);
+  //   newX = snapped.x;
+  //   newY = snapped.y;
+  // }
 
   // 7. 细粒度更新节点位置（触发响应式刷新）
   this.store.updateNode(this.dragState.nodeId, {
@@ -194,7 +189,6 @@ handleNodeMove(e: MouseEvent) {
 
 /**
  * 节点鼠标松开事件（重置拖拽状态）
- * @param e 鼠标事件对象
  */
 handleNodeUp() {
   // 1. 重置拖拽状态
@@ -208,7 +202,7 @@ handleNodeUp() {
   };
 
   // 2. 解除交互锁
-  this.store.isInteracting= false;
+  this.store.isInteracting = false;
 
   // 3. 可选：触发节点拖拽结束的钩子（如保存、日志）
   // this.emit('nodeDragEnd', e, this.dragState.nodeId);
