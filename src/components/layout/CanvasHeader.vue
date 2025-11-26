@@ -1,7 +1,7 @@
 <template>
   <div :style="{ background: 'var(--color-fill-2)' }">
     <a-page-header
-      :style="{ background: 'var(--color-bg-2)',paddingLeft:'15px' }"
+      :style="{ background: 'var(--color-bg-2)', paddingLeft:'15px' }"
       title="Byte Canvas"
       subtitle="无限画布"
       :show-back="false"
