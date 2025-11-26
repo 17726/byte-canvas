@@ -167,8 +167,8 @@ export class ToolManager {
     const deltaY = currentWorldPos.y - startWorldPos.y;
 
     // 5. 计算节点新位置（初始位置 + 偏移）
-    const newX = this.dragState.startTransform.x + deltaX;
-    const newY = this.dragState.startTransform.y + deltaY;
+    let newX = this.dragState.startTransform.x + deltaX;
+    let newY = this.dragState.startTransform.y + deltaY;
 
     // TODO: Implement grid snapping logic here if viewport.isSnapToGrid is true.
     // Example:
