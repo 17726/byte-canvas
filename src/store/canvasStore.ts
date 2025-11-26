@@ -39,6 +39,10 @@ export const useCanvasStore = defineStore('canvas', () => {
     return nodeOrder.value.map((id) => nodes.value[id]).filter(Boolean);
   });
 
+  const activeElements = computed(() => {
+    return Array.from(activeElementIds.value).map(id => nodes.value[id]).filter(Boolean);
+  });
+
   // Actions
   // 1. 更新节点
   function updateNode(id: string, patch: Partial<BaseNodeState>) {
@@ -86,6 +90,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     activeElementIds,
     isInteracting,
     renderList,
+    activeElements,
     updateNode,
     addNode,
     deleteNode,

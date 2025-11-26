@@ -24,6 +24,9 @@
       </a-button>
     </a-space>
   </div>
+  <div class="property-panel">
+    <PropertyPanel></PropertyPanel>
+  </div>
 </template>
 
 <script setup lang="ts">
@@ -32,6 +35,7 @@ import { useCanvasStore } from '@/store/canvasStore';
 import { IconDelete, IconPlus } from '@arco-design/web-vue/es/icon';
 import { computed } from 'vue';
 
+import PropertyPanel from '@/components/layout/PropertyPanel.vue';
 const store = useCanvasStore();
 const toolManager = new ToolManager();
 
@@ -66,5 +70,8 @@ const deleteSelected = () => {
   /* 移除阴影和背景，使其融入 Header */
   background: transparent;
   border-radius: 4px;
+}
+.property-panel {
+  padding: 4px;
 }
 </style>
