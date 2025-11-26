@@ -40,14 +40,21 @@
       </a-menu-item>
     </a-menu>
   </div>
+
+  <!-- 确认删除弹窗 -->
+  <a-modal v-model:visible="delModalVisible" @ok="onDeleteConfirm" @cancel="delModalVisible = false">
+    <template #title>确认删除</template>
+    <div>确定要删除选中的元素吗？</div>
+  </a-modal>
 </template>
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { IconPlus, IconEdit, IconImage, IconDelete } from '@arco-design/web-vue/es/icon';
 import { Square , Round } from '@icon-park/vue-next';
-import { useCanvasStore } from '@/store/canvasStore'
-import { ToolManager } from '@/core/tools/ToolManager'
+import { useCanvasStore } from '@/store/canvasStore';
+import { ToolManager } from '@/core/tools/ToolManager';
+import { Notification } from '@arco-design/web-vue';
 
 enum MenuKey {
   AddRect   = 'addRect',
@@ -60,9 +67,14 @@ enum MenuKey {
 const store = useCanvasStore();
 const hasSelection = computed(() => store.activeElementIds.size > 0);
 
+//元素控制底层组件
 const toolManager = new ToolManager();
 
+// 高亮控制
 const selectedKeys = ref<string[]>([]);
+
+//弹窗确认-弹窗开关
+const delModalVisible = ref(false)
 
 function onMenuItemClick(key: string) {
   switch (key) {
@@ -87,13 +99,24 @@ function onMenuItemClick(key: string) {
       selectedKeys.value = [key];
       break;
     case MenuKey.Delete:
-      toolManager.deleteSelected();
-      selectedKeys.value = [];
+      if (!hasSelection.value) return;
+      delModalVisible.value = true;
       break;
     default:
-      console.warn('未处理的菜单项: ${key}');
+      console.warn(`未处理的菜单项: ${key}`);
       break;
   }
+}
+
+function onDeleteConfirm() {
+  toolManager.deleteSelected();
+  Notification.success({
+    content: '删除成功！',
+    closable: true,
+    duration: 3000
+  });
+  selectedKeys.value = [];        // 清空选中状态
+  delModalVisible.value = false;  // 关闭弹窗
 }
 
 </script>
@@ -107,7 +130,7 @@ function onMenuItemClick(key: string) {
   left:0;
   top: 80px;
   pointer-events: none;
-  z-index:9999;
+  z-index:1002;
 }
 
 .tool-menu .arco-menu {
@@ -163,4 +186,5 @@ function onMenuItemClick(key: string) {
 :deep(.arco-menu-item[key="deleteSelected"].arco-menu-item-selected) {
   background-color: transparent !important;
 }
+
 </style>
