@@ -1,9 +1,15 @@
 <template>
   <!-- 使用 Arco Design 菜单 -->
-  <div class="ToolMenu">
-    <a-menu mode="pop" showCollapseButton :default-collapsed="true" @menu-item-click="onMenuItemClick">
+  <div class="tool-menu">
+    <a-menu
+      mode="pop"
+      showCollapseButton
+      :default-collapsed="true"
+      :selected-keys="selectedKeys"
+      @menu-item-click="onMenuItemClick"
+    >
       <!-- 元素创建列表 -->
-      <a-sub-menu key="addGraphics">
+      <a-sub-menu key="addGraphics" >
         <template #icon><icon-plus/></template>
         <template #title>图形</template>
         <!-- 创建矩形 -->
@@ -37,7 +43,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { ref, computed } from 'vue';
 import { IconPlus, IconEdit, IconImage, IconDelete } from '@arco-design/web-vue/es/icon';
 import { Square , Round } from '@icon-park/vue-next';
 import { useCanvasStore } from '@/store/canvasStore'
@@ -56,26 +62,36 @@ const hasSelection = computed(() => store.activeElementIds.size > 0);
 
 const toolManager = new ToolManager();
 
+const selectedKeys = ref<string[]>([]);
+
 function onMenuItemClick(key: string) {
   switch (key) {
     case MenuKey.AddRect:
       console.log("矩形被点击");
       toolManager.createRect();
+      selectedKeys.value = [key];
       break;
     case MenuKey.AddCircle:
       console.log("圆被点击");
       toolManager.createCircle();
+      selectedKeys.value = [key];
       break;
     case MenuKey.AddText:
       console.log("文本被点击");
-      // toolManager.createText();   // 需 core 层实现
+      toolManager.createText();
+      selectedKeys.value = [key];
       break;
     case MenuKey.AddImage:
       console.log("照片被点击");
-      // toolManager.createImage();  // 需 core 层实现
+      // toolManager.createImage();
+      selectedKeys.value = [key];
       break;
     case MenuKey.Delete:
       toolManager.deleteSelected();
+      selectedKeys.value = [];
+      break;
+    default:
+      console.warn('未处理的菜单项: ${key}');
       break;
   }
 }
@@ -83,36 +99,38 @@ function onMenuItemClick(key: string) {
 </script>
 
 <style scoped>
-.ToolMenu {
-  width: 100%;
-  height: 600px;
+.tool-menu {
+  width: 250px;
+  height: 500px;
   padding: 40px;
   position: fixed;
+  left:0;
+  top: 80px;
   pointer-events: none;
   z-index:9999;
 }
 
-.ToolMenu .arco-menu {
+.tool-menu .arco-menu {
   width: 150px;
-  height: 100%;
+  height: 400px;
   box-shadow: 0 0 1px rgba(0, 0, 0, 0.3);
   pointer-events: auto;
   border-radius: 22px 22px 0 22px;
 }
 
-.ToolMenu .arco-menu :deep(.arco-menu-collapse-button) {
+.tool-menu .arco-menu :deep(.arco-menu-collapse-button) {
   width: 32px;
   height: 32px;
   border-radius: 50%;
 }
 
-.ToolMenu .arco-menu:not(.arco-menu-collapsed) :deep(.arco-menu-collapse-button) {
+.tool-menu .arco-menu:not(.arco-menu-collapsed) :deep(.arco-menu-collapse-button) {
   right: 0;
   bottom: 8px;
   transform: translateX(50%);
 }
 
-.ToolMenu .arco-menu:not(.arco-menu-collapsed)::before {
+.tool-menu .arco-menu:not(.arco-menu-collapsed)::before {
   content: '';
   position: absolute;
   right: 0;
@@ -125,16 +143,24 @@ function onMenuItemClick(key: string) {
   transform: translateX(50%);
 }
 
-.ToolMenu .arco-menu.arco-menu-collapsed {
+.tool-menu .arco-menu.arco-menu-collapsed {
   width: 48px;
-  height: auto;
+  height: 400px;
   padding-top: 24px;
   padding-bottom: 138px;
   border-radius: 22px;
 }
 
-.ToolMenu .arco-menu.arco-menu-collapsed :deep(.arco-menu-collapse-button) {
+.tool-menu .arco-menu.arco-menu-collapsed :deep(.arco-menu-collapse-button) {
   right: 8px;
   bottom: 8px;
+}
+
+.tool-menu .arco-menu:not(.arco-menu-collapsed) :deep(.arco-menu-inner) {
+  padding-top: 28px;
+}
+
+:deep(.arco-menu-item[key="deleteSelected"].arco-menu-item-selected) {
+  background-color: transparent !important;
 }
 </style>
