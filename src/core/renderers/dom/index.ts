@@ -25,9 +25,9 @@ export function getDomStyle(node: BaseNodeState): CSSProperties {
       return rectRenderer.render(node);
     case NodeType.CIRCLE:
       return cirRenderer.render(node);
-    // 未来扩展点：
     case NodeType.TEXT:
       return textRenderer.render(node);
+    // 未来扩展点：
     // case NodeType.IMAGE: return imageRenderer.render(node);
     default:
       // 【Fail Fast 机制】
