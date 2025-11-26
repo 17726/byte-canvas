@@ -74,7 +74,7 @@ const toolManager = new ToolManager();
 const selectedKeys = ref<string[]>([]);
 
 // 弹窗确认-弹窗开关
-const delModalVisible = ref(false)
+const delModalVisible = ref(false);
 
 function onMenuItemClick(key: string) {
   switch (key) {
