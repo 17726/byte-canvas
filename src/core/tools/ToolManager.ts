@@ -112,6 +112,7 @@ export class ToolManager {
     if (e.ctrlKey || e.metaKey) {
       // Ctrl/Cmd + 点击：切换选中状态（多选模式）
       this.store.toggleSelection(id);
+      return;
     } else {
       // 普通点击：单选模式
       this.store.setActive([id]);
