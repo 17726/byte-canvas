@@ -54,11 +54,9 @@ const getComponentType = (type: NodeType) => {
     case NodeType.RECT:
       return RectLayer;
     case NodeType.CIRCLE:
-      return RectLayer; // 暂时用 Rect 代替
+      return CircleLayer; // 暂时用 Rect 代替
     case NodeType.TEXT:
       return TextLayer;
-      return CircleLayer;
-    // case NodeType.TEXT: return TextLayer;
     default:
       return 'div';
   }
