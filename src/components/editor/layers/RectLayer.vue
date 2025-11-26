@@ -28,6 +28,7 @@ const isSelected = computed(() => store.activeElementIds.has(props.node.id));
   /* 基础样式由 style 绑定控制 */
   box-sizing: border-box;
   transition: box-shadow 0.2s;
+  cursor: move; /* 显示四方箭头拖拽光标 */
 }
 
 .is-selected {
