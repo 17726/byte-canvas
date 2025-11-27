@@ -1,170 +1,250 @@
 <!-- 属性面板 -->
-
 <template>
-  <a-space direction="vertical" size="large">
-    <a-space>
-      <a-color-picker  @change="fillColorChange" v-model="fillColor" />
-      <a-color-picker  @change="viceColorChange" v-model="viceColor" />
-      <!-- 使用 precision 属性控制显示精度，而不是修改底层数据 -->
-      <a-input-number value = "x" :disabled="!hasSelection" v-model="x" :precision="2" :style="{width:'80px'}" placeholder="X" class="input-demo"/>
-      <a-input-number value = "y" :disabled="!hasSelection" v-model="y" :precision="2" :style="{width:'80px'}" placeholder="Y" class="input-demo"/>
-      <a-button-group>
-      <a-button @click="moveLayerUp" type="primary">上移</a-button>
-      <a-button @click="moveLayerDown" type="primary">下移</a-button>
-      <!-- TODO: 样式硬编码，以后可以提取为公共样式，并尽量用 UI 库原生的 props 或 theme 机制 -->
-      <a-button @click="toggleFontBold" type="primary" style="background-color: white;color: black;border: 0;">B</a-button>
-      <a-button @click="toggleFontStrikethrough" type="primary" style="background-color: white;color: black;border: 0;">S</a-button>
-      <a-button @click="setFontItalic" type="primary" style="background-color: white;color: black;border: 0;">I</a-button>
-      <a-button @click="toggleFontUnderline" type="primary" style="background-color: white;color: black;border: 0;">U</a-button>
-      <a-input-number  @change="updateBorderWidth" v-model="activeStyleValue" :style="{width:'120px'}" placeholder="Please Enter" class="input-demo"/>
+  <div class="property-panel">
+    <a-space direction="vertical" size="large" style="width: 100%">
+      <!-- 颜色设置区域 -->
+      <a-space>
+        <!-- 填充色/背景色 -->
+        <div class="color-item">
+          <span class="label">填充</span>
+          <a-color-picker v-model="fillColor" size="mini" show-text />
+        </div>
+        <!-- 边框色 -->
+        <div class="color-item">
+          <span class="label">描边</span>
+          <a-color-picker v-model="borderColor" size="mini" show-text />
+        </div>
+        <!-- 文本颜色 (仅文本节点显示) -->
+        <div class="color-item" v-if="isTextNode">
+          <span class="label">文字</span>
+          <a-color-picker v-model="textColor" size="mini" show-text />
+        </div>
+      </a-space>
+
+      <!-- 坐标与尺寸区域 -->
+      <a-space>
+        <a-input-number
+          v-model="x"
+          :disabled="!hasSelection"
+          :precision="2"
+          placeholder="X"
+          hide-button
+          class="input-coord"
+        >
+          <template #prefix>X</template>
+        </a-input-number>
+        <a-input-number
+          v-model="y"
+          :disabled="!hasSelection"
+          :precision="2"
+          placeholder="Y"
+          hide-button
+          class="input-coord"
+        >
+          <template #prefix>Y</template>
+        </a-input-number>
+      </a-space>
+
+      <!-- 样式属性区域 -->
+      <a-space>
+        <a-input-number
+          v-model="borderWidth"
+          :disabled="!hasSelection"
+          :min="0"
+          placeholder="边框"
+          class="input-coord"
+        >
+          <template #prefix>边框</template>
+        </a-input-number>
+      </a-space>
+
+      <!-- 层级操作 -->
+      <a-button-group type="secondary" size="small">
+        <a-button @click="moveLayer('up')">上移一层</a-button>
+        <a-button @click="moveLayer('down')">下移一层</a-button>
+      </a-button-group>
+
+      <!-- 文本样式操作 (仅当选中包含文本时显示) -->
+      <a-button-group type="text" size="small" v-if="isTextNode">
+        <a-button @click="logFeature('Bold')">B</a-button>
+        <a-button @click="logFeature('Strike')">S</a-button>
+        <a-button @click="logFeature('Italic')">I</a-button>
+        <a-button @click="logFeature('Underline')">U</a-button>
       </a-button-group>
     </a-space>
-  </a-space>
+  </div>
 </template>
 
 <script setup lang="ts">
-import { useCanvasStore } from '@/store/canvasStore'
-import { computed, ref, watch } from 'vue'
-const canvasStore = useCanvasStore()
-  const fillColor = ref('#ffccc7')
-  const viceColor = ref('#ff4d4f')
-  const hasSelection = computed(() => canvasStore.activeElements.length > 0)
-  const x = ref(0)
-  const y = ref(0)
-  const activeStyleValue = ref(16)
-  const fillColorChange = (val: string) => {
-    canvasStore.activeElements.forEach(element => {
-      if (element && element.id && element.style) {
-        canvasStore.updateNode(element.id, {
-          style: {
-            ...element.style,
-            backgroundColor: val
-          }
-        });
-      }
-    });
-  }
-  const viceColorChange = (val: string) => {
-    // FIXME: 文本节点实际用 props.color/CSS 变量渲染，这里改 style 颜色无法改变文字颜色，需分支处理。
-    canvasStore.activeElements.forEach(element => {
-      if (element && element.id && element.style) {
-          canvasStore.updateNode(element.id, {
-            style: {
-              ...element.style,
-              borderColor: val
-            }
-          });
-      }
-    });
-  }
-  const moveLayerUp = () => {
-    canvasStore.activeElements.forEach(element => {
-      if (element && element.id) {
-        canvasStore.updateNode(element.id,{
-          style:{
-            ...element.style,
-            zIndex:element.style.zIndex+1
-          }
-        });
-      }
-    });
-  }
-  const moveLayerDown = () => {
-    canvasStore.activeElements.forEach(element => {
-      if (element && element.id) {
-        canvasStore.updateNode(element.id,{
-          style:{
-            ...element.style,
-            zIndex:element.style.zIndex-1
-          }
-        })
-      }
-    })
-  }
-  const toggleFontBold = () => {
-    console.log('字体加粗')
-  }
-  const toggleFontStrikethrough = () => {
-    console.log('字体删除线')
-  }
-  const setFontItalic = () => {
-    console.log('字体斜体')
-  }
-  const toggleFontUnderline = () => {
-    console.log('字体下划线')
-  }
-  const updateBorderWidth = () => {
-    canvasStore.activeElements.forEach(element => {
-      if (element && element.id) {
-        canvasStore.updateNode(element.id, {
-          style: {
-            ...element.style,
-            borderWidth: activeStyleValue.value
-          }
-        });
-      }
-    });
-  }
-  // 监听选中元素变化，更新所有属性
-  watch(() => canvasStore.activeElements, (newElements) => {
-    if (newElements.length > 0) {
-      const firstElement = newElements[0];
-      if (firstElement) {
-        // 更新坐标
-        if (firstElement.transform) {
-          x.value = firstElement.transform.x;
-          y.value = firstElement.transform.y;
-        }
-        // 更新颜色
-        if (firstElement.style) {
-          // 设置填充色（背景色）
-          if (firstElement.style.backgroundColor) {
-            fillColor.value = firstElement.style.backgroundColor;
-          }
-          // 设置边框色或文字颜色
-          if (firstElement.type === 'rect' || firstElement.type === 'circle') {
-            // 形状元素使用边框色
-            if (firstElement.style.borderColor) {
-              viceColor.value = firstElement.style.borderColor;
-            }
-          } else {
-            // 其他元素（如文本）使用文字颜色
-            if (firstElement.style.color) {
-              viceColor.value = firstElement.style.color;
-            }
-          }
-          if(firstElement.style.borderWidth){
-            activeStyleValue.value = firstElement.style.borderWidth;
-          }
-        }
-      }
+import { computed } from 'vue';
+import { useCanvasStore } from '@/store/canvasStore';
+import { NodeType, type BaseNodeState, type TextState } from '@/types/state';
+
+const store = useCanvasStore();
+
+// =================================================================================
+// 1. 逻辑抽象层 (Logic Abstraction)
+//    这些函数充当了 "ViewModel" 的角色，将 UI 操作转换为 Store 的原子更新。
+// =================================================================================
+
+/**
+ * 核心辅助函数：批量更新选中节点
+ * @param updater 一个回调函数，接收当前节点，返回需要更新的属性对象 (Partial State)
+ */
+const updateSelectedNodes = (updater: (node: BaseNodeState) => Partial<BaseNodeState> | null) => {
+  store.activeElements.forEach((node) => {
+    if (!node || !node.id) return;
+
+    const patch = updater(node);
+    if (patch) {
+      store.updateNode(node.id, patch);
     }
-  }, { immediate: true, deep: true })
-  watch(x, (newX) => {
-    // FIXME: 多选模式下，直接将所有元素的 X 坐标设为相同值，会导致元素重叠。
-    // 建议：多选时应计算相对位移 (deltaX)，或者禁用坐标修改，或者明确这是“对齐”操作。
-    canvasStore.activeElements.forEach(element => {
-      if (element && element.id && element.transform) {
-        canvasStore.updateNode(element.id, {
-          transform: {
-            ...element.transform,
-            x: newX
-          }
-        });
-      }
-    });
   });
-  watch(y, (newY) => {
-    // FIXME: 同上，多选模式下会导致元素重叠。
-    canvasStore.activeElements.forEach(element => {
-      if (element && element.id && element.transform) {
-        canvasStore.updateNode(element.id, {
-          transform: {
-            ...element.transform,
-            y: newY
-          }
-        });
+};
+
+/**
+ * 核心辅助函数：获取第一个选中节点的值（用于回显）
+ * @param getter 读取属性的函数
+ * @param defaultValue 默认值
+ */
+const getFirstSelectionValue = <T,>(getter: (node: BaseNodeState) => T, defaultValue: T): T => {
+  const first = store.activeElements[0];
+  if (!first) return defaultValue;
+  try {
+    return getter(first) ?? defaultValue;
+  } catch (e) {
+    return defaultValue;
+  }
+};
+
+// =================================================================================
+// 2. 视图模型绑定 (ViewModel Binding)
+//    使用 computed get/set 替代 watch，实现干净的双向绑定
+// =================================================================================
+
+const hasSelection = computed(() => store.activeElements.length > 0);
+
+const isTextNode = computed(() => {
+  const first = store.activeElements[0];
+  return first && first.type === NodeType.TEXT;
+});
+
+// --- 坐标属性 (X/Y) ---
+
+const x = computed({
+  get: () => getFirstSelectionValue((n) => n.transform.x, 0),
+  set: (val) => {
+    // NOTE: 属性面板修改坐标通常是"绝对定位"语义，即"对齐到 X"。
+    updateSelectedNodes((node) => ({
+      transform: { ...node.transform, x: val },
+    }));
+  },
+});
+
+const y = computed({
+  get: () => getFirstSelectionValue((n) => n.transform.y, 0),
+  set: (val) => {
+    updateSelectedNodes((node) => ({
+      transform: { ...node.transform, y: val },
+    }));
+  },
+});
+
+// --- 样式属性 (Colors) ---
+
+// 填充色 (Background Color)
+const fillColor = computed({
+  get: () => getFirstSelectionValue((n) => n.style.backgroundColor, 'transparent'),
+  set: (val) => {
+    updateSelectedNodes((node) => ({
+      style: { ...node.style, backgroundColor: val },
+    }));
+  },
+});
+
+// 边框色 (Border Color)
+const borderColor = computed({
+  get: () => getFirstSelectionValue((n) => n.style.borderColor, '#000000'),
+  set: (val) => {
+    updateSelectedNodes((node) => ({
+      style: { ...node.style, borderColor: val },
+    }));
+  },
+});
+
+// 文本颜色 (Text Color)
+const textColor = computed({
+  get: () =>
+    getFirstSelectionValue((n) => {
+      if (n.type === NodeType.TEXT) {
+        return (n as TextState).props.color;
       }
+      return '#000000';
+    }, '#000000'),
+  set: (val) => {
+    updateSelectedNodes((node) => {
+      if (node.type === NodeType.TEXT) {
+        return {
+          props: { ...(node as TextState).props, color: val },
+        };
+      }
+      return null;
     });
+  },
+});
+
+// 边框宽度
+const borderWidth = computed({
+  get: () => getFirstSelectionValue((n) => n.style.borderWidth, 0),
+  set: (val) => {
+    updateSelectedNodes((node) => ({
+      style: { ...node.style, borderWidth: val },
+    }));
+  },
+});
+
+// =================================================================================
+// 3. 操作指令 (Actions)
+// =================================================================================
+
+const moveLayer = (direction: 'up' | 'down') => {
+  updateSelectedNodes((node) => {
+    const currentZ = node.style.zIndex || 0;
+    return {
+      style: {
+        ...node.style,
+        zIndex: direction === 'up' ? currentZ + 1 : Math.max(0, currentZ - 1),
+      },
+    };
   });
+};
+
+const logFeature = (name: string) => {
+  console.log(`[Feature Pending] ${name} style toggle`);
+};
 </script>
+
+<style scoped>
+.property-panel {
+  padding: 12px;
+  background-color: var(--color-bg-2);
+  border-left: 1px solid var(--color-border);
+  height: 100%;
+  overflow-y: auto;
+}
+
+.color-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.label {
+  font-size: 12px;
+  color: var(--color-text-3);
+}
+
+.input-coord {
+  width: 100px;
+}
+</style>
