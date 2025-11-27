@@ -113,7 +113,7 @@ export interface ImageState extends BaseNodeState {
       contrast?: number;       // 百分比
       saturate?: number;       // 百分比
       hueRotate?: number;      // 角度值
-      opacity?: number;        // 百分比
+      filterOpacity?: number;  // 百分比 (滤镜透明度, 对应 CSS filter: opacity(); 与 style.opacity 区分)
       invert?: number;         // 百分比
       sepia?: number;          // 百分比
     };
