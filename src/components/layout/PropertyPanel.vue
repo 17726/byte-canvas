@@ -113,7 +113,7 @@ const getFirstSelectionValue = <T,>(getter: (node: BaseNodeState) => T, defaultV
   try {
     return getter(first) ?? defaultValue;
   } catch (e) {
-    console.warn('Error getting selection value:', e);
+    console.warn('[PropertyPanel] Failed to get property:', e);
     return defaultValue;
   }
 };
