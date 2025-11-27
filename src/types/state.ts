@@ -79,8 +79,8 @@ export interface TextState extends BaseNodeState {
     fontStyle: 'normal' | 'italic'; // I (斜体)
     color: string;
     lineHeight: number;
-    textDecoration: string; // underline 删除线
-    textDecorationLine:string // line-through 下划线
+    textDecoration: string; // 文本装饰（下划线、删除线等）
+    textDecorationLine: string; // 文本装饰线类型（underline, line-through）
   };
 }
 
