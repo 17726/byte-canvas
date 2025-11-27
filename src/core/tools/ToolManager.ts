@@ -135,12 +135,17 @@ export class ToolManager {
    */
   handleNodeDown(e: MouseEvent, id: string) {
     // 1.阻止事件冒泡，避免触发画布的 handleMouseDown (导致取消选中)
-    // 注意：在 Vue 中可以使用 @mousedown.stop，如果移到这里，需要手动调用
-    // 但为了保持"Vue仅转发"，建议在Vue层就 .stop，或者在这里调用 e.stopPropagation()
     e.stopPropagation();
-    // 2. 基础选中逻辑（TODO: 后续扩展Shift/Ctrl多选）
-    // TODO: 支持多选 (Shift/Ctrl)
-    this.store.setActive([id]);
+
+    // 2. 多选逻辑：按住 Ctrl/Cmd 键时切换选中状态
+    if (e.ctrlKey || e.metaKey) {
+      // Ctrl/Cmd + 点击：切换选中状态（多选模式）
+      this.store.toggleSelection(id);
+      return;
+    } else {
+      // 普通点击：单选模式
+      this.store.setActive([id]);
+    }
 
     // 3. 获取节点数据，校验有效性
     const node = this.store.nodes[id] as BaseNodeState;

@@ -51,6 +51,11 @@ const handleResizeHandleDown = (e: MouseEvent, handle: ResizeHandle) => {
   transition:
     outline 0.2s,
     box-shadow 0.2s;
+  cursor: move; /* 显示四方箭头拖拽光标 */
+  user-select: none; /* 禁止文本选择 */
+  -webkit-user-select: none; /* Safari */
+  -moz-user-select: none; /* Firefox */
+  -ms-user-select: none; /* IE/Edge */
   /* 确保元素可以正确显示为圆形 */
   display: flex;
   align-items: center;
@@ -60,6 +65,7 @@ const handleResizeHandleDown = (e: MouseEvent, handle: ResizeHandle) => {
 .is-selected {
   /* 选中时的视觉反馈 - 使用 outline 和阴影来突出显示 */
   outline: 2px solid #1890ff;
+  outline-offset: 0; /* 确保 outline 不会触发焦点 */
   box-shadow: 0 0 0 4px rgba(24, 144, 255, 0.2);
 }
 </style>

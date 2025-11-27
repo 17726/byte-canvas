@@ -67,6 +67,11 @@ const handleResizeHandleDown = (e: MouseEvent, handle: ResizeHandle) => {
   background: transparent;
   /* 移除 min-width 和 min-height，避免与数据层缩放不一致 */
   /* 最小尺寸限制已在 ToolManager.resizeText 中处理 */
+  cursor: move;
+  user-select: none; /* 禁止文本选择 */
+  -webkit-user-select: none; /* Safari */
+  -moz-user-select: none; /* Firefox */
+  -ms-user-select: none; /* IE/Edge */
 }
 
 .text-content {
