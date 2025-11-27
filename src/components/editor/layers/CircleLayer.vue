@@ -30,7 +30,11 @@ const style = computed(() => {
   // 圆形样式：支持椭圆（宽高可以不同），border-radius 为 50%
   return {
     ...baseStyle,
-    // 允许宽高不同，可以拉伸成椭圆
+    // FIXME: 视图层不应强制修改数据表现。如果数据层 width != height，这里强制相等会导致碰撞检测（基于数据）与视觉（基于这里）不一致。
+    // 建议：移除此处的覆盖，改为在 ToolManager (Resize) 或 Store 中强制约束 width === height。
+    // 防止宽高不一致
+    width: baseStyle.width,
+    height: baseStyle.width, // 使用宽度作为基准，确保宽高相等
   };
 });
 
