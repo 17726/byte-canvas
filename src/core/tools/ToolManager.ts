@@ -357,8 +357,8 @@ export class ToolManager {
         fontStyle: 'normal', // I (斜体)
         color: '#000',
         lineHeight: 1.6,
-        underline:false,
-        strikethrough: false
+        underline: false,
+        strikethrough: false,
       },
       parentId: null,
       isLocked: false,
@@ -400,16 +400,17 @@ export class ToolManager {
       },
       props: {
         imageUrl: '/uploads/images/img-test_2.png', // 资源 URL
-        filters: {  //NOTE: 滤镜需要通过以下细分属性来设置
-          grayscale: 0,      // 0-100
-          blur: 0,           // 像素值
-          brightness: 100,     // 百分比
-          contrast: 100,      // 百分比
-          saturate: 100,    // 百分比
-          hueRotate: 0,      // 角度值
-          filterOpacity: 100,        // 百分比
-          invert: 0,         // 百分比
-          sepia: 0,          // 百分比
+        filters: {
+          //NOTE: 滤镜需要通过以下细分属性来设置
+          grayscale: 0, // 0-100
+          blur: 0, // 像素值
+          brightness: 100, // 百分比
+          contrast: 100, // 百分比
+          saturate: 100, // 百分比
+          hueRotate: 0, // 角度值
+          filterOpacity: 100, // 百分比
+          invert: 0, // 百分比
+          sepia: 0, // 百分比
         },
       },
       parentId: null,
@@ -636,8 +637,8 @@ export class ToolManager {
 
   /**
    * 圆形缩放计算
-   * - 四个角（nw, ne, se, sw）：等比缩放，保持圆形
-   * - 四条边（n, e, s, w）：独立缩放宽高，可拉伸成椭圆
+   * - 四个角（nw, ne, se, sw）：等比缩放，保持圆形，锚点为对角
+   * - 四条边（n, e, s, w）：独立缩放宽高，可拉伸成椭圆，锚点为对边
    */
   private resizeCircle(
     handle: ResizeHandle,
@@ -654,52 +655,55 @@ export class ToolManager {
     let newX = startNodeX;
     let newY = startNodeY;
 
-    // 判断是否为角点（等比缩放）还是边点（可拉伸）
-    const isCorner = handle.length === 2; // 'nw', 'ne', 'se', 'sw' 长度为2
+    // 宽高比
+    const ratio = startWidth / startHeight;
+
+    // 判断是否为角点（等比缩放）
+    const isCorner = handle.length === 2;
 
     if (isCorner) {
-      // 角点：等比缩放，保持圆形
-      let delta = 0;
-      switch (handle) {
-        case 'nw': // 左上：取平均值
-          delta = -(dx + dy) / 2;
-          break;
-        case 'ne': // 右上：取平均值
-          delta = (dx - dy) / 2;
-          break;
-        case 'se': // 右下：取平均值
-          delta = (dx + dy) / 2;
-          break;
-        case 'sw': // 左下：取平均值
-          delta = (-dx + dy) / 2;
-          break;
+      // 角点：等比缩放，保持宽高比
+      // 以宽度变化为主导 (也可以取 max(dx, dy))
+
+      // 1. 计算基于宽度的预期新宽度
+      if (handle.includes('e')) {
+        newWidth = startWidth + dx;
+      } else {
+        newWidth = startWidth - dx;
       }
 
-      newWidth = startWidth + delta * 2;
-      newHeight = startHeight + delta * 2 * (startHeight / startWidth);
+      // 2. 根据比例计算高度
+      newHeight = newWidth / ratio;
 
-      // 根据控制点调整位置
-      if (handle.includes('w')) {
-        newX = startNodeX - delta;
-      }
-      if (handle.includes('n')) {
-        newY = startNodeY - delta;
+      // 3. 根据锚点调整位置
+      if (handle === 'se') {
+        // 锚点在左上 (startNodeX, startNodeY) -> 不变
+      } else if (handle === 'sw') {
+        // 锚点在右上 (startNodeX + startWidth, startNodeY)
+        newX = startNodeX + startWidth - newWidth;
+      } else if (handle === 'ne') {
+        // 锚点在左下 (startNodeX, startNodeY + startHeight)
+        newY = startNodeY + startHeight - newHeight;
+      } else if (handle === 'nw') {
+        // 锚点在右下 (startNodeX + startWidth, startNodeY + startHeight)
+        newX = startNodeX + startWidth - newWidth;
+        newY = startNodeY + startHeight - newHeight;
       }
     } else {
-      // 边点：独立缩放宽高，可拉伸成椭圆
+      // 边点：独立缩放宽高，可拉伸成椭圆 (与矩形逻辑一致)
       switch (handle) {
-        case 'n': // 上：只改变高度
-          newHeight = startHeight - dy * 2;
+        case 'n': // 上：只改变高度，锚点在下
+          newHeight = startHeight - dy;
           newY = startNodeY + dy;
           break;
-        case 'e': // 右：只改变宽度
-          newWidth = startWidth + dx * 2;
+        case 'e': // 右：只改变宽度，锚点在左
+          newWidth = startWidth + dx;
           break;
-        case 's': // 下：只改变高度
-          newHeight = startHeight + dy * 2;
+        case 's': // 下：只改变高度，锚点在上
+          newHeight = startHeight + dy;
           break;
-        case 'w': // 左：只改变宽度
-          newWidth = startWidth - dx * 2;
+        case 'w': // 左：只改变宽度，锚点在右
+          newWidth = startWidth - dx;
           newX = startNodeX + dx;
           break;
       }

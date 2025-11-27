@@ -18,6 +18,9 @@
         :node="node"
         @mousedown="handleNodeDown($event, node!.id)"
       />
+
+      <!-- 选中覆盖层 (处理拖拽缩放) -->
+      <SelectionOverlay />
     </div>
 
     <!-- 辅助信息：显示当前视口状态 -->
@@ -36,9 +39,10 @@ import { NodeType } from '@/types/state';
 import RectLayer from './layers/RectLayer.vue';
 import TextLayer from './layers/TextLayer.vue';
 import CircleLayer from './layers/CircleLayer.vue';
-import { ToolManager } from '@/core/tools/ToolManager';
-import NodeHighlight from './NodeHighlight.vue'
 import ImageLayer from './layers/ImageLayer.vue';
+import SelectionOverlay from './SelectionOverlay.vue';
+import { ToolManager } from '@/core/tools/ToolManager';
+import NodeHighlight from './NodeHighlight.vue';
 
 const store = useCanvasStore();
 const stageRef = ref<HTMLElement | null>(null);
