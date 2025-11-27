@@ -23,7 +23,7 @@ const style = computed(() => getDomStyle(props.node));
 const isSelected = computed(() => store.activeElementIds.has(props.node.id));
 
 // 图片URL
-const imageUrl = computed(() => props.node.props.imageUrl || 'https://images.unsplash.com/photo-1763634048525-5ca118fe6c05?q=80&w=985&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D');
+const imageUrl = computed(() => props.node.props.imageUrl || '/uploads/images/img-test_1.jpg');
 
 // 滤镜样式
 const filterStyle = computed(() => {
@@ -85,10 +85,11 @@ const filterStyle = computed(() => {
   /* 基础样式由 style 绑定控制 */
   box-sizing: border-box;
   transition: box-shadow 0.2s;
-  overflow: hidden;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  cursor: move; /* 显示四方箭头拖拽光标 */
+  user-select: none; /* 禁止文本选择 */
+  -webkit-user-select: none; /* Safari */
+  -moz-user-select: none; /* Firefox */
+  -ms-user-select: none; /* IE/Edge */
 }
 
 .node-image img {
@@ -96,6 +97,9 @@ const filterStyle = computed(() => {
   height: 100%;
   object-fit: cover;
   display: block;
+  /** NOTE: 让鼠标事件从img穿透到父容器div
+      因为我们监听的是div上的mousedown 同时禁止事件冒泡 这里不穿透的话光标在img上时无法拖拽*/
+  pointer-events: none;
 }
 
 .is-selected {

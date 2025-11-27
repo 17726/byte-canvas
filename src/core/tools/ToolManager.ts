@@ -373,7 +373,7 @@ export class ToolManager {
         zIndex: 1,
       },
       props: {
-        imageUrl: '/uploads/images/img-test_1.jpg', // 资源 URL
+        imageUrl: '/uploads/images/img-test_2.png', // 资源 URL
         filters: {  //NOTE: 滤镜需要通过以下细分属性来设置
           grayscale: 0,      // 0-100
           blur: 0,           // 像素值
