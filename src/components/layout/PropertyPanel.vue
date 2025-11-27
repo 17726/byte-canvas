@@ -18,6 +18,18 @@
       <a-button @click="toggleFontUnderline" type="primary" style="background-color: white;color: black;border: 0;">U</a-button>
       <a-input-number  @change="updateBorderWidth" v-model="activeStyleValue" :style="{width:'120px'}" placeholder="Please Enter" class="input-demo"/>
       </a-button-group>
+      <a-dropdown-button type="primary" >
+        滤镜
+        <template #icon>
+          <icon-down />
+        </template>
+        <template #content>
+          <a-doption @click="grayscaleFilter">黑白</a-doption>
+          <a-doption @click="blurFilter">模糊</a-doption>
+          <a-doption @click="vintageFilter">复古</a-doption>
+          <a-doption @click="resetFilter">重置</a-doption>
+        </template>
+      </a-dropdown-button>
     </a-space>
   </a-space>
 </template>
@@ -25,6 +37,7 @@
 <script setup lang="ts">
 import { useCanvasStore } from '@/store/canvasStore'
 import { computed, ref, watch } from 'vue'
+import { IconDown } from '@arco-design/web-vue/es/icon'
 const canvasStore = useCanvasStore()
   const fillColor = ref('#ffccc7')
   const viceColor = ref('#ff4d4f')
@@ -104,6 +117,78 @@ const canvasStore = useCanvasStore()
         });
       }
     });
+  }
+  const grayscaleFilter = () => {
+    canvasStore.activeElements.forEach(element => {
+      if (element && element.id && element.type === 'image') {
+        canvasStore.updateNode(element.id,{
+          props:{
+            ...element.props,
+            filters:{
+              grayscale: 100,        // 完全黑白
+              contrast: 110,         // 稍微增强对比度
+              brightness: 95         // 稍微降低亮度，让黑白更纯粹
+            }
+          }
+        })
+      }
+    })
+  }
+  const blurFilter = () => {
+    canvasStore.activeElements.forEach(element => {
+      if (element && element.id && element.type === 'image') {
+        canvasStore.updateNode(element.id,{
+          props:{
+            ...element.props,
+            filters:{
+              blur: 8,               // 中等模糊程度
+              brightness: 98,        // 轻微降低亮度
+              filterOpacity: 95      // 轻微降低滤镜强度
+            }
+          }
+        })
+      }
+    })
+  }
+  const vintageFilter = () => {
+    canvasStore.activeElements.forEach(element => {
+      if (element && element.id && element.type === 'image') {
+        canvasStore.updateNode(element.id,{
+          props:{
+            ...element.props,
+            filters:{
+              sepia: 60,             // 棕褐色调
+              contrast: 115,         // 增强对比度
+              brightness: 95,        // 降低亮度
+              saturate: 85,          // 降低饱和度
+              hueRotate: -10         // 轻微色相偏移
+            }
+          }
+        })
+      }
+    })
+  }
+  const resetFilter = () => {
+    canvasStore.activeElements.forEach(element => {
+      if (element && element.id && element.type === 'image') {
+        canvasStore.updateNode(element.id,{
+          props:{
+            ...element.props,
+            filters:{
+              grayscale: 0,      // 0-100
+              blur: 0,           // 像素值
+              brightness: 100,     // 百分比
+              contrast: 100,      // 百分比
+              saturate: 100,    // 百分比
+              hueRotate: 0,      // 角度值
+              filterOpacity: 100,        // 百分比
+              invert: 0,         // 百分比
+              sepia: 0,          // 百分比
+            }
+          }
+        })
+      }
+    })
   }
   // 监听选中元素变化，更新所有属性
   watch(() => canvasStore.activeElements, (newElements) => {
