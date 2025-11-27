@@ -67,7 +67,7 @@ import type { TextState } from '@/types/state';
     });
   }
   const toggleFontUnderline = () => {
-    console.log('字体下划线')
+    
     canvasStore.activeElements.forEach(element => {
       if (element && element.id && element.props) {
           canvasStore.updateNode(element.id, {
