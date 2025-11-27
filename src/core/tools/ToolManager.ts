@@ -172,6 +172,9 @@ export class ToolManager {
 
     // 4. 标记交互中，防止昂贵操作（如自动保存）
     this.store.isInteracting = true;
+    // 展示右侧属性面板并切换为节点模式
+    this.store.setActivePanel('node');
+    this.store.setPanelExpanded(true);
 
     // 5. 初始化拖拽状态（深拷贝节点初始transform，避免引用同步）
     this.dragState = {

@@ -23,6 +23,10 @@ export const useCanvasStore = defineStore('canvas', () => {
 
   // 优化：交互锁，防止拖拽过程中触发昂贵操作(如自动保存)
   const isInteracting = ref(false);
+  // 右侧面板展示模式：'node' | 'canvas'
+  const activePanel = ref<'node' | 'canvas'>('node');
+  // 面板折叠/展开
+  const isPanelExpanded = ref(false);
 
   // Getters
   // 获取排序后的渲染列表，供 v-for 使用
@@ -97,6 +101,14 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
   }
 
+  function setActivePanel(panel: 'node' | 'canvas') {
+    activePanel.value = panel;
+  }
+
+  function setPanelExpanded(expanded: boolean) {
+    isPanelExpanded.value = expanded;
+  }
+
   return {
     nodes,
     nodeOrder,
@@ -111,5 +123,9 @@ export const useCanvasStore = defineStore('canvas', () => {
     deleteNode,
     setActive,
     toggleSelection,
+    activePanel,
+    isPanelExpanded,
+    setActivePanel,
+    setPanelExpanded,
   };
 });

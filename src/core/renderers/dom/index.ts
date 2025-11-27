@@ -34,7 +34,7 @@ export function getDomStyle(node: NodeState): CSSProperties {
     default:
       // 【Fail Fast 机制】
       // 如果出现了未知的节点类型，直接抛错，防止渲染出奇怪的东西难以排查
-      // @ts-ignore
+      // @ts-expect-error -- fallback for unsupported node types (should be unreachable with current NodeType)
       console.warn(`[Renderer] Unsupported node type: ${node.type}`);
       return { display: 'none' }; // 安全回退：隐藏该节点
   }

@@ -11,11 +11,10 @@ export function clientToWorld(
   clientY: number
 ): { x: number; y: number } {
   return {
-    x: (clientX - viewport.offsetX) / viewport.zoom,//clientX是相对于浏览器窗口的坐标，需要减去视口的偏移量，再除以缩放比例
-    y: (clientY - viewport.offsetY) / viewport.zoom
+    x: (clientX - viewport.offsetX) / viewport.zoom, //clientX是相对于浏览器窗口的坐标，需要减去视口的偏移量，再除以缩放比例
+    y: (clientY - viewport.offsetY) / viewport.zoom,
   };
 }
-
 
 // 画布世界坐标 → 屏幕坐标
 export function worldToClient(
@@ -25,6 +24,6 @@ export function worldToClient(
 ): { x: number; y: number } {
   return {
     x: worldX * viewport.zoom + viewport.offsetX,
-    y: worldY * viewport.zoom + viewport.offsetY
+    y: worldY * viewport.zoom + viewport.offsetY,
   };
 }

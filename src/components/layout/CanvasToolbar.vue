@@ -9,28 +9,28 @@
       @menu-item-click="onMenuItemClick"
     >
       <!-- 元素创建列表 -->
-      <a-sub-menu key="addGraphics" >
-        <template #icon><icon-plus/></template>
+      <a-sub-menu key="addGraphics">
+        <template #icon><icon-plus /></template>
         <template #title>图形</template>
         <!-- 创建矩形 -->
         <a-menu-item key="addRect">
-          <template #icon><square/></template>
+          <template #icon><square /></template>
           矩形
         </a-menu-item>
         <!-- 创建圆形 -->
         <a-menu-item key="addCircle">
-          <template #icon><round/></template>
+          <template #icon><round /></template>
           圆形
         </a-menu-item>
       </a-sub-menu>
       <!-- 文本创建按钮 -->
       <a-menu-item key="addText">
-        <template #icon><icon-edit/></template>
+        <template #icon><icon-edit /></template>
         文本
       </a-menu-item>
       <!-- 照片创建按钮 -->
       <a-menu-item key="addImage">
-        <template #icon><icon-image/></template>
+        <template #icon><icon-image /></template>
         图片
       </a-menu-item>
       <!-- 元素删除按钮 -->
@@ -38,11 +38,16 @@
         <template #icon><icon-delete /></template>
         删除
       </a-menu-item>
+      <!-- Canvas Settings moved to top-right header -->
     </a-menu>
   </div>
 
   <!-- 确认删除弹窗 -->
-  <a-modal v-model:visible="delModalVisible" @ok="onDeleteConfirm" @cancel="delModalVisible = false">
+  <a-modal
+    v-model:visible="delModalVisible"
+    @ok="onDeleteConfirm"
+    @cancel="delModalVisible = false"
+  >
     <template #title>确认删除</template>
     <div>确定要删除选中的元素吗？</div>
   </a-modal>
@@ -55,19 +60,21 @@ import { IconPlus, IconEdit, IconImage, IconDelete } from '@arco-design/web-vue/
 import { Square, Round } from '@icon-park/vue-next';
 import { useCanvasStore } from '@/store/canvasStore';
 import { ToolManager } from '@/core/tools/ToolManager';
+// DEFAULT_CANVAS_THEMES moved to header
 import { Notification } from '@arco-design/web-vue';
 
 //NOTE：按钮返回值需提前在MenuKey进行注册
 enum MenuKey {
-  AddRect   = 'addRect',
+  AddRect = 'addRect',
   AddCircle = 'addCircle',
-  AddText   = 'addText',
-  AddImage  = 'addImage',
-  Delete    = 'deleteSelected',
+  AddText = 'addText',
+  AddImage = 'addImage',
+  Delete = 'deleteSelected',
 }
 
 const store = useCanvasStore();
 const hasSelection = computed(() => store.activeElementIds.size > 0);
+// Settings handled by header component now
 
 // 元素控制底层组件
 const toolManager = new ToolManager();
@@ -81,22 +88,22 @@ const delModalVisible = ref(false);
 function onMenuItemClick(key: string) {
   switch (key) {
     case MenuKey.AddRect:
-      console.log("矩形被点击");
+      console.log('矩形被点击');
       toolManager.createRect();
       selectedKeys.value = [key];
       break;
     case MenuKey.AddCircle:
-      console.log("圆被点击");
+      console.log('圆被点击');
       toolManager.createCircle();
       selectedKeys.value = [key];
       break;
     case MenuKey.AddText:
-      console.log("文本被点击");
+      console.log('文本被点击');
       toolManager.createText();
       selectedKeys.value = [key];
       break;
     case MenuKey.AddImage:
-      console.log("图片被点击");
+      console.log('图片被点击');
       toolManager.createImage();
       selectedKeys.value = [key];
       break;
@@ -115,12 +122,11 @@ function onDeleteConfirm() {
   Notification.success({
     content: '删除成功！',
     closable: true,
-    duration: 3000
+    duration: 3000,
   });
-  selectedKeys.value = [];        // 清空选中状态
-  delModalVisible.value = false;  // 关闭弹窗
+  selectedKeys.value = []; // 清空选中状态
+  delModalVisible.value = false; // 关闭弹窗
 }
-
 </script>
 
 <style scoped>
@@ -129,10 +135,10 @@ function onDeleteConfirm() {
   height: 500px;
   padding: 40px;
   position: fixed;
-  left:0;
+  left: 0;
   top: 80px;
   pointer-events: none;
-  z-index:1002;
+  z-index: 1002;
 }
 
 .tool-menu .arco-menu {
@@ -164,7 +170,9 @@ function onDeleteConfirm() {
   height: 48px;
   background-color: inherit;
   border-radius: 50%;
-  box-shadow: -4px 0 2px var(--color-bg-2), 0 0 1px rgba(0, 0, 0, 0.3);
+  box-shadow:
+    -4px 0 2px var(--color-bg-2),
+    0 0 1px rgba(0, 0, 0, 0.3);
   transform: translateX(50%);
 }
 
@@ -185,8 +193,10 @@ function onDeleteConfirm() {
   padding-top: 28px;
 }
 
-:deep(.arco-menu-item[key="deleteSelected"].arco-menu-item-selected) {
+:deep(.arco-menu-item[key='deleteSelected'].arco-menu-item-selected) {
   background-color: transparent !important;
 }
 
+/* canvas settings is now a menu item; remove absolute popover container */
+/* canvas settings styles moved to header */
 </style>

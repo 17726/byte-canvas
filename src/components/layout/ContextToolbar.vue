@@ -2,7 +2,7 @@
   <div v-if="isVisible" class="context-toolbar" :style="positionStyle" @mousedown.stop>
     <!-- Common Properties (Opacity & Layer) -->
     <div class="tool-section">
-      <div class="tool-item" title="Opacity">
+      <div class="tool-item" title="不透明度">
         <span class="label">Opacity</span>
         <a-slider
           v-model="opacity"
@@ -15,10 +15,10 @@
       </div>
       <div class="divider"></div>
       <div class="tool-item">
-        <a-button size="mini" type="text" @click="bringToFront" title="Bring to Front">
+        <a-button size="mini" type="text" @click="bringToFront" title="置于最前">
           <icon-bring-to-front />
         </a-button>
-        <a-button size="mini" type="text" @click="sendToBack" title="Send to Back">
+        <a-button size="mini" type="text" @click="sendToBack" title="置于最底">
           <icon-send-to-back />
         </a-button>
       </div>
@@ -130,7 +130,7 @@ const positionStyle = computed(() => {
   if (!activeNode.value) return {};
 
   const node = activeNode.value;
-  const { x, y, width, rotation } = node.transform;
+  const { x, y, width } = node.transform;
 
   // 计算节点在屏幕上的位置（相对于 CanvasStage 容器）
   const worldCenter = {

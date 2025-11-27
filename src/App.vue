@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import {  watch } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
 import { Left as IconLeft, Right as IconRight } from '@icon-park/vue-next';
 import CanvasStage from '@/components/editor/CanvasStage.vue';
@@ -8,23 +8,23 @@ import CanvasToolbar from '@/components/layout/CanvasToolbar.vue';
 import PropertyPanel from '@/components/layout/PropertyPanel.vue';
 
 const store = useCanvasStore();
-const isPanelExpanded = ref(false);
 
 // 监听选中状态，自动展开/折叠
 watch(
   () => store.activeElementIds.size,
   (newSize) => {
     if (newSize > 0) {
-      isPanelExpanded.value = true;
+      store.setPanelExpanded(true);
+      store.setActivePanel('node');
     } else {
-      isPanelExpanded.value = false;
+      store.setPanelExpanded(false);
     }
   },
   { immediate: true }
 );
 
 const togglePanel = () => {
-  isPanelExpanded.value = !isPanelExpanded.value;
+  store.setPanelExpanded(!store.isPanelExpanded);
 };
 </script>
 
@@ -42,10 +42,10 @@ const togglePanel = () => {
       <!-- 中间画布 -->
       <a-layout-content class="canvas-content">
         <CanvasStage />
-        
+
         <!-- 展开/折叠按钮 -->
         <div class="panel-toggle-btn" @click="togglePanel" title="Toggle Property Panel">
-          <component :is="isPanelExpanded ? IconRight : IconLeft" size="16" fill="#333" />
+          <component :is="store.isPanelExpanded ? IconRight : IconLeft" size="16" fill="#333" />
         </div>
       </a-layout-content>
 
@@ -53,7 +53,7 @@ const togglePanel = () => {
       <a-layout-sider
         :width="280"
         class="right-sider"
-        :collapsed="!isPanelExpanded"
+        :collapsed="!store.isPanelExpanded"
         :collapsed-width="0"
         collapsible
         :trigger="null"

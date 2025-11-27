@@ -1,118 +1,184 @@
 <template>
   <div class="property-panel">
-    <div v-if="!activeNode" class="empty-state">
-      <a-empty description="未选中元素" />
+    <!-- Canvas Settings Mode -->
+    <div v-if="isCanvas" class="panel-content">
+      <div class="panel-header">
+        <span class="node-type">画布设置</span>
+      </div>
+      <div class="panel-section">
+        <div class="panel-section">
+          <div class="section-title">网格</div>
+          <div class="prop-item">
+            <span class="label">显示网格</span>
+            <a-switch v-model:checked="store.viewport.isGridVisible" />
+          </div>
+          <div class="prop-item">
+            <span class="label">样式</span>
+            <a-radio-group v-model="store.viewport.gridStyle" size="mini">
+              <a-radio value="dot">点</a-radio>
+              <a-radio value="line">线</a-radio>
+              <a-radio value="none">无</a-radio>
+            </a-radio-group>
+          </div>
+          <div class="prop-item">
+            <span class="label">网格颜色</span>
+            <a-color-picker v-model="store.viewport.gridDotColor" size="small" show-text />
+          </div>
+          <div class="prop-item">
+            <span class="label">间距</span>
+            <a-input-number v-model="store.viewport.gridSize" size="small" :min="8" :max="200" />
+          </div>
+          <div class="prop-item">
+            <span class="label">粗细</span>
+            <a-input-number v-model="store.viewport.gridDotSize" size="small" :min="1" :max="8" />
+          </div>
+        </div>
+      </div>
+      <a-divider style="margin: 12px 0" />
+      <div class="panel-section">
+        <div class="section-title">背景与主题</div>
+        <div class="prop-item">
+          <span class="label">背景色</span>
+          <a-color-picker v-model="store.viewport.backgroundColor" size="small" show-text />
+        </div>
+        <div class="prop-item">
+          <span class="label">主题</span>
+          <div class="preset-buttons">
+            <a-button
+              v-for="theme in presets"
+              :key="theme.name"
+              size="mini"
+              type="text"
+              @click="applyPreset(theme)"
+              >{{ theme.name }}</a-button
+            >
+          </div>
+        </div>
+      </div>
     </div>
 
-    <div v-else class="panel-content">
-      <div class="panel-header">
-        <span class="node-type">{{ activeNode.type.toUpperCase() }}</span>
-        <span class="node-id">#{{ activeNode.id.slice(-4) }}</span>
+    <!-- Node Property Mode -->
+    <div v-else>
+      <div v-if="!activeNode" class="empty-state">
+        <a-empty description="未选中元素" />
       </div>
-
-      <!-- Section 1: 变换 (Transform) -->
-      <div class="panel-section">
-        <div class="section-title">变换</div>
-        <a-row :gutter="8" class="prop-row">
-          <a-col :span="12">
-            <a-input-number v-model="transformX" size="small" mode="button">
-              <template #prefix>X</template>
-            </a-input-number>
-          </a-col>
-          <a-col :span="12">
-            <a-input-number v-model="transformY" size="small" mode="button">
-              <template #prefix>Y</template>
-            </a-input-number>
-          </a-col>
-        </a-row>
-        <a-row :gutter="8" class="prop-row">
-          <a-col :span="12">
-            <a-input-number v-model="transformW" size="small" :min="1" mode="button">
-              <template #prefix>W</template>
-            </a-input-number>
-          </a-col>
-          <a-col :span="12">
-            <a-input-number v-model="transformH" size="small" :min="1" mode="button">
-              <template #prefix>H</template>
-            </a-input-number>
-          </a-col>
-        </a-row>
-        <a-row :gutter="8" class="prop-row">
-          <a-col :span="24">
-            <a-input-number v-model="transformRotation" size="small" mode="button">
-              <template #prefix>∠</template>
-              <template #suffix>°</template>
-            </a-input-number>
-          </a-col>
-        </a-row>
-      </div>
-
-      <a-divider style="margin: 12px 0" />
-
-      <!-- Section 2: 外观 (Appearance) -->
-      <div class="panel-section">
-        <div class="section-title">外观</div>
-
-        <!-- Fill -->
-        <div class="prop-item" v-if="hasFill">
-          <span class="label">填充</span>
-          <a-color-picker v-model="fillColor" show-text size="small" />
+      <div v-else class="panel-content">
+        <div class="panel-header">
+          <span class="node-type">{{ activeNode?.type?.toUpperCase() }}</span>
+          <span class="node-id">#{{ activeNode?.id?.slice(-4) }}</span>
         </div>
 
-        <!-- Stroke -->
-        <div class="prop-item" v-if="hasStroke">
-          <span class="label">描边</span>
-          <div class="flex-row">
-            <a-color-picker v-model="strokeColor" size="small" />
-            <a-input-number v-model="strokeWidth" size="small" style="width: 80px" :min="0">
-              <template #suffix>px</template>
-            </a-input-number>
+        <!-- Section 1: 变换 (Transform) -->
+        <div class="panel-section">
+          <div class="section-title">变换</div>
+          <a-row :gutter="8" class="prop-row">
+            <a-col :span="12">
+              <a-input-number v-model="transformX" size="small" mode="button">
+                <template #prefix>X</template>
+              </a-input-number>
+            </a-col>
+            <a-col :span="12">
+              <a-input-number v-model="transformY" size="small" mode="button">
+                <template #prefix>Y</template>
+              </a-input-number>
+            </a-col>
+          </a-row>
+          <a-row :gutter="8" class="prop-row">
+            <a-col :span="12">
+              <a-input-number v-model="transformW" size="small" :min="1" mode="button">
+                <template #prefix>W</template>
+              </a-input-number>
+            </a-col>
+            <a-col :span="12">
+              <a-input-number v-model="transformH" size="small" :min="1" mode="button">
+                <template #prefix>H</template>
+              </a-input-number>
+            </a-col>
+          </a-row>
+          <a-row :gutter="8" class="prop-row">
+            <a-col :span="24">
+              <a-input-number v-model="transformRotation" size="small" mode="button">
+                <template #prefix>∠</template>
+                <template #suffix>°</template>
+              </a-input-number>
+            </a-col>
+          </a-row>
+        </div>
+
+        <a-divider style="margin: 12px 0" />
+
+        <!-- Section 2: 外观 (Appearance) -->
+        <div class="panel-section">
+          <div class="section-title">外观</div>
+
+          <!-- Fill -->
+          <div class="prop-item" v-if="hasFill">
+            <span class="label">填充</span>
+            <a-color-picker v-model="fillColor" show-text size="small" />
+          </div>
+
+          <!-- Stroke -->
+          <div class="prop-item" v-if="hasStroke">
+            <span class="label">描边</span>
+            <div class="flex-row">
+              <a-color-picker v-model="strokeColor" size="small" />
+              <a-input-number v-model="strokeWidth" size="small" style="width: 80px" :min="0">
+                <template #suffix>px</template>
+              </a-input-number>
+            </div>
+          </div>
+
+          <!-- Opacity -->
+          <div class="prop-item">
+            <span class="label">不透明度</span>
+            <a-slider v-model="opacity" :min="0" :max="1" :step="0.01" show-input size="small" />
           </div>
         </div>
 
-        <!-- Opacity -->
-        <div class="prop-item">
-          <span class="label">不透明度</span>
-          <a-slider v-model="opacity" :min="0" :max="1" :step="0.01" show-input size="small" />
+        <a-divider style="margin: 12px 0" />
+
+        <!-- Section 3: 特有属性 (Specific) -->
+        <div class="panel-section" v-if="isText || isShape">
+          <div class="section-title">属性</div>
+
+          <!-- Text Specific -->
+          <template v-if="isText">
+            <div class="prop-item">
+              <span class="label">内容</span>
+              <a-textarea v-model="textContent" :auto-size="{ minRows: 2, maxRows: 5 }" />
+            </div>
+            <div class="prop-item">
+              <span class="label">字号</span>
+              <a-input-number v-model="fontSize" size="small" :min="1" />
+            </div>
+            <div class="prop-item">
+              <span class="label">字重</span>
+              <a-select v-model="fontWeight" size="small">
+                <a-option :value="400">Normal</a-option>
+                <a-option :value="700">Bold</a-option>
+              </a-select>
+            </div>
+            <div class="prop-item">
+              <span class="label">颜色</span>
+              <a-color-picker v-model="textColor" show-text size="small" />
+            </div>
+          </template>
+
+          <!-- Shape Specific -->
+          <template v-if="isRect">
+            <div class="prop-item">
+              <span class="label">圆角 (%)</span>
+              <a-slider
+                v-model="cornerRadius"
+                :min="0"
+                :max="50"
+                :step="1"
+                show-input
+                size="small"
+              />
+            </div>
+          </template>
         </div>
-      </div>
-
-      <a-divider style="margin: 12px 0" />
-
-      <!-- Section 3: 特有属性 (Specific) -->
-      <div class="panel-section" v-if="isText || isShape">
-        <div class="section-title">属性</div>
-
-        <!-- Text Specific -->
-        <template v-if="isText">
-          <div class="prop-item">
-            <span class="label">内容</span>
-            <a-textarea v-model="textContent" :auto-size="{ minRows: 2, maxRows: 5 }" />
-          </div>
-          <div class="prop-item">
-            <span class="label">字号</span>
-            <a-input-number v-model="fontSize" size="small" :min="1" />
-          </div>
-          <div class="prop-item">
-            <span class="label">字重</span>
-            <a-select v-model="fontWeight" size="small">
-              <a-option :value="400">Normal</a-option>
-              <a-option :value="700">Bold</a-option>
-            </a-select>
-          </div>
-          <div class="prop-item">
-            <span class="label">颜色</span>
-            <a-color-picker v-model="textColor" show-text size="small" />
-          </div>
-        </template>
-
-        <!-- Shape Specific -->
-        <template v-if="isShape && activeNode.shapeType === 'rect'">
-          <div class="prop-item">
-            <span class="label">圆角 (%)</span>
-            <a-slider v-model="cornerRadius" :min="0" :max="50" :step="1" show-input size="small" />
-          </div>
-        </template>
       </div>
     </div>
   </div>
@@ -122,20 +188,44 @@
 import { computed } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
 import { NodeType, type ShapeState, type TextState } from '@/types/state';
+import { DEFAULT_CANVAS_THEMES } from '@/config/defaults';
 
 const store = useCanvasStore();
 
 const activeNode = computed(() => {
   const ids = Array.from(store.activeElementIds);
   if (ids.length !== 1) return null;
-  return store.nodes[ids[0]];
+  const id = ids[0]!;
+  return store.nodes[id];
 });
+
+const isCanvas = computed(() => store.activePanel === 'canvas');
+const presets = DEFAULT_CANVAS_THEMES as {
+  name: string;
+  background: string;
+  gridColor: string;
+  gridSize: number;
+}[];
+
+function applyPreset(theme: {
+  name: string;
+  background: string;
+  gridColor: string;
+  gridSize: number;
+}) {
+  store.viewport.backgroundColor = theme.background;
+  store.viewport.gridDotColor = theme.gridColor;
+  store.viewport.gridSize = theme.gridSize;
+}
 
 // --- Helpers ---
 const isShape = computed(
   () => activeNode.value?.type === NodeType.RECT || activeNode.value?.type === NodeType.CIRCLE
 );
 const isText = computed(() => activeNode.value?.type === NodeType.TEXT);
+const isRect = computed(
+  () => isShape.value && (activeNode.value as ShapeState)?.shapeType === 'rect'
+);
 const hasFill = computed(() => isShape.value);
 const hasStroke = computed(() => isShape.value);
 

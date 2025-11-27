@@ -55,6 +55,10 @@ export interface ViewportState {
   isGridVisible: boolean; // 是否显示网格
   gridSize: number; // 网格大小（px）
   isSnapToGrid: boolean; // 是否开启吸附到网格
+  // Grid rendering options
+  gridStyle?: 'dot' | 'line' | 'none';
+  gridDotColor?: string;
+  gridDotSize?: number;
 }
 
 /** 缩放控制点类型 */

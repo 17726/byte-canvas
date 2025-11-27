@@ -1,4 +1,4 @@
-import { NodeType } from '@/types/state';
+// import { NodeType } from '@/types/state'; // Not used, remove to satisfy lint
 
 // Viewport Defaults
 export const DEFAULT_VIEWPORT = {
@@ -10,6 +10,9 @@ export const DEFAULT_VIEWPORT = {
   isGridVisible: true,
   gridSize: 20,
   isSnapToGrid: true,
+  gridStyle: 'dot' as const, // 'dot' | 'line' | 'none'
+  gridDotColor: 'rgba(0,0,0,0.04)',
+  gridDotSize: 1,
 };
 
 // Common Node Defaults
@@ -84,3 +87,14 @@ export const DEFAULT_IMAGE_FILTERS = {
   invert: 0,
   sepia: 0,
 };
+
+export const DEFAULT_CANVAS_THEMES = [
+  { name: 'Soft', background: '#fbfcfe', gridColor: 'rgba(0,0,0,0.04)', gridSize: 20 },
+  { name: 'Warm', background: '#fff8f0', gridColor: 'rgba(0,0,0,0.03)', gridSize: 20 },
+  { name: 'Dark', background: '#0f1724', gridColor: 'rgba(255,255,255,0.04)', gridSize: 20 },
+];
+
+// Canvas Background / Grid Defaults
+export const DEFAULT_CANVAS_BG = '#fbfcfe'; // 更柔和的背景色（更靠近白色但带一点冷色调）
+export const DEFAULT_GRID_DOT_COLOR = 'rgba(0,0,0,0.04)'; // 更轻的点网格颜色
+export const DEFAULT_GRID_DOT_SIZE = 1; // 点大小（像素）
