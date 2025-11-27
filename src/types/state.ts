@@ -93,12 +93,12 @@ export interface TextState extends BaseNodeState {
     content: string;
     fontFamily: string;
     fontSize: number;
-    fontWeight: string | number; // B (加粗)
+    fontWeight: number; // B (加粗)
     fontStyle: 'normal' | 'italic'; // I (斜体)
     color: string;
     lineHeight: number;
-    textDecoration: string; // 文本装饰（下划线、删除线等）
-    textDecorationLine: string; // 文本装饰线类型（underline, line-through）
+    underline:boolean;
+    strikethrough:boolean;
   };
 }
 

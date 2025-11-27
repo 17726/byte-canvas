@@ -20,6 +20,12 @@ export class DomTextRenderer implements INodeRenderer<CSSProperties> {
     // 这样我们才能访问 props.content、props.fontFamily 等特有属性
     const shape = node as TextState;
     const { transform, style,props } = shape;
+
+    // 计算文本装饰
+    const textDecoration: string[] = [];
+    if (props.underline) textDecoration.push('underline');
+    if (props.strikethrough) textDecoration.push('line-through');
+
     // 2. 样式映射 (Mapping)
     return {
       // --- 布局属性 ---
@@ -41,14 +47,14 @@ export class DomTextRenderer implements INodeRenderer<CSSProperties> {
       zIndex: style.zIndex,
 
       // 文本相关CSS变量
-      '--font-family':props.fontFamily || 'sans-serif',
-      '--text-size': `${props.fontSize || 16}px` ,
-      '--font-weight':props.fontWeight || 'normal',
-      '--font-style':props.fontStyle || 'normal',
+      '--font-family': props.fontFamily || 'sans-serif',
+      '--text-size': `${props.fontSize || 16}px`,
+      '--font-weight': props.fontWeight || 400,
+      '--font-style': props.fontStyle || 'normal',
       '--text-color': props.color || '#000000',
       '--line-height': props.lineHeight || 1.6,
       '--text-scale': 1,
-      '--text-decoration-line': props.textDecorationLine || 'none',
+      '--text-decoration-line': textDecoration.length > 0 ? textDecoration.join(' ') : 'none',
 
       // --- 交互属性 ---
       // NOTE: 后期可恢复基于 isVisible 的 display 控制，否则文本节点无法按可见性隐藏，行为与其他渲染器不一致。

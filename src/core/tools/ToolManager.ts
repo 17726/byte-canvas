@@ -357,8 +357,8 @@ export class ToolManager {
         fontStyle: 'normal', // I (斜体)
         color: '#000',
         lineHeight: 1.6,
-        textDecoration: 'none', // underline 删除线
-        textDecorationLine: 'none', // line-through 下划线
+        underline:false,
+        strikethrough: false
       },
       parentId: null,
       isLocked: false,
