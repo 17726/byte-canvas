@@ -47,7 +47,8 @@ export class DomTextRenderer implements INodeRenderer<CSSProperties> {
       '--font-style':props.fontStyle || 'normal',
       '--text-color': props.color || '#000000',
       '--line-height': props.lineHeight || 1.6,
-      '--text-scale': 1
+      '--text-scale': 1,
+      '--text-decoration-line': props.textDecorationLine || 'none',
 
       // --- 交互属性 ---
       // NOTE: 后期可恢复基于 isVisible 的 display 控制，否则文本节点无法按可见性隐藏，行为与其他渲染器不一致。
