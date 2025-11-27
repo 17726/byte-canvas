@@ -45,7 +45,6 @@ const canvasStore = useCanvasStore()
     });
   }
   const viceColorChange = (val: string) => {
-    // FIXME: 文本节点实际用 props.color/CSS 变量渲染，这里改 style 颜色无法改变文字颜色，需分支处理。
     canvasStore.activeElements.forEach(element => {
       if (element && element.id && element.style) {
           canvasStore.updateNode(element.id, {
@@ -82,15 +81,55 @@ const canvasStore = useCanvasStore()
     })
   }
   const toggleFontBold = () => {
+    canvasStore.activeElements.forEach(element => {
+      if (element && element.id && element.type=='text') {
+          canvasStore.updateNode(element.id, {
+            props:{
+              ...element.props,
+              fontWeight: element.props.fontWeight==400? 700 : 400
+            }
+          });
+      }
+    });
     console.log('字体加粗')
   }
   const toggleFontStrikethrough = () => {
+    canvasStore.activeElements.forEach(element => {
+      if (element && element.id&& element.type=='text') {
+        canvasStore.updateNode(element.id, {
+          props:{
+            ...element.props,
+            strikethrough: element.props.strikethrough?false:true
+          }
+        });
+      }
+    });
     console.log('字体删除线')
   }
   const setFontItalic = () => {
+    canvasStore.activeElements.forEach(element => {
+      if (element && element.id && element.type=='text') {
+          canvasStore.updateNode(element.id, {
+            props:{
+              ...element.props,
+              fontStyle: element.props.fontStyle=='normal'? 'italic' : 'normal'
+            }
+          });
+      }
+    });
     console.log('字体斜体')
   }
   const toggleFontUnderline = () => {
+    canvasStore.activeElements.forEach(element => {
+      if (element && element.id&& element.type=='text') {
+        canvasStore.updateNode(element.id, {
+          props:{
+            ...element.props,
+            underline: element.props.underline?false:true
+          }
+        });
+      }
+    });
     console.log('字体下划线')
   }
   const updateBorderWidth = () => {

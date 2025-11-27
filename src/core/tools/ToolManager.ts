@@ -351,6 +351,8 @@ export class ToolManager {
         fontStyle: 'normal', // I (斜体)
         color: '#000',
         lineHeight: 1.6,
+        underline:false,
+        strikethrough: false
       },
       parentId: null,
       isLocked: false,
