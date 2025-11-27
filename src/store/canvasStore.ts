@@ -1,12 +1,12 @@
 // stores/canvasStore.ts
 import { defineStore } from 'pinia';
 import { ref, reactive, computed } from 'vue';
-import type { BaseNodeState } from '@/types/state';
+import type { NodeState } from '@/types/state';
 
 export const useCanvasStore = defineStore('canvas', () => {
   // 1. 核心数据
   // 使用 Record 存储，对应调研报告中的 "State/Node分离" 思想
-  const nodes = ref<Record<string, BaseNodeState>>({});
+  const nodes = ref<Record<string, NodeState>>({});
   const nodeOrder = ref<string[]>([]); // 决定渲染顺序
   const version = ref(0); //脏标记计数器，可以理解为版本号，每次Node改动都要将其+1
   // 2. 视口状态 (应用在容器层，不传递给单个 Node)
@@ -45,7 +45,7 @@ export const useCanvasStore = defineStore('canvas', () => {
 
   // Actions
   // 1. 更新节点
-  function updateNode(id: string, patch: Partial<BaseNodeState>) {
+  function updateNode(id: string, patch: Partial<NodeState>) {
     if (!nodes.value[id]) return;
     // 细粒度更新，Vue 组件只会更新变更的 Props
     Object.assign(nodes.value[id], patch);
@@ -55,7 +55,7 @@ export const useCanvasStore = defineStore('canvas', () => {
   }
 
   // 2. 添加节点
-  function addNode(node: BaseNodeState) {
+  function addNode(node: NodeState) {
     nodes.value[node.id] = node;
     nodeOrder.value.push(node.id);
     version.value++; // 触发更新

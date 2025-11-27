@@ -31,7 +31,7 @@ import type { TextState } from '@/types/state';
   const isTextNode = computed(() =>activeNode.value?.type === NodeType.TEXT);
   const toggleFontBold = () => {
     canvasStore.activeElements.forEach(element => {
-      if (element && element.id && element.props) {
+      if (element && element.id && element.type == 'text') {
           canvasStore.updateNode(element.id, {
             props: {
               ...element.props,
@@ -44,7 +44,7 @@ import type { TextState } from '@/types/state';
   const toggleFontStrikethrough = () => {
     console.log('字体删除线')
     canvasStore.activeElements.forEach(element => {
-      if (element && element.id && element.props) {
+      if (element && element.id && element.type == 'text') {
           canvasStore.updateNode(element.id, {
             props: {
               ...element.props,
@@ -56,7 +56,7 @@ import type { TextState } from '@/types/state';
   }
   const setFontItalic = () => {
     canvasStore.activeElements.forEach(element => {
-      if (element && element.id && element.props) {
+      if (element && element.id && element.type == 'text') {
           canvasStore.updateNode(element.id, {
             props: {
               ...element.props,
@@ -69,7 +69,7 @@ import type { TextState } from '@/types/state';
   const toggleFontUnderline = () => {
     console.log('字体下划线')
     canvasStore.activeElements.forEach(element => {
-      if (element && element.id && element.props) {
+      if (element && element.id && element.type == 'text') {
           canvasStore.updateNode(element.id, {
             props: {
               ...element.props,
