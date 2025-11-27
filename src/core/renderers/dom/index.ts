@@ -4,12 +4,14 @@ import { NodeType } from '@/types/state';
 import { DomRectRenderer } from './DomRectRenderer';
 import { DomTextRenderer } from './DomTextRenderer';
 import { DomCircleRenderer } from './DomCircleRenderer';
+import { DomImageRenderer } from './DomImageRenderer';
 
 // 【单例模式】
 // 实例化渲染器缓存起来，避免每次渲染都 new 一个新对象，提升性能
 const rectRenderer = new DomRectRenderer();
 const textRenderer=new DomTextRenderer();
 const cirRenderer = new DomCircleRenderer();
+const imageRenderer=new DomImageRenderer();
 
 /**
  * 【工厂模式 - 分发中心】
@@ -27,8 +29,8 @@ export function getDomStyle(node: BaseNodeState): CSSProperties {
       return cirRenderer.render(node);
     case NodeType.TEXT:
       return textRenderer.render(node);
-    // 未来扩展点：
-    // case NodeType.IMAGE: return imageRenderer.render(node);
+    case NodeType.IMAGE:
+      return imageRenderer.render(node);
     default:
       // 【Fail Fast 机制】
       // 如果出现了未知的节点类型，直接抛错，防止渲染出奇怪的东西难以排查
