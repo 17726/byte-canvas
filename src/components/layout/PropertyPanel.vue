@@ -229,7 +229,6 @@ const logFeature = (name: string) => {
 .property-panel {
   padding: 12px;
   background-color: var(--color-bg-2);
-  border-left: 1px solid var(--color-border);
   height: 100%;
   overflow-y: auto;
 }
