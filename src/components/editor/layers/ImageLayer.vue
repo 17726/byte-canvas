@@ -94,10 +94,10 @@ const filterStyle = computed(() => {
 
   // 透明度滤镜 (default: 100%)
   if (
-    props.node.props.filters?.opacity !== undefined &&
-    props.node.props.filters.opacity !== 100
+    props.node.props.filters?.filterOpacity !== undefined &&
+    props.node.props.filters.filterOpacity !== 100
   ) {
-    filters.push(`opacity(${props.node.props.filters.opacity}%)`);
+    filters.push(`opacity(${props.node.props.filters.filterOpacity}%)`);
   }
 
   // 反转滤镜 (default: 0%)

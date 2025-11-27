@@ -405,7 +405,7 @@ export class ToolManager {
           contrast: 100,      // 百分比
           saturate: 100,    // 百分比
           hueRotate: 0,      // 角度值
-          opacity: 100,        // 百分比
+          filterOpacity: 100,        // 百分比
           invert: 0,         // 百分比
           sepia: 0,          // 百分比
         },
