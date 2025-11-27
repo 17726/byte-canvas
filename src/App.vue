@@ -43,8 +43,6 @@ import PropertyPanel from '@/components/layout/PropertyPanel.vue';
 }
 
 .right-sider {
-  background: var(--color-bg-2);
-  border-left: 1px solid var(--color-border);
   z-index: 10;
 }
 </style>
