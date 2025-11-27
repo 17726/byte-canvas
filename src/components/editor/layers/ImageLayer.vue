@@ -29,48 +29,75 @@ const imageUrl = computed(() => props.node.props.imageUrl || '/uploads/images/im
 const filterStyle = computed(() => {
   const filters: string[] = [];
 
-  // 灰度滤镜
-  if (props.node.props.filters?.grayscale) {
+  // 灰度滤镜 (default: 0%)
+  if (
+    props.node.props.filters?.grayscale !== undefined &&
+    props.node.props.filters.grayscale !== 0
+  ) {
     filters.push(`grayscale(${props.node.props.filters.grayscale}%)`);
   }
 
-  // 模糊滤镜
-  if (props.node.props.filters?.blur) {
+  // 模糊滤镜 (default: 0px)
+  if (
+    props.node.props.filters?.blur !== undefined &&
+    props.node.props.filters.blur !== 0
+  ) {
     filters.push(`blur(${props.node.props.filters.blur}px)`);
   }
 
-  // 亮度滤镜
-  if (props.node.props.filters?.brightness) {
+  // 亮度滤镜 (default: 100%)
+  if (
+    props.node.props.filters?.brightness !== undefined &&
+    props.node.props.filters.brightness !== 100
+  ) {
     filters.push(`brightness(${props.node.props.filters.brightness}%)`);
   }
 
-  // 对比度滤镜
-  if (props.node.props.filters?.contrast) {
+  // 对比度滤镜 (default: 100%)
+  if (
+    props.node.props.filters?.contrast !== undefined &&
+    props.node.props.filters.contrast !== 100
+  ) {
     filters.push(`contrast(${props.node.props.filters.contrast}%)`);
   }
 
-  // 饱和度滤镜
-  if (props.node.props.filters?.saturate) {
+  // 饱和度滤镜 (default: 100%)
+  if (
+    props.node.props.filters?.saturate !== undefined &&
+    props.node.props.filters.saturate !== 100
+  ) {
     filters.push(`saturate(${props.node.props.filters.saturate}%)`);
   }
 
-  // 色相旋转滤镜
-  if (props.node.props.filters?.hueRotate) {
+  // 色相旋转滤镜 (default: 0deg)
+  if (
+    props.node.props.filters?.hueRotate !== undefined &&
+    props.node.props.filters.hueRotate !== 0
+  ) {
     filters.push(`hue-rotate(${props.node.props.filters.hueRotate}deg)`);
   }
 
-  // 透明度滤镜
-  if (props.node.props.filters?.opacity) {
+  // 透明度滤镜 (default: 100%)
+  if (
+    props.node.props.filters?.opacity !== undefined &&
+    props.node.props.filters.opacity !== 100
+  ) {
     filters.push(`opacity(${props.node.props.filters.opacity}%)`);
   }
 
-  // 反转滤镜
-  if (props.node.props.filters?.invert) {
+  // 反转滤镜 (default: 0%)
+  if (
+    props.node.props.filters?.invert !== undefined &&
+    props.node.props.filters.invert !== 0
+  ) {
     filters.push(`invert(${props.node.props.filters.invert}%)`);
   }
 
-  // 棕褐色滤镜
-  if (props.node.props.filters?.sepia) {
+  // 棕褐色滤镜 (default: 0%)
+  if (
+    props.node.props.filters?.sepia !== undefined &&
+    props.node.props.filters.sepia !== 0
+  ) {
     filters.push(`sepia(${props.node.props.filters.sepia}%)`);
   }
 
