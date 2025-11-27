@@ -1,6 +1,12 @@
 <template>
   <div class="node-image" :style="style" :class="{ 'is-selected': isSelected }">
     <img :src="imageUrl" :alt="node.name || 'Image'" :style="filterStyle" />
+        <!-- 选中时显示缩放控制点（隐藏显示） -->
+        <ResizeHandles
+      v-if="isSelected"
+      class="text-resize-handles"
+      @handle-down="handleResizeHandleDown"
+    />
   </div>
 </template>
 
@@ -8,11 +14,20 @@
 import { getDomStyle } from '@/core/renderers/dom';
 import { useCanvasStore } from '@/store/canvasStore';
 import type { ImageState } from '@/types/state';
-import { computed } from 'vue';
+import { computed,inject } from 'vue';
+import type { ResizeHandle } from '@/types/editor';
+import ResizeHandles from '../ResizeHandles.vue';
+import { ToolManager } from '@/core/tools/ToolManager';
 
 const props = defineProps<{
   node: ImageState;
 }>();
+
+// 注入父组件提供的 toolManager 实例
+const toolManager = inject<ToolManager>('toolManager');
+if (!toolManager) {
+  throw new Error('toolManager must be provided by parent component');
+}
 
 const store = useCanvasStore();
 
@@ -78,6 +93,11 @@ const filterStyle = computed(() => {
     filter: filters.length > 0 ? filters.join(' ') : 'none',
   };
 });
+
+// 处理缩放控制点鼠标按下事件
+const handleResizeHandleDown = (e: MouseEvent, handle: ResizeHandle) => {
+  toolManager.handleResizeHandleDown(e, props.node.id, handle);
+};
 </script>
 
 <style scoped>
@@ -105,6 +125,7 @@ const filterStyle = computed(() => {
 .is-selected {
   /* 选中时的视觉反馈 */
   outline: 2px solid #1890ff;
+  outline-offset: 0; /* 确保 outline 不会触发焦点 */
   box-shadow: 0 0 0 4px rgba(24, 144, 255, 0.2);
 }
 </style>
