@@ -482,9 +482,8 @@ export class ToolManager {
         break;
 
       case NodeType.TEXT:
-        // 文本：可能需要特殊处理（如只改变容器大小，不缩放字体）
-        // TODO: 实现文本缩放逻辑
-        this.resizeRect(
+        // 文本：只改变容器大小，不缩放字体
+        this.resizeText(
           handle,
           dx,
           dy,
@@ -702,6 +701,88 @@ export class ToolManager {
         newWidth = startWidth - dx;
         newX = startNodeX + dx;
         break;
+    }
+
+    callback({
+      width: newWidth,
+      height: newHeight,
+      x: newX,
+      y: newY,
+    });
+  }
+
+  /**
+   * 文本缩放计算（只改变容器大小，不改变字号）
+   * 与矩形缩放逻辑相同，但不会影响文本的 fontSize
+   */
+  private resizeText(
+    handle: ResizeHandle,
+    dx: number,
+    dy: number,
+    startWidth: number,
+    startHeight: number,
+    startNodeX: number,
+    startNodeY: number,
+    callback: (result: { width: number; height: number; x: number; y: number }) => void
+  ) {
+    let newWidth = startWidth;
+    let newHeight = startHeight;
+    let newX = startNodeX;
+    let newY = startNodeY;
+
+    // 文本容器的缩放逻辑与矩形相同
+    // 区别在于：文本的字体大小（fontSize）不会随容器缩放而改变
+    switch (handle) {
+      case 'nw': // 左上
+        newWidth = startWidth - dx;
+        newHeight = startHeight - dy;
+        newX = startNodeX + dx;
+        newY = startNodeY + dy;
+        break;
+      case 'n': // 上
+        newHeight = startHeight - dy;
+        newY = startNodeY + dy;
+        break;
+      case 'ne': // 右上
+        newWidth = startWidth + dx;
+        newHeight = startHeight - dy;
+        newY = startNodeY + dy;
+        break;
+      case 'e': // 右
+        newWidth = startWidth + dx;
+        break;
+      case 'se': // 右下
+        newWidth = startWidth + dx;
+        newHeight = startHeight + dy;
+        break;
+      case 's': // 下
+        newHeight = startHeight + dy;
+        break;
+      case 'sw': // 左下
+        newWidth = startWidth - dx;
+        newHeight = startHeight + dy;
+        newX = startNodeX + dx;
+        break;
+      case 'w': // 左
+        newWidth = startWidth - dx;
+        newX = startNodeX + dx;
+        break;
+    }
+
+    // 限制最小尺寸（与其他缩放方法一致）
+    const minSize = 20;
+
+    if (newWidth < minSize) {
+      newWidth = minSize;
+      if (handle.includes('w')) {
+        newX = startNodeX + startWidth - minSize;
+      }
+    }
+    if (newHeight < minSize) {
+      newHeight = minSize;
+      if (handle.includes('n')) {
+        newY = startNodeY + startHeight - minSize;
+      }
     }
 
     callback({

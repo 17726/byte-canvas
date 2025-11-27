@@ -43,7 +43,7 @@ const handleMouseDown = (e: MouseEvent, handle: ResizeHandle) => {
   position: absolute;
   width: 8px;
   height: 8px;
-  background-color: #1890ff;
+  background-color: #fff;
   border: 1px solid #fff;
   border-radius: 50%;
   pointer-events: auto;
@@ -106,8 +106,10 @@ const handleMouseDown = (e: MouseEvent, handle: ResizeHandle) => {
 
 /* 鼠标悬停效果 */
 .resize-handle:hover {
-  background-color: #40a9ff;
+  background-color: #ffff;
   transform: scale(1.2);
+  box-sizing: border-box;
+  outline: 0.001px solid gray;
 }
 
 /* 上下边的悬停效果需要考虑已有的 transform */
