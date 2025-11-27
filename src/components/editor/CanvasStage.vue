@@ -23,6 +23,9 @@
       <SelectionOverlay />
     </div>
 
+    <!-- 悬浮属性栏 (Context Toolbar) - 放在视口外，但跟随节点坐标 -->
+    <ContextToolbar />
+
     <!-- 辅助信息：显示当前视口状态 -->
     <div class="debug-info">
       Zoom: {{ (store.viewport.zoom * 100).toFixed(0) }}% <br />
@@ -30,7 +33,6 @@
       Y: {{ store.viewport.offsetY.toFixed(0) }}
     </div>
   </div>
-  <NodeHighlight></NodeHighlight>
 </template>
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, provide } from 'vue';
@@ -41,8 +43,8 @@ import TextLayer from './layers/TextLayer.vue';
 import CircleLayer from './layers/CircleLayer.vue';
 import ImageLayer from './layers/ImageLayer.vue';
 import SelectionOverlay from './SelectionOverlay.vue';
+import ContextToolbar from './ContextToolbar.vue'; // Import ContextToolbar
 import { ToolManager } from '@/core/tools/ToolManager';
-import NodeHighlight from './NodeHighlight.vue';
 
 const store = useCanvasStore();
 const stageRef = ref<HTMLElement | null>(null);
