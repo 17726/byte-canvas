@@ -90,6 +90,11 @@ const store = useCanvasStore();
 /**
  * 核心辅助函数：批量更新选中节点
  * @param updater 一个回调函数，接收当前节点，返回需要更新的属性对象 (Partial State)
+ * @example
+ * // 将所有选中节点的 zIndex 增加 1
+ * updateSelectedNodes((node) => ({
+ *   style: { ...node.style, zIndex: node.style.zIndex + 1 }
+ * }));
  */
 const updateSelectedNodes = (updater: (node: BaseNodeState) => Partial<BaseNodeState> | null) => {
   store.activeElements.forEach((node) => {
