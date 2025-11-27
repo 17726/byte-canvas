@@ -39,10 +39,7 @@ import { ToolManager } from '@/core/tools/ToolManager';
 
 const store = useCanvasStore();
 const stageRef = ref<HTMLElement | null>(null);
-let toolManager: ToolManager; // 改为let，延迟初始化
-
-// 将 toolManager 提供给子组件
-provide('toolManager', toolManager);
+let toolManager: ToolManager; // 延迟初始化
 
 // 1. 视口样式计算
 const viewportStyle = computed(() => ({
@@ -97,12 +94,15 @@ const boxSelectStyle = computed(() => {
 
 // 3. 事件转发 -> 逻辑层
 const handleWheel = (e: WheelEvent) => {
-  toolManager.handleWheel(e); // 使用初始化后的实例
+  if (!toolManager) return; // 防御性判断
+  toolManager.handleWheel(e);
 };
 const handleMouseDown = (e: MouseEvent) => {
+  if (!toolManager) return;
   toolManager.handleMouseDown(e);
 };
 const handleMouseMove = (e: MouseEvent) => {
+  if (!toolManager) return;
   toolManager.handleMouseMove(e);
   // 同步框选状态到Vue组件
   const boxState = toolManager.getBoxSelectState();
@@ -111,19 +111,36 @@ const handleMouseMove = (e: MouseEvent) => {
   boxSelectEnd.value = boxState.boxSelectEnd;
 };
 const handleMouseUp = () => {
+  if (!toolManager) return;
   toolManager.handleMouseUp();
   isBoxSelecting.value = false;
 };
 
 // 节点交互转发
 const handleNodeDown = (e: MouseEvent, id: string) => {
+  if (!toolManager) return;
   toolManager.handleNodeDown(e, id);
 };
 
+// 暴露创建节点的方法（供父组件/子组件调用）
+const createRect = () => toolManager?.createRect();
+const createCircle = () => toolManager?.createCircle();
+const createText = () => toolManager?.createText();
+const deleteSelected = () => toolManager?.deleteSelected();
+
 // 全局事件监听
 onMounted(() => {
-  // 方案一核心：传入stage元素初始化ToolManager
+  // 1. 先初始化toolManager（核心修复：顺序调整）
   toolManager = new ToolManager(stageRef.value);
+  // 2. 再provide给子组件（确保注入的是有效实例）
+  provide('toolManager', toolManager);
+  // 3. 暴露方法给父组件（可选，若需要外部调用）
+  provide('createRect', createRect);
+  provide('createCircle', createCircle);
+  provide('createText', createText);
+  provide('deleteSelected', deleteSelected);
+
+  // 绑定事件
   window.addEventListener('mousemove', handleMouseMove);
   window.addEventListener('mouseup', handleMouseUp);
 });
