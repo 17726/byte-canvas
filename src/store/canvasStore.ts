@@ -1,12 +1,12 @@
 // stores/canvasStore.ts
 import { defineStore } from 'pinia';
 import { ref, reactive, computed } from 'vue';
-import type { BaseNodeState } from '@/types/state';
+import type { NodeState } from '@/types/state';
 
 export const useCanvasStore = defineStore('canvas', () => {
   // 1. 核心数据
   // 使用 Record 存储，对应调研报告中的 "State/Node分离" 思想
-  const nodes = ref<Record<string, BaseNodeState>>({});
+  const nodes = ref<Record<string, NodeState>>({});
   const nodeOrder = ref<string[]>([]); // 决定渲染顺序
   const version = ref(0); //脏标记计数器，可以理解为版本号，每次Node改动都要将其+1
   // 2. 视口状态 (应用在容器层，不传递给单个 Node)
@@ -18,12 +18,11 @@ export const useCanvasStore = defineStore('canvas', () => {
     offsetY: 0,
 
     // --- 辅助 (并给出默认值) ---
-    rotation: 0,              // 默认不旋转
+    rotation: 0, // 默认不旋转
     backgroundColor: '#ffffff', // 默认白底
-    isGridVisible: true,      // 默认显示网格
-    gridSize: 20,             // 默认 20px 网格
-    isSnapToGrid: true        // 默认开启吸附
-
+    isGridVisible: true, // 默认显示网格
+    gridSize: 20, // 默认 20px 网格
+    isSnapToGrid: true, // 默认开启吸附
   });
 
   // 3. 交互状态
@@ -40,22 +39,46 @@ export const useCanvasStore = defineStore('canvas', () => {
   });
 
   const activeElements = computed(() => {
-    return Array.from(activeElementIds.value).map(id => nodes.value[id]).filter(Boolean);
+    return Array.from(activeElementIds.value)
+      .map((id) => nodes.value[id])
+      .filter(Boolean);
   });
 
   // Actions
   // 1. 更新节点
-  function updateNode(id: string, patch: Partial<BaseNodeState>) {
-    if (!nodes.value[id]) return;
-    // 细粒度更新，Vue 组件只会更新变更的 Props
-    Object.assign(nodes.value[id], patch);
+  function updateNode(id: string, patch: Partial<NodeState>) {
+    const node = nodes.value[id];
+    if (!node) return;
+
+    // 核心优化：处理 props 的深度合并 (Deep Merge for props)
+    // 防止 updateNode(id, { props: { fontSize: 20 } }) 导致 content 等其他属性丢失
+    // 使用类型守卫或 'in' 操作符检查 props 是否存在于 patch 中
+    if ('props' in patch && patch.props) {
+      // 这里需要断言，因为 TS 无法确定 node 和 patch 是同一种类型
+      // 但在业务逻辑上，我们保证 id 对应的 node 类型是稳定的
+      const currentNode = node as any;
+      const patchProps = patch.props as any;
+
+      currentNode.props = {
+        ...currentNode.props,
+        ...patchProps,
+      };
+
+      // 合并除 props 外的其他属性 (transform, style, etc.)
+      const { props, ...rest } = patch;
+      Object.assign(node, rest);
+    } else {
+      // 普通更新
+      Object.assign(node, patch);
+    }
+
     // 每次修改数据，手动触发版本号自增
     // 这样外部监听 version 就能知道数据变了
     version.value++;
   }
 
   // 2. 添加节点
-  function addNode(node: BaseNodeState) {
+  function addNode(node: NodeState) {
     nodes.value[node.id] = node;
     nodeOrder.value.push(node.id);
     version.value++; // 触发更新

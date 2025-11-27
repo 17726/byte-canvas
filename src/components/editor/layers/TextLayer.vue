@@ -3,7 +3,7 @@
   <div class="text-layer-wrapper" :style="style">
     <!-- 透明矩形内部写文字，即文本框 -->
     <div class="textBox" :class="{ 'is-selected': isSelected }">
-      <div class="text-content">
+      <div class="text-content" >
         {{ node.props.content }}
       </div>
     </div>
@@ -83,8 +83,8 @@ const handleResizeHandleDown = (e: MouseEvent, handle: ResizeHandle) => {
   color: var(--text-color);
   line-height: var(--line-height);
   transform: scale(var(--text-scale));
+  text-decoration-line: var(--text-decoration-line);
   transform-origin: top left;
-
   /* 确保文本正确显示 */
   white-space: pre-wrap;
   word-wrap: break-word;

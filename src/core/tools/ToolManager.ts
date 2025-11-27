@@ -241,9 +241,9 @@ export class ToolManager {
   createRect() {
     const id = uuidv4();
     // 随机位置
-    const x = Number((Math.random() * 800).toFixed(2));
-    const y = Number((Math.random() * 600).toFixed(2));
-    // 这里修改一下 保留两位小数 不然界面展示xy坐标的时候过长
+    // NOTE：不应该在这里限制精度，应该在UI层处理 --- IGNORE ---
+    const x = Math.random() * 800;
+    const y = Math.random() * 600;
 
     const newRect: ShapeState = {
       id,
@@ -306,7 +306,7 @@ export class ToolManager {
         zIndex: 1,
       },
       props: {
-        // cornerRadius is rectangle-specific; set to 0 for circles for interface compliance
+        // cornerRadius 是矩形专用；对于圆形设置为 0 以符合接口规范
         cornerRadius: 0,
       },
       parentId: null,
@@ -357,6 +357,8 @@ export class ToolManager {
         fontStyle: 'normal', // I (斜体)
         color: '#000',
         lineHeight: 1.6,
+        underline:false,
+        strikethrough: false
       },
       parentId: null,
       isLocked: false,

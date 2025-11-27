@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'vue';
 import type { INodeRenderer } from '..';
-import type { BaseNodeState, ShapeState } from '@/types/state';
+import type { NodeState, ShapeState } from '@/types/state';
 
 /**
  * 【策略模式 - 具体策略】
@@ -14,7 +14,7 @@ export class DomRectRenderer implements INodeRenderer<CSSProperties> {
    * 执行渲染逻辑
    * @param node 基础节点数据
    */
-  render(node: BaseNodeState): CSSProperties {
+  render(node: NodeState): CSSProperties {
     // 1. 类型断言 (Type Assertion)
     // 我们确信传入给 RectRenderer 的一定是 ShapeState，所以强制告诉 TS "相信我"
     // 这样我们才能访问 props.cornerRadius 等特有属性

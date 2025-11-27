@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'vue';
 import type { INodeRenderer } from '..';
-import type { BaseNodeState, ShapeState } from '@/types/state';
+import type { NodeState, ShapeState } from '@/types/state';
 
 /**
  * 【策略模式 - 具体策略】
@@ -15,7 +15,7 @@ export class DomCircleRenderer implements INodeRenderer<CSSProperties> {
    * 执行圆形渲染逻辑
    * @param node 基础节点数据
    */
-  render(node: BaseNodeState): CSSProperties {
+  render(node: NodeState): CSSProperties {
     // 类型断言，确保我们处理的是 ShapeState
     const shape = node as ShapeState;
     const { transform, style } = shape;
