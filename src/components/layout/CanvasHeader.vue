@@ -8,7 +8,8 @@
     >
       <template #extra>
         <div class="extra">
-          <property-panel></property-panel>
+          <!-- TODO：Header额外功能预留空间，用于添加额外功能组件 -->
+          <PropertyPanel/>
         </div>
       </template>
     </a-page-header>
