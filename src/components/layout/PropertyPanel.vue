@@ -210,7 +210,7 @@ const borderWidth = computed({
 
 const moveLayer = (direction: 'up' | 'down') => {
   updateSelectedNodes((node) => {
-    const currentZ = node.style.zIndex || 0;
+    const currentZ = node.style.zIndex ?? 0;
     return {
       style: {
         ...node.style,
