@@ -122,7 +122,7 @@ const canvasStore = useCanvasStore()
   }
   const toggleFontUnderline = () => {
     canvasStore.activeElements.forEach(element => {
-      if (element && element.id&& element.type=='text') {
+      if (element && element.id && element.type === 'text') {
         canvasStore.updateNode(element.id, {
           props:{
             ...element.props,
