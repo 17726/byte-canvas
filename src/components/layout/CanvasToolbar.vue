@@ -45,7 +45,6 @@ const hasSelection = computed(() => store.activeElementIds.size > 0);
 // 添加矩形
 const addRect = () => {
   console.log('矩形被点击');
-  console.log('矩形被点击');
   toolManager.createRect();
 };
 //添加文本
