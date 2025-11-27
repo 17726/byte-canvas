@@ -14,6 +14,10 @@
         <template #icon><icon-plus /></template>
         文本
       </a-button>
+      <a-button type="primary" shape="square" @click="addText">
+        <template #icon><icon-plus /></template>
+        文本
+      </a-button>
       <a-button>图片</a-button>
 
       <a-divider direction="vertical" />
@@ -41,7 +45,13 @@ const hasSelection = computed(() => store.activeElementIds.size > 0);
 // 添加矩形
 const addRect = () => {
   console.log('矩形被点击');
+  console.log('矩形被点击');
   toolManager.createRect();
+};
+//添加文本
+const addText = () => {
+  console.log('文本被点击');
+  toolManager.createText();
 };
 //添加文本
 const addText = () => {
@@ -51,6 +61,7 @@ const addText = () => {
 
 // 添加圆形
 const addCircle = () => {
+  console.log('圆被点击');
   console.log('圆被点击');
   toolManager.createCircle();
 };
