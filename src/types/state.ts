@@ -88,10 +88,17 @@ export interface TextState extends BaseNodeState {
 export interface ImageState extends BaseNodeState {
   type: NodeType.IMAGE;
   props: {
-    src: string; // 资源 URL (不存 HTMLImageElement)
-    filters: {
-      blur: number;
-      brightness: number;
+    imageUrl: string; // 资源 URL (不存 HTMLImageElement)
+    filters: {  //NOTE: 滤镜需要通过以下细分属性来设置
+      grayscale?: number;      // 0-100
+      blur?: number;           // 像素值
+      brightness?: number;     // 百分比
+      contrast?: number;       // 百分比
+      saturate?: number;       // 百分比
+      hueRotate?: number;      // 角度值
+      opacity?: number;        // 百分比
+      invert?: number;         // 百分比
+      sepia?: number;          // 百分比
     };
   };
 }
