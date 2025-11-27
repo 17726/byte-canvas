@@ -21,7 +21,6 @@ import { ref, computed, watch } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore'
 import { NodeType } from '@/types/state'
 import type { TextState } from '@/types/state';
-// import { worldToClient } from '@/core/utils/geometry';
   const fontSize = ref(16);
   const canvasStore = useCanvasStore();
   const viewport = computed(() => canvasStore.viewport)
