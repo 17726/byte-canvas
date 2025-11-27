@@ -50,7 +50,7 @@ const viewportStyle = computed(() => ({
 
 // 2. 组件映射工厂
 const getComponentType = (type: NodeType) => {
-  console.log("开始映射")
+  // Removed excessive debug log
   switch (type) {
     case NodeType.RECT:
       return RectLayer;
