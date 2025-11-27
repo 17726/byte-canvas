@@ -28,11 +28,17 @@ const isSelected = computed(() => store.activeElementIds.has(props.node.id));
   /* 基础样式由 style 绑定控制 */
   box-sizing: border-box;
   transition: box-shadow 0.2s;
+  cursor: move; /* 显示四方箭头拖拽光标 */
+  user-select: none; /* 禁止文本选择 */
+  -webkit-user-select: none; /* Safari */
+  -moz-user-select: none; /* Firefox */
+  -ms-user-select: none; /* IE/Edge */
 }
 
 .is-selected {
   /* 选中时的视觉反馈 */
   outline: 2px solid #1890ff;
+  outline-offset: 0; /* 确保 outline 不会触发焦点 */
   box-shadow: 0 0 0 4px rgba(24, 144, 255, 0.2);
 }
 </style>

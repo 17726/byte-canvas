@@ -1,8 +1,8 @@
 <template>
   <!-- 透明矩形内部写文字，即文本框 -->
-  <div class="textBox" :style="style" :class="{ 'is-selected': isSelected } " >
+  <div class="textBox" :style="style" :class="{ 'is-selected': isSelected }">
     <div class="text-content">
-      {{node.props.content}}
+      {{ node.props.content }}
     </div>
   </div>
 </template>
@@ -12,8 +12,6 @@ import { computed } from 'vue';
 import type { TextState } from '@/types/state';
 import { useCanvasStore } from '@/store/canvasStore';
 import { getDomStyle } from '@/core/renderers/dom';
-
-
 
 const props = defineProps<{
   node: TextState;
@@ -26,11 +24,9 @@ const style = computed(() => getDomStyle(props.node));
 
 // 选中状态
 const isSelected = computed(() => store.activeElementIds.has(props.node.id));
-
 </script>
 
 <style scoped>
-
 .is-selected {
   /* 选中时的视觉反馈 */
   outline: 2px solid #1890ff;
@@ -48,6 +44,11 @@ const isSelected = computed(() => store.activeElementIds.has(props.node.id));
   min-height: 80px;
   min-width: 150px;
   background: transparent;
+  cursor: move;
+  user-select: none; /* 禁止文本选择 */
+  -webkit-user-select: none; /* Safari */
+  -moz-user-select: none; /* Firefox */
+  -ms-user-select: none; /* IE/Edge */
 }
 
 .text-content {
@@ -66,5 +67,4 @@ const isSelected = computed(() => store.activeElementIds.has(props.node.id));
   word-wrap: break-word;
   overflow-wrap: break-word;
 }
-
 </style>
