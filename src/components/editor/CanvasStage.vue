@@ -43,7 +43,7 @@ import TextLayer from './layers/TextLayer.vue';
 import CircleLayer from './layers/CircleLayer.vue';
 import ImageLayer from './layers/ImageLayer.vue';
 import SelectionOverlay from './SelectionOverlay.vue';
-import ContextToolbar from './ContextToolbar.vue'; // Import ContextToolbar
+import ContextToolbar from '../layout/ContextToolbar.vue'; // Import ContextToolbar
 import { ToolManager } from '@/core/tools/ToolManager';
 
 const store = useCanvasStore();

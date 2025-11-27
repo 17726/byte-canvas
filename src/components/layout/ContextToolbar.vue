@@ -1,5 +1,31 @@
 <template>
   <div v-if="isVisible" class="context-toolbar" :style="positionStyle" @mousedown.stop>
+    <!-- Common Properties (Opacity & Layer) -->
+    <div class="tool-section">
+      <div class="tool-item" title="Opacity">
+        <span class="label">Opacity</span>
+        <a-slider
+          v-model="opacity"
+          :min="0"
+          :max="1"
+          :step="0.01"
+          style="width: 60px; margin-left: 8px"
+          size="mini"
+        />
+      </div>
+      <div class="divider"></div>
+      <div class="tool-item">
+        <a-button size="mini" type="text" @click="bringToFront" title="Bring to Front">
+          <icon-bring-to-front />
+        </a-button>
+        <a-button size="mini" type="text" @click="sendToBack" title="Send to Back">
+          <icon-send-to-back />
+        </a-button>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
     <!-- Shape Controls -->
     <template v-if="isShape">
       <div class="tool-item">
@@ -64,7 +90,7 @@
 
     <div class="divider"></div>
 
-    <!-- Common -->
+    <!-- Delete -->
     <div class="tool-item">
       <a-button size="mini" status="danger" type="text" @click="handleDelete">
         <icon-delete />
@@ -84,6 +110,8 @@ import {
   TextItalic as IconTextItalic,
   TextUnderline as IconTextUnderline,
   Strikethrough as IconStrikethrough,
+  BringToFrontOne as IconBringToFront,
+  SentToBack as IconSendToBack,
 } from '@icon-park/vue-next';
 
 const store = useCanvasStore();
@@ -105,8 +133,6 @@ const positionStyle = computed(() => {
   const { x, y, width, rotation } = node.transform;
 
   // 计算节点在屏幕上的位置（相对于 CanvasStage 容器）
-  // 注意：这里简化了旋转的处理，仅基于包围盒左上角和宽度计算中心点
-  // 如果需要更精确的跟随旋转，需要计算旋转后的包围盒
   const worldCenter = {
     x: x + width / 2,
     y: y,
@@ -129,6 +155,44 @@ const isShape = computed(() => {
 const isText = computed(() => {
   return activeNode.value?.type === NodeType.TEXT;
 });
+
+// --- Common Actions ---
+const opacity = computed({
+  get: () => activeNode.value?.style.opacity ?? 1,
+  set: (val) => {
+    if (activeNode.value) {
+      store.updateNode(activeNode.value.id, {
+        style: { ...activeNode.value.style, opacity: val as number },
+      });
+    }
+  },
+});
+
+const bringToFront = () => {
+  if (!activeNode.value) return;
+  const id = activeNode.value.id;
+  const order = [...store.nodeOrder];
+  const index = order.indexOf(id);
+  if (index > -1) {
+    order.splice(index, 1);
+    order.push(id);
+    store.nodeOrder = order;
+    store.version++;
+  }
+};
+
+const sendToBack = () => {
+  if (!activeNode.value) return;
+  const id = activeNode.value.id;
+  const order = [...store.nodeOrder];
+  const index = order.indexOf(id);
+  if (index > -1) {
+    order.splice(index, 1);
+    order.unshift(id);
+    store.nodeOrder = order;
+    store.version++;
+  }
+};
 
 // --- Shape Actions ---
 const fillColor = computed({
@@ -218,13 +282,19 @@ const handleDelete = () => {
   z-index: 1000;
   display: flex;
   align-items: center;
-  padding: 4px 8px;
-  background-color: var(--color-bg-5);
-  background-color: #232324; /* 强制深色背景 */
-  border-radius: 20px;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  padding: 6px 12px;
+  background-color: var(--color-bg-2); /* 白色背景 */
+  border-radius: 8px; /* 圆角矩形 */
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1); /* 柔和阴影 */
   gap: 8px;
   pointer-events: auto;
+  border: 1px solid var(--color-border-2);
+}
+
+.tool-section {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .tool-item {
@@ -232,25 +302,15 @@ const handleDelete = () => {
   align-items: center;
 }
 
+.label {
+  font-size: 12px;
+  color: var(--color-text-2);
+  margin-right: 4px;
+}
+
 .divider {
   width: 1px;
   height: 16px;
-  background-color: rgba(255, 255, 255, 0.2);
-}
-
-/* 覆盖 Arco 样式以适应深色工具栏 */
-:deep(.arco-btn-text) {
-  color: #fff;
-}
-:deep(.arco-btn-text:hover) {
-  background-color: rgba(255, 255, 255, 0.1);
-}
-:deep(.arco-input-number) {
-  background-color: rgba(255, 255, 255, 0.1);
-  color: #fff;
-  border: none;
-}
-:deep(.arco-input-number-input) {
-  color: #fff;
+  background-color: var(--color-border-2);
 }
 </style>
