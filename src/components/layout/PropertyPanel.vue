@@ -107,8 +107,8 @@ import { computed, ref, watch } from 'vue'
           }
           // 设置边框色
           if (firstElement.style.borderColor) {
-              borderColor.value = firstElement.style.borderColor;
-            }
+            borderColor.value = firstElement.style.borderColor;
+          }
           if(firstElement.style.borderWidth){
             activeStyleValue.value = firstElement.style.borderWidth;
           }
