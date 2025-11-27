@@ -16,14 +16,17 @@ export class ToolManager {
   private lastPos = { x: 0, y: 0 };
   private stageEl: HTMLElement | null; // 画布根元素
 
-  /** 临时拖动状态 */
+   /**
+   *临时拖动状态
+   */
   private dragState: InternalDragState = {
-    isDragging: false,
-    type: null,
-    nodeId: '',
-    startMouseX: 0,
-    startMouseY: 0,
+    isDragging: false, // 是否正在拖拽节点
+    type: null, // 拖拽类型：移动/缩放/旋转
+    nodeId: '', // 被拖拽的节点ID
+    startMouseX: 0,// 拖拽起始鼠标屏幕X
+    startMouseY: 0,// 拖拽起始鼠标屏幕Y
     startTransform: {
+       // 节点起始位置/尺寸（深拷贝，避免引用同步）
       x: 0,
       y: 0,
       width: 0,
@@ -65,19 +68,27 @@ export class ToolManager {
     };
   }
 
-  /** 处理画布滚轮事件 (缩放) */
+  /**
+   * 处理画布滚轮事件 (缩放)
+   */
   handleWheel(e: WheelEvent) {
     e.preventDefault();
     const zoomSensitivity = 0.001;
     const delta = -e.deltaY * zoomSensitivity;
     const newZoom = Math.max(0.1, Math.min(5, this.store.viewport.zoom + delta));
+    
+    // TODO: 以鼠标为中心缩放
     this.store.viewport.zoom = newZoom;
   }
 
-  /** 处理画布鼠标按下事件 (中键平移 / 左键框选) */
+  /**
+   * 处理画布鼠标按下事件 (平移开始 / 取消选中)
+   */
   handleMouseDown(e: MouseEvent) {
+      // 互斥逻辑：如果正在拖拽节点，不触发画布平移
     if (this.dragState.isDragging) return;
 
+    // 记录起始位置
     this.lastPos.x = e.clientX;
     this.lastPos.y = e.clientY;
 
@@ -91,10 +102,13 @@ export class ToolManager {
     }
   }
 
-  /** 处理全局鼠标移动事件 */
+  /**
+   * 处理全局鼠标移动事件 (平移中 / 缩放中)
+   */
   handleMouseMove(e: MouseEvent) {
+    // 优先处理节点拖拽
     if (this.dragState.isDragging) {
-      this.handleNodeMove(e);
+      this.handleNodeMove(e);// 调用节点拖拽计算逻辑
       return;
     }
 
@@ -107,8 +121,10 @@ export class ToolManager {
     if (this.isPanDragging) {
       const dx = e.clientX - this.lastPos.x;
       const dy = e.clientY - this.lastPos.y;
+
       this.store.viewport.offsetX += dx;
       this.store.viewport.offsetY += dy;
+
       this.lastPos.x = e.clientX;
       this.lastPos.y = e.clientY;
       return;
@@ -119,8 +135,11 @@ export class ToolManager {
     }
   }
 
-  /** 处理全局鼠标松开事件 */
+   /**
+   * 处理全局鼠标松开事件 (平移结束 / 缩放结束)
+   */
   handleMouseUp() {
+    // 重置画布平移状态
     this.isPanDragging = false;
     this.handleNodeUp();
 
@@ -197,22 +216,31 @@ export class ToolManager {
     this.store.setActive(selectedIds);
   }
 
-  /** 处理节点鼠标按下事件 */
+  /**
+   * 处理节点鼠标按下事件 (选中)
+   */
   handleNodeDown(e: MouseEvent, id: string) {
+    // 1.阻止事件冒泡，避免触发画布的 handleMouseDown (导致取消选中)
     e.stopPropagation();
 
+     // 2. 多选逻辑：按住 Ctrl/Cmd 键时切换选中状态
     if (e.ctrlKey || e.metaKey) {
+      // Ctrl/Cmd + 点击：切换选中状态（多选模式）
       this.store.toggleSelection(id);
       return;
     } else {
+       // 普通点击：单选模式
       this.store.setActive([id]);
     }
 
+     // 3. 获取节点数据，校验有效性
     const node = this.store.nodes[id] as BaseNodeState;
     if (!node || node.isLocked) return;
 
+    // 4. 标记交互中，防止昂贵操作（如自动保存）
     this.store.isInteracting = true;
 
+     // 5. 初始化拖拽状态（深拷贝节点初始transform，避免引用同步）
     this.dragState = {
       isDragging: true,
       type: 'move',
@@ -223,15 +251,19 @@ export class ToolManager {
     };
   }
 
-  /** 节点鼠标移动事件 */
-  handleNodeMove(e: MouseEvent) {
-    if (!this.dragState.isDragging || !this.dragState.nodeId) return;
 
+  /**
+   * 节点鼠标移动事件（处理拖拽位移计算）
+   */
+  handleNodeMove(e: MouseEvent) {
+     // 1. 非拖拽状态，直接返回
+    if (!this.dragState.isDragging || !this.dragState.nodeId) return;
+     // 如果没有按住鼠标，强制结束拖拽
     if ((e.buttons & 1) === 0) {
       this.handleNodeUp();
       return;
     }
-
+    // 2. 获取视口状态（画布缩放/平移/网格配置
     const viewport = this.store.viewport as ViewportState;
     const node = this.store.nodes[this.dragState.nodeId] as BaseNodeState;
     if (!node) return;
@@ -243,18 +275,31 @@ export class ToolManager {
       this.dragState.startMouseY
     );
 
+    // 4. 计算鼠标偏移量（世界坐标下，避免缩放影响）
     const deltaX = currentWorldPos.x - startWorldPos.x;
     const deltaY = currentWorldPos.y - startWorldPos.y;
 
+    // 5. 计算节点新位置（初始位置 + 偏移）
     const newX = this.dragState.startTransform.x + deltaX;
     const newY = this.dragState.startTransform.y + deltaY;
 
+        // TODO: Implement grid snapping logic here if viewport.isSnapToGrid is true.
+    // Example:
+    // if (viewport.isSnapToGrid) {
+    //   const snapped = snapToGrid(viewport, newX, newY);
+    //   newX = snapped.x;
+    //   newY = snapped.y;
+    // }
+
+    // 7. 细粒度更新节点位置（触发响应式刷新）
     this.store.updateNode(this.dragState.nodeId, {
       transform: { ...node.transform, x: newX, y: newY },
     });
   }
 
-  /** 节点鼠标松开事件 */
+   /**
+   * 节点鼠标松开事件（重置拖拽状态）
+   */
   handleNodeUp() {
     // 修正：移除重复的 dragState 重置（仅保留整体重置即可）
     this.dragState = {
@@ -268,12 +313,16 @@ export class ToolManager {
     // 解除交互锁
     this.store.isInteracting = false;
   }
-
+  /**
+   * 业务逻辑：创建矩形
+   */
   /** 创建矩形 */
   createRect() {
     const id = uuidv4();
+     // 随机位置
     const x = Number((Math.random() * 800).toFixed(2));
     const y = Number((Math.random() * 600).toFixed(2));
+    // 这里修改一下 保留两位小数 不然界面展示xy坐标的时候过长
 
     const newRect: ShapeState = {
       id,
@@ -288,7 +337,9 @@ export class ToolManager {
         opacity: 1,
         zIndex: 1,
       },
-      props: { cornerRadius: 0 },
+      props: { 
+        cornerRadius: 0
+       },
       parentId: null,
       isLocked: false,
       isVisible: true,
@@ -300,7 +351,9 @@ export class ToolManager {
     console.log('矩形创建完成');
   }
 
-  /** 创建圆形 */
+  /**
+   * 业务逻辑：创建圆形
+   */
   createCircle() {
     const id = uuidv4();
     const x = Math.random() * 800;
@@ -310,7 +363,13 @@ export class ToolManager {
       id,
       type: NodeType.CIRCLE,
       name: 'Circle',
-      transform: { x, y, width: 100, height: 100, rotation: 0 },
+      transform: {
+        x,
+        y,
+        width: 100,
+        height: 100,
+        rotation: 0,
+      },
       style: {
         backgroundColor: '#ADD8E6',
         borderWidth: 1,
@@ -319,7 +378,10 @@ export class ToolManager {
         opacity: 1,
         zIndex: 1,
       },
-      props: { cornerRadius: 0 },
+      props: {
+        // cornerRadius is rectangle-specific; set to 0 for circles for interface compliance
+        cornerRadius: 0,
+      },
       parentId: null,
       isLocked: false,
       isVisible: true,
@@ -331,9 +393,12 @@ export class ToolManager {
     console.log('圆形创建完成');
   }
 
-  /** 创建文本 */
+  /**
+   * 业务逻辑：创建文本
+   */
   createText() {
     const id = uuidv4();
+    // 随机位置
     const x = Math.random() * 800;
     const y = Math.random() * 600;
 
@@ -341,21 +406,28 @@ export class ToolManager {
       id,
       type: NodeType.TEXT,
       name: 'Text',
-      transform: { x, y, width: 100, height: 100, rotation: 0 },
+       transform: {
+        x,
+        y,
+        width: 100,
+        height: 100,
+        rotation: 0,
+      },
       style: {
-        backgroundColor: '#fff0',
+        backgroundColor: '#fff0',//背景色
         borderWidth: 2,
         borderStyle: 'solid',
-        borderColor: '#fff0',
+        borderColor: '#fff0', //边框透明
         opacity: 1,
         zIndex: 1,
       },
       props: {
-        content: '这里采用了vue绑定，修改这里，内容会响应式改变。但编辑功能暂时没实现，mvp版本中先写死。',
+          content:
+          '这里采用了vue绑定，修改这里，内容会响应式改变。但编辑功能暂时没实现，mvp版本中先写死。',
         fontFamily: 'Segoe UI',
         fontSize: 16,
-        fontWeight: 400,
-        fontStyle: 'normal',
+        fontWeight: 400,// B (加粗)
+        fontStyle: 'normal',// I (斜体)
         color: '#000',
         lineHeight: 1.6,
       },
@@ -369,20 +441,26 @@ export class ToolManager {
     console.log('文本创建完成');
   }
 
-  /** 删除选中元素 */
+  /**
+   * 业务逻辑：删除选中元素
+   */
   deleteSelected() {
     this.store.activeElementIds.forEach((id) => {
       this.store.deleteNode(id);
     });
   }
 
-  /** 处理缩放控制点鼠标按下事件 */
+  /**
+   * 处理缩放控制点鼠标按下事件
+   */
   handleResizeHandleDown(e: MouseEvent, nodeId: string, handle: ResizeHandle) {
     e.stopPropagation();
 
     const node = this.store.nodes[nodeId];
     if (!node || node.isLocked) return;
 
+    
+    // 标记交互中
     this.store.isInteracting = true;
 
     this.resizeState = {
@@ -398,13 +476,17 @@ export class ToolManager {
     };
   }
 
-  /** 处理缩放过程中的鼠标移动 */
+
+  /**
+   * 处理缩放过程中的鼠标移动
+   */
   private handleResizeMove(e: MouseEvent) {
     const { handle, nodeId, startX, startY, startWidth, startHeight, startNodeX, startNodeY } =
       this.resizeState;
 
     if (!handle || !nodeId) return;
 
+    // 如果没有按住鼠标左键，强制结束缩放
     if ((e.buttons & 1) === 0) {
       this.resizeState.isResizing = false;
       this.resizeState.handle = null;
@@ -416,6 +498,7 @@ export class ToolManager {
     const node = this.store.nodes[nodeId];
     if (!node) return;
 
+    // 计算鼠标移动的距离（考虑缩放
     const dx = (e.clientX - startX) / this.store.viewport.zoom;
     const dy = (e.clientY - startY) / this.store.viewport.zoom;
 
@@ -424,8 +507,10 @@ export class ToolManager {
     let newX = startNodeX;
     let newY = startNodeY;
 
+    // 根据节点类型选择不同的缩放策略
     switch (node.type) {
       case NodeType.CIRCLE:
+        // 圆形：等比缩放，保持宽高相等
         this.resizeCircle(
           handle,
           dx,
@@ -442,7 +527,9 @@ export class ToolManager {
           }
         );
         break;
+
       case NodeType.RECT:
+        // 矩形：独立缩放宽高
         this.resizeRect(
           handle,
           dx,
@@ -459,7 +546,10 @@ export class ToolManager {
           }
         );
         break;
+
       case NodeType.IMAGE:
+        // 图片：等比缩放（保持宽高比）
+        // TODO: 实现图片等比缩放逻辑
         this.resizeRect(
           handle,
           dx,
@@ -476,7 +566,9 @@ export class ToolManager {
           }
         );
         break;
+
       case NodeType.TEXT:
+        // 文本：只改变容器大小，不缩放字体 
         this.resizeText(
           handle,
           dx,
@@ -493,7 +585,10 @@ export class ToolManager {
           }
         );
         break;
+
       case NodeType.GROUP:
+        // 组合：等比缩放所有子元素
+        // TODO: 实现组合缩放逻辑
         this.resizeRect(
           handle,
           dx,
@@ -510,7 +605,9 @@ export class ToolManager {
           }
         );
         break;
+
       default:
+        // 默认使用矩形缩放逻辑
         this.resizeRect(
           handle,
           dx,
@@ -529,7 +626,10 @@ export class ToolManager {
         break;
     }
 
+    // 限制最小尺寸
     const minSize = 20;
+
+     // 圆形和矩形都使用独立的宽高限制（因为圆形现在可以拉伸成椭圆）
     if (newWidth < minSize) {
       newWidth = minSize;
       if (handle.includes('w')) {
@@ -543,6 +643,7 @@ export class ToolManager {
       }
     }
 
+    // 使用 updateNode 方法更新节点的变换状态
     this.store.updateNode(nodeId, {
       transform: {
         ...node.transform,
@@ -554,7 +655,11 @@ export class ToolManager {
     });
   }
 
-  /** 圆形缩放计算 */
+  /**
+   * 圆形缩放计算
+   * - 四个角（nw, ne, se, sw）：等比缩放，保持圆形
+   * - 四条边（n, e, s, w）：独立缩放宽高，可拉伸成椭圆
+   */
   private resizeCircle(
     handle: ResizeHandle,
     dx: number,
@@ -570,21 +675,23 @@ export class ToolManager {
     let newX = startNodeX;
     let newY = startNodeY;
 
-    const isCorner = handle.length === 2;
+      // 判断是否为角点（等比缩放）还是边点（可拉伸）
+    const isCorner = handle.length === 2; // 'nw', 'ne', 'se', 'sw' 长度为2
 
     if (isCorner) {
+      // 角点：等比缩放，保持圆形
       let delta = 0;
       switch (handle) {
-        case 'nw':
+        case 'nw': // 左上：取平均值
           delta = -(dx + dy) / 2;
           break;
-        case 'ne':
+        case 'ne':// 右上：取平均值
           delta = (dx - dy) / 2;
           break;
-        case 'se':
+        case 'se':// 右下：取平均值
           delta = (dx + dy) / 2;
           break;
-        case 'sw':
+        case 'sw':// 左下：取平均值
           delta = (-dx + dy) / 2;
           break;
       }
@@ -592,6 +699,7 @@ export class ToolManager {
       newWidth = startWidth + delta * 2;
       newHeight = startHeight + delta * 2 * (startHeight / startWidth);
 
+      // 根据控制点调整位置
       if (handle.includes('w')) {
         newX = startNodeX - delta;
       }
@@ -599,18 +707,19 @@ export class ToolManager {
         newY = startNodeY - delta;
       }
     } else {
+      // 边点：独立缩放宽高，可拉伸成椭圆
       switch (handle) {
-        case 'n':
+        case 'n':// 上：只改变高度
           newHeight = startHeight - dy * 2;
           newY = startNodeY + dy;
           break;
-        case 'e':
+        case 'e': // 右：只改变宽度
           newWidth = startWidth + dx * 2;
           break;
-        case 's':
+        case 's':// 下：只改变高度
           newHeight = startHeight + dy * 2;
           break;
-        case 'w':
+        case 'w':// 左：只改变宽度
           newWidth = startWidth - dx * 2;
           newX = startNodeX + dx;
           break;
@@ -625,7 +734,9 @@ export class ToolManager {
     });
   }
 
-  /** 矩形缩放计算 */
+  /**
+   * 矩形缩放计算（独立缩放宽高）
+   */
   private resizeRect(
     handle: ResizeHandle,
     dx: number,
@@ -642,37 +753,37 @@ export class ToolManager {
     let newY = startNodeY;
 
     switch (handle) {
-      case 'nw':
+      case 'nw':// 左上
         newWidth = startWidth - dx;
         newHeight = startHeight - dy;
         newX = startNodeX + dx;
         newY = startNodeY + dy;
         break;
-      case 'n':
+      case 'n':// 上
         newHeight = startHeight - dy;
         newY = startNodeY + dy;
         break;
-      case 'ne':
+      case 'ne':// 右上
         newWidth = startWidth + dx;
         newHeight = startHeight - dy;
         newY = startNodeY + dy;
         break;
-      case 'e':
+      case 'e':// 右
         newWidth = startWidth + dx;
         break;
-      case 'se':
+      case 'se':// 右下
         newWidth = startWidth + dx;
         newHeight = startHeight + dy;
         break;
-      case 's':
+      case 's':// 下
         newHeight = startHeight + dy;
         break;
-      case 'sw':
+      case 'sw':// 左下
         newWidth = startWidth - dx;
         newHeight = startHeight + dy;
         newX = startNodeX + dx;
         break;
-      case 'w':
+      case 'w':// 左下
         newWidth = startWidth - dx;
         newX = startNodeX + dx;
         break;
@@ -686,7 +797,10 @@ export class ToolManager {
     });
   }
 
-  /** 文本缩放计算 */
+   /**
+   * 文本缩放计算（只改变容器大小，不改变字号）
+   * 与矩形缩放逻辑相同，但不会影响文本的 fontSize
+   */
   private resizeText(
     handle: ResizeHandle,
     dx: number,
@@ -702,44 +816,49 @@ export class ToolManager {
     let newX = startNodeX;
     let newY = startNodeY;
 
+    
+    // 文本容器的缩放逻辑与矩形相同
+    // 区别在于：文本的字体大小（fontSize）不会随容器缩放而改变
     switch (handle) {
-      case 'nw':
+      case 'nw':// 左上
         newWidth = startWidth - dx;
         newHeight = startHeight - dy;
         newX = startNodeX + dx;
         newY = startNodeY + dy;
         break;
-      case 'n':
+      case 'n':// 上
         newHeight = startHeight - dy;
         newY = startNodeY + dy;
         break;
-      case 'ne':
+      case 'ne':// 右上
         newWidth = startWidth + dx;
         newHeight = startHeight - dy;
         newY = startNodeY + dy;
         break;
-      case 'e':
+      case 'e':// 右
         newWidth = startWidth + dx;
         break;
-      case 'se':
+      case 'se':// 右下
         newWidth = startWidth + dx;
         newHeight = startHeight + dy;
         break;
-      case 's':
+      case 's':// 下
         newHeight = startHeight + dy;
         break;
-      case 'sw':
+      case 'sw':// 左下
         newWidth = startWidth - dx;
         newHeight = startHeight + dy;
         newX = startNodeX + dx;
         break;
-      case 'w':
+      case 'w':// 左
         newWidth = startWidth - dx;
         newX = startNodeX + dx;
         break;
     }
 
+    // 限制最小尺寸（与其他缩放方法一致）
     const minSize = 20;
+
     if (newWidth < minSize) {
       newWidth = minSize;
       if (handle.includes('w')) {
@@ -762,5 +881,4 @@ export class ToolManager {
   }
 }
 
-// 若需导出类型，补充如下（示例）：
-// export type { ResizeHandle, InternalResizeState, InternalDragState };
+// 导出类型以便在组件中使用

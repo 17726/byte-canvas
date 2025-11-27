@@ -1,5 +1,10 @@
 <template>
   <div class="canvas-stage" ref="stageRef" @mousedown="handleMouseDown" @wheel="handleWheel">
+    <!--
+      视口层 (Viewport Layer)
+      职责：应用全局的平移(Translate)和缩放(Scale)
+      对应文档：L4 渲染层 - 画布容器
+    -->
     <!-- 框选视觉层 -->
     <div
       v-if="isBoxSelecting"
@@ -9,6 +14,11 @@
 
     <!-- 视口层 -->
     <div class="canvas-viewport" :style="viewportStyle">
+      <!--
+        图元渲染层 (Node Rendering Layer)
+        职责：遍历 Store 中的节点列表进行渲染
+        对应文档：L4 渲染层 - 响应式渲染
+      -->
       <!-- 图元渲染层 -->
       <component
         v-for="node in store.renderList"
@@ -19,7 +29,7 @@
       />
     </div>
 
-    <!-- 辅助信息 -->
+    <!-- 辅助信息：显示当前视口状态 -->
     <div class="debug-info">
       Zoom: {{ (store.viewport.zoom * 100).toFixed(0) }}% <br />
       X: {{ store.viewport.offsetX.toFixed(0) }} <br />
@@ -44,7 +54,7 @@ let toolManager: ToolManager; // 延迟初始化
 // 1. 视口样式计算
 const viewportStyle = computed(() => ({
   transform: `translate(${store.viewport.offsetX}px, ${store.viewport.offsetY}px) scale(${store.viewport.zoom})`,
-  transformOrigin: '0 0',
+  transformOrigin: '0 0', // 从左上角开始变换
 }));
 
 // 2. 组件映射工厂
@@ -53,14 +63,15 @@ const getComponentType = (type: NodeType) => {
     case NodeType.RECT:
       return RectLayer;
     case NodeType.CIRCLE:
-      return CircleLayer;
+      return CircleLayer; // 暂时用 Rect 代替
     case NodeType.TEXT:
       return TextLayer;
     default:
       return 'div';
   }
 };
-
+// 3. 事件转发 -> 逻辑层 (ToolManager)
+// 滚轮缩放
 // 框选状态响应式数据
 const isBoxSelecting = ref(false);
 const boxSelectStart = ref({ x: 0, y: 0 });
@@ -97,10 +108,12 @@ const handleWheel = (e: WheelEvent) => {
   if (!toolManager) return; // 防御性判断
   toolManager.handleWheel(e);
 };
+// 鼠标按下
 const handleMouseDown = (e: MouseEvent) => {
   if (!toolManager) return;
   toolManager.handleMouseDown(e);
 };
+// 鼠标移动
 const handleMouseMove = (e: MouseEvent) => {
   if (!toolManager) return;
   toolManager.handleMouseMove(e);
@@ -110,6 +123,7 @@ const handleMouseMove = (e: MouseEvent) => {
   boxSelectStart.value = boxState.boxSelectStart;
   boxSelectEnd.value = boxState.boxSelectEnd;
 };
+// 鼠标抬起
 const handleMouseUp = () => {
   if (!toolManager) return;
   toolManager.handleMouseUp();
@@ -118,6 +132,7 @@ const handleMouseUp = () => {
 
 // 节点交互转发
 const handleNodeDown = (e: MouseEvent, id: string) => {
+    // 注意：这里传入 e，以便 ToolManager 处理 stopPropagation 或其他逻辑
   if (!toolManager) return;
   toolManager.handleNodeDown(e, id);
 };
@@ -155,14 +170,19 @@ onUnmounted(() => {
 .canvas-stage {
   width: 100%;
   height: 100%;
-  overflow: hidden;
-  background-color: #f5f5f5;
+  overflow: hidden; /* 隐藏超出视口的内容 */
+  background-color: #f5f5f5;/* 画布背景色 */
   position: relative;
+  /* cursor: grab; */ /* 暂时禁用拖拽手势 */
 }
+/* .canvas-stage:active {
+  cursor: grabbing;
+} */
 
 .canvas-viewport {
   width: 100%;
   height: 100%;
+   /* 硬件加速 */
   will-change: transform;
 }
 
