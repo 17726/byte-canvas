@@ -155,7 +155,7 @@ const y = computed({
 
 // 填充色 (Background Color)
 const fillColor = computed({
-  get: () => getFirstSelectionValue((n) => n.style.backgroundColor, 'transparent'),
+  get: () => getFirstSelectionValue((n) => n.style.backgroundColor, '#FFFFFF'),
   set: (val) => {
     updateSelectedNodes((node) => ({
       style: { ...node.style, backgroundColor: val },
