@@ -57,7 +57,6 @@ const addText = () => {
 // 添加圆形
 const addCircle = () => {
   console.log('圆被点击');
-  console.log('圆被点击');
   toolManager.createCircle();
 };
 
