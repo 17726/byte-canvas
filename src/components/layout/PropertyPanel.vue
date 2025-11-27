@@ -33,12 +33,7 @@
         <a-input-number @change="updateBorderWidth" v-model="activeStyleValue" :style="{width:'120px'}" placeholder="Please Enter" class="input-demo"/>
       </a-button-group>
     </a-space>
-    
-    <!-- 多选提示 -->
-    <div v-if="isMultipleSelection" class="multiple-selection-hint">
-      已选择 {{ canvasStore.activeElements.length }} 个元素
-      <small>修改坐标将相对移动所有元素</small>
-    </div>
+    <!-- 移除：多选提示 DOM 节点 -->
   </a-space>
 </template>
 
@@ -50,7 +45,8 @@ const canvasStore = useCanvasStore()
 const fillColor = ref('#ffccc7')
 const viceColor = ref('#ff4d4f')
 const hasSelection = computed(() => canvasStore.activeElements.length > 0)
-const isMultipleSelection = computed(() => canvasStore.activeElements.length > 1)
+// 可选：删除无引用的 isMultipleSelection 计算属性
+// const isMultipleSelection = computed(() => canvasStore.activeElements.length > 1)
 
 // 使用 ref 存储坐标，但不再直接 watch 它们
 const x = ref(0)
@@ -235,17 +231,5 @@ watch(() => canvasStore.activeElements, (newElements) => {
 </script>
 
 <style scoped>
-.multiple-selection-hint {
-  background-color: #f0f0f0;
-  padding: 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  color: #666;
-}
 
-.multiple-selection-hint small {
-  display: block;
-  margin-top: 4px;
-  color: #999;
-}
 </style>
