@@ -38,6 +38,9 @@ const isSelected = computed(() => store.activeElementIds.has(props.node.id));
   /* 容器样式 */
   overflow: auto;
   margin: 0;
+  /* FIXME: CSS 最小尺寸可能导致视觉大小 > 数据尺寸(transform.width/height)。
+     这会导致碰撞检测（基于数据）失效（看起来点中了但没选中）。
+     建议：移除 min-wh，或者实现文本内容变化时自动更新 Store 尺寸的逻辑。 */
   min-height: 80px;
   min-width: 150px;
   background: transparent;

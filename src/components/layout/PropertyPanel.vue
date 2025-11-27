@@ -5,11 +5,13 @@
     <a-space>
       <a-color-picker  @change="fillColorChange" v-model="fillColor" />
       <a-color-picker  @change="viceColorChange" v-model="viceColor" />
-      <a-input-number value = "x" :disabled="!hasSelection" v-model="x" :style="{width:'80px'}" placeholder="X" class="input-demo"/>
-      <a-input-number value = "y" :disabled="!hasSelection" v-model="y" :style="{width:'80px'}" placeholder="Y" class="input-demo"/>
+      <!-- 使用 precision 属性控制显示精度，而不是修改底层数据 -->
+      <a-input-number value = "x" :disabled="!hasSelection" v-model="x" :precision="2" :style="{width:'80px'}" placeholder="X" class="input-demo"/>
+      <a-input-number value = "y" :disabled="!hasSelection" v-model="y" :precision="2" :style="{width:'80px'}" placeholder="Y" class="input-demo"/>
       <a-button-group>
       <a-button @click="moveLayerUp" type="primary">上移</a-button>
       <a-button @click="moveLayerDown" type="primary">下移</a-button>
+      <!-- TODO: 样式硬编码，以后可以提取为公共样式，并尽量用 UI 库原生的 props 或 theme 机制 -->
       <a-button @click="toggleFontBold" type="primary" style="background-color: white;color: black;border: 0;">B</a-button>
       <a-button @click="toggleFontStrikethrough" type="primary" style="background-color: white;color: black;border: 0;">S</a-button>
       <a-button @click="setFontItalic" type="primary" style="background-color: white;color: black;border: 0;">I</a-button>
@@ -43,6 +45,7 @@ const canvasStore = useCanvasStore()
     });
   }
   const viceColorChange = (val: string) => {
+    // FIXME: 文本节点实际用 props.color/CSS 变量渲染，这里改 style 颜色无法改变文字颜色，需分支处理。
     canvasStore.activeElements.forEach(element => {
       if (element && element.id && element.style) {
           canvasStore.updateNode(element.id, {
@@ -138,6 +141,8 @@ const canvasStore = useCanvasStore()
     }
   }, { immediate: true, deep: true })
   watch(x, (newX) => {
+    // FIXME: 多选模式下，直接将所有元素的 X 坐标设为相同值，会导致元素重叠。
+    // 建议：多选时应计算相对位移 (deltaX)，或者禁用坐标修改，或者明确这是“对齐”操作。
     canvasStore.activeElements.forEach(element => {
       if (element && element.id && element.transform) {
         canvasStore.updateNode(element.id, {
@@ -150,6 +155,7 @@ const canvasStore = useCanvasStore()
     });
   });
   watch(y, (newY) => {
+    // FIXME: 同上，多选模式下会导致元素重叠。
     canvasStore.activeElements.forEach(element => {
       if (element && element.id && element.transform) {
         canvasStore.updateNode(element.id, {

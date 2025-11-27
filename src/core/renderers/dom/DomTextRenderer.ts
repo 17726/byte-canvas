@@ -50,6 +50,8 @@ export class DomTextRenderer implements INodeRenderer<CSSProperties> {
       '--text-scale': 1
 
       // --- 交互属性 ---
+      // NOTE: 后期可恢复基于 isVisible 的 display 控制，否则文本节点无法按可见性隐藏，行为与其他渲染器不一致。
+
       // 这里的 display 控制显隐
       // display: node.isVisible ? 'block' : 'none',
     };

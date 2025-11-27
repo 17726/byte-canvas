@@ -1,5 +1,6 @@
 import { useCanvasStore } from '@/store/canvasStore';
 import { NodeType, type BaseNodeState, type ShapeState, type TextState } from '@/types/state';
+import { NodeType, type BaseNodeState, type ShapeState, type TextState } from '@/types/state';
 import type { InternalDragState } from '@/types/editor';
 import { v4 as uuidv4 } from 'uuid';
 import type { ViewportState } from '@/types/state';
@@ -17,7 +18,24 @@ export class ToolManager {
   /**
    *临时拖动状态
    */
+  /**
+   *临时拖动状态
+   */
   private dragState: InternalDragState = {
+    isDragging: false, // 是否正在拖拽节点
+    type: null, // 拖拽类型：移动/缩放/旋转
+    nodeId: '', // 被拖拽的节点ID
+    startMouseX: 0, // 拖拽起始鼠标屏幕X
+    startMouseY: 0, // 拖拽起始鼠标屏幕Y
+    startTransform: {
+      // 节点起始位置/尺寸（深拷贝，避免引用同步）
+      x: 0,
+      y: 0,
+      width: 0,
+      height: 0,
+      rotation: 0,
+    },
+  };
     isDragging: false, // 是否正在拖拽节点
     type: null, // 拖拽类型：移动/缩放/旋转
     nodeId: '', // 被拖拽的节点ID
@@ -117,14 +135,34 @@ export class ToolManager {
       // 普通点击：单选模式
       this.store.setActive([id]);
     }
+    // 注意：在 Vue 中可以使用 @mousedown.stop，如果移到这里，需要手动调用
+    // 但为了保持"Vue仅转发"，建议在Vue层就 .stop，或者在这里调用 e.stopPropagation()
+    e.stopPropagation();
+    // 2. 基础选中逻辑（TODO: 后续扩展Shift/Ctrl多选）
+    // TODO: 支持多选 (Shift/Ctrl)
+    this.store.setActive([id]);
 
+    // 3. 获取节点数据，校验有效性
+    const node = this.store.nodes[id] as BaseNodeState;
+    if (!node || node.isLocked) return;
     // 3. 获取节点数据，校验有效性
     const node = this.store.nodes[id] as BaseNodeState;
     if (!node || node.isLocked) return;
 
     // 4. 标记交互中，防止昂贵操作（如自动保存）
     this.store.isInteracting = true;
+    // 4. 标记交互中，防止昂贵操作（如自动保存）
+    this.store.isInteracting = true;
 
+    // 5. 初始化拖拽状态（深拷贝节点初始transform，避免引用同步）
+    this.dragState = {
+      isDragging: true,
+      type: 'move',
+      nodeId: id,
+      startMouseX: e.clientX,
+      startMouseY: e.clientY,
+      startTransform: { ...node.transform },
+    };
     // 5. 初始化拖拽状态（深拷贝节点初始transform，避免引用同步）
     this.dragState = {
       isDragging: true,
@@ -142,13 +180,28 @@ export class ToolManager {
   handleNodeMove(e: MouseEvent) {
     // 1. 非拖拽状态，直接返回
     if (!this.dragState.isDragging || !this.dragState.nodeId) return;
+  /**
+   * 节点鼠标移动事件（处理拖拽位移计算）
+   */
+  handleNodeMove(e: MouseEvent) {
+    // 1. 非拖拽状态，直接返回
+    if (!this.dragState.isDragging || !this.dragState.nodeId) return;
 
     // 如果没有按住鼠标，强制结束拖拽
     if ((e.buttons & 1) === 0) {
       this.handleNodeUp();
       return;
     }
+    // 如果没有按住鼠标，强制结束拖拽
+    if ((e.buttons & 1) === 0) {
+      this.handleNodeUp();
+      return;
+    }
 
+    // 2. 获取视口状态（画布缩放/平移/网格配置）
+    const viewport = this.store.viewport as ViewportState;
+    const node = this.store.nodes[this.dragState.nodeId] as BaseNodeState;
+    if (!node) return;
     // 2. 获取视口状态（画布缩放/平移/网格配置）
     const viewport = this.store.viewport as ViewportState;
     const node = this.store.nodes[this.dragState.nodeId] as BaseNodeState;
@@ -161,7 +214,17 @@ export class ToolManager {
       this.dragState.startMouseX,
       this.dragState.startMouseY
     );
+    // 3. 屏幕坐标 → 画布世界坐标（抵消画布缩放/平移）
+    const currentWorldPos = clientToWorld(viewport, e.clientX, e.clientY);
+    const startWorldPos = clientToWorld(
+      viewport,
+      this.dragState.startMouseX,
+      this.dragState.startMouseY
+    );
 
+    // 4. 计算鼠标偏移量（世界坐标下，避免缩放影响）
+    const deltaX = currentWorldPos.x - startWorldPos.x;
+    const deltaY = currentWorldPos.y - startWorldPos.y;
     // 4. 计算鼠标偏移量（世界坐标下，避免缩放影响）
     const deltaX = currentWorldPos.x - startWorldPos.x;
     const deltaY = currentWorldPos.y - startWorldPos.y;
@@ -169,6 +232,9 @@ export class ToolManager {
     // 5. 计算节点新位置（初始位置 + 偏移）
     let newX = this.dragState.startTransform.x + deltaX;
     let newY = this.dragState.startTransform.y + deltaY;
+    // 5. 计算节点新位置（初始位置 + 偏移）
+    const newX = this.dragState.startTransform.x + deltaX;
+    const newY = this.dragState.startTransform.y + deltaY;
 
     // TODO: Implement grid snapping logic here if viewport.isSnapToGrid is true.
     // Example:
@@ -177,7 +243,19 @@ export class ToolManager {
     //   newX = snapped.x;
     //   newY = snapped.y;
     // }
+    // TODO: Implement grid snapping logic here if viewport.isSnapToGrid is true.
+    // Example:
+    // if (viewport.isSnapToGrid) {
+    //   const snapped = snapToGrid(viewport, newX, newY);
+    //   newX = snapped.x;
+    //   newY = snapped.y;
+    // }
 
+    // 7. 细粒度更新节点位置（触发响应式刷新）
+    this.store.updateNode(this.dragState.nodeId, {
+      transform: { ...node.transform, x: newX, y: newY },
+    });
+  }
     // 7. 细粒度更新节点位置（触发响应式刷新）
     this.store.updateNode(this.dragState.nodeId, {
       transform: { ...node.transform, x: newX, y: newY },
@@ -197,10 +275,28 @@ export class ToolManager {
       startMouseY: 0,
       startTransform: { x: 0, y: 0, width: 0, height: 0, rotation: 0 },
     };
+  /**
+   * 节点鼠标松开事件（重置拖拽状态）
+   */
+  handleNodeUp() {
+    // 1. 重置拖拽状态
+    this.dragState = {
+      isDragging: false,
+      type: null,
+      nodeId: '',
+      startMouseX: 0,
+      startMouseY: 0,
+      startTransform: { x: 0, y: 0, width: 0, height: 0, rotation: 0 },
+    };
 
     // 2. 解除交互锁
     this.store.isInteracting = false;
+    // 2. 解除交互锁
+    this.store.isInteracting = false;
 
+    // 3. 可选：触发节点拖拽结束的钩子（如保存、日志）
+    // this.emit('nodeDragEnd', e, this.dragState.nodeId);
+  }
     // 3. 可选：触发节点拖拽结束的钩子（如保存、日志）
     // this.emit('nodeDragEnd', e, this.dragState.nodeId);
   }
@@ -211,9 +307,9 @@ export class ToolManager {
   createRect() {
     const id = uuidv4();
     // 随机位置
-    const x = Number((Math.random() * 800).toFixed(2));
-    const y = Number((Math.random() * 600).toFixed(2));
-    // 这里修改一下 保留两位小数 不然界面展示xy坐标的时候过长
+    // NOTE：不应该在这里限制精度，应该在UI层处理 --- IGNORE ---
+    const x = Math.random() * 800;
+    const y = Math.random() * 600;
 
     const newRect: ShapeState = {
       id,
@@ -276,7 +372,7 @@ export class ToolManager {
         zIndex: 1,
       },
       props: {
-        // cornerRadius is rectangle-specific; set to 0 for circles for interface compliance
+        // cornerRadius 是矩形专用；对于圆形设置为 0 以符合接口规范
         cornerRadius: 0,
       },
       parentId: null,
@@ -321,9 +417,12 @@ export class ToolManager {
       props: {
         content:
           '这里采用了vue绑定，修改这里，内容会响应式改变。但编辑功能暂时没实现，mvp版本中先写死。',
+        content:
+          '这里采用了vue绑定，修改这里，内容会响应式改变。但编辑功能暂时没实现，mvp版本中先写死。',
         fontFamily: 'Segoe UI',
         fontSize: 16,
         fontWeight: 400, // B (加粗)
+        fontStyle: 'normal', // I (斜体)
         fontStyle: 'normal', // I (斜体)
         color: '#000',
         lineHeight: 1.6,
@@ -347,3 +446,4 @@ export class ToolManager {
     });
   }
 }
+
