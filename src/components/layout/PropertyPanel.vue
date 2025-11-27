@@ -95,11 +95,12 @@ const canvasStore = useCanvasStore()
   }
   const toggleFontStrikethrough = () => {
     canvasStore.activeElements.forEach(element => {
-      if (element && element.id&& element.type=='text') {
-        canvasStore.updateNode(element.id, {
-          props:{
-            ...element.props,
-            strikethrough: element.props.strikethrough?false:true
+      if (element && element.id && element.type == 'text') {
+        const textElement = element as TextState;
+        canvasStore.updateNode(textElement.id, {
+          props: {
+            ...textElement.props,
+            strikethrough: textElement.props.strikethrough ? false : true
           }
         });
       }
