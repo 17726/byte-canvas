@@ -97,8 +97,8 @@ function onMenuItemClick(key: string) {
       setTimeout(() => { selectedKeys.value = []; }, 200);
       break;
     case MenuKey.AddImage:
-      console.log("照片被点击");
-      // toolManager.createImage();
+      console.log("图片被点击");
+      toolManager.createImage();
       selectedKeys.value = [key];
       setTimeout(() => { selectedKeys.value = []; }, 200);
       break;

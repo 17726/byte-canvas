@@ -1,9 +1,15 @@
-import { useCanvasStore } from '@/store/canvasStore';
-import { NodeType, type BaseNodeState, type ShapeState, type TextState } from '@/types/state';
-import type { InternalDragState } from '@/types/editor';
-import { v4 as uuidv4 } from 'uuid';
-import type { ViewportState } from '@/types/state';
 import { clientToWorld } from '@/core/utils/geometry';
+import { useCanvasStore } from '@/store/canvasStore';
+import type { InternalDragState } from '@/types/editor';
+import type { ViewportState } from '@/types/state';
+import {
+  NodeType,
+  type BaseNodeState,
+  type ImageState,
+  type ShapeState,
+  type TextState,
+} from '@/types/state';
+import { v4 as uuidv4 } from 'uuid';
 
 /**
  * 逻辑层：工具管理器
@@ -336,6 +342,58 @@ export class ToolManager {
     this.store.addNode(newText);
     this.store.setActive([id]);
     console.log('文本创建完成');
+  }
+
+  /**
+   * 业务逻辑：创建图片
+   */
+  createImage() {
+    const id = uuidv4();
+    // 随机位置
+    const x = Math.random() * 800;
+    const y = Math.random() * 600;
+
+    const newImage: ImageState = {
+      id,
+      type: NodeType.IMAGE,
+      name: 'Image',
+      transform: {
+        x,
+        y,
+        width: 100,
+        height: 100,
+        rotation: 0,
+      },
+      style: {
+        backgroundColor: '#fff0', //背景色
+        borderWidth: 2,
+        borderStyle: 'solid',
+        borderColor: '#fff0', //边框透明
+        opacity: 1,
+        zIndex: 1,
+      },
+      props: {
+        imageUrl: '/uploads/images/img-test_1.jpg', // 资源 URL
+        filters: {  //NOTE: 滤镜需要通过以下细分属性来设置
+          grayscale: 0,      // 0-100
+          blur: 0,           // 像素值
+          brightness: 100,     // 百分比
+          contrast: 100,      // 百分比
+          saturate: 100,    // 百分比
+          hueRotate: 0,      // 角度值
+          opacity: 100,        // 百分比
+          invert: 0,         // 百分比
+          sepia: 0,          // 百分比
+        },
+      },
+      parentId: null,
+      isLocked: false,
+      isVisible: true,
+    };
+
+    this.store.addNode(newImage);
+    this.store.setActive([id]);
+    console.log('图片创建完成');
   }
 
   /**
