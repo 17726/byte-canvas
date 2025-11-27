@@ -1,9 +1,10 @@
+<!-- 属性面板 -->
 <template>
   <a-space direction="vertical" size="large">
     <a-space>
       <a-color-picker @change="fillColorChange" v-model="fillColor" />
       <a-color-picker @change="viceColorChange" v-model="viceColor" />
-      <!-- 使用 precision 属性控制显示精度，而不是修改底层数据 -->
+      <!-- 移除了多余的value属性，避免与v-model冲突 -->
       <a-input-number 
         :disabled="!hasSelection" 
         v-model="x" 
@@ -11,7 +12,6 @@
         :style="{width:'80px'}" 
         placeholder="X" 
         class="input-demo"
-        @blur="handleXBlur"
       />
       <a-input-number 
         :disabled="!hasSelection" 
@@ -20,7 +20,6 @@
         :style="{width:'80px'}" 
         placeholder="Y" 
         class="input-demo"
-        @blur="handleYBlur"
       />
       <a-button-group>
         <a-button @click="moveLayerUp" type="primary">上移</a-button>
@@ -30,32 +29,24 @@
         <a-button @click="toggleFontStrikethrough" type="primary" style="background-color: white;color: black;border: 0;">S</a-button>
         <a-button @click="setFontItalic" type="primary" style="background-color: white;color: black;border: 0;">I</a-button>
         <a-button @click="toggleFontUnderline" type="primary" style="background-color: white;color: black;border: 0;">U</a-button>
-        <a-input-number @change="updateBorderWidth" v-model="activeStyleValue" :style="{width:'120px'}" placeholder="Please Enter" class="input-demo"/>
+        <a-input-number  @change="updateBorderWidth" v-model="activeStyleValue" :style="{width:'120px'}" placeholder="Please Enter" class="input-demo"/>
       </a-button-group>
     </a-space>
-    <!-- 移除：多选提示 DOM 节点 -->
   </a-space>
 </template>
 
 <script setup lang="ts">
 import { useCanvasStore } from '@/store/canvasStore'
 import { computed, ref, watch } from 'vue'
-
 const canvasStore = useCanvasStore()
 const fillColor = ref('#ffccc7')
 const viceColor = ref('#ff4d4f')
 const hasSelection = computed(() => canvasStore.activeElements.length > 0)
-// 可选：删除无引用的 isMultipleSelection 计算属性
-// const isMultipleSelection = computed(() => canvasStore.activeElements.length > 1)
-
-// 使用 ref 存储坐标，但不再直接 watch 它们
+// 新增：判断是否为多选状态
+const isMultipleSelection = computed(() => canvasStore.activeElements.length > 1)
 const x = ref(0)
 const y = ref(0)
 const activeStyleValue = ref(16)
-
-// 存储第一个节点的初始坐标，用于计算相对移动
-let firstNodeInitialX = 0
-let firstNodeInitialY = 0
 
 const fillColorChange = (val: string) => {
   canvasStore.activeElements.forEach(element => {
@@ -139,54 +130,6 @@ const updateBorderWidth = () => {
   });
 }
 
-// 处理 X 坐标变化 - 使用相对移动而非绝对设置
-const handleXBlur = () => {
-  if (canvasStore.activeElements.length === 0) return;
-  
-  const firstElement = canvasStore.activeElements[0];
-  if (!firstElement || !firstElement.transform) return;
-  
-  // 计算相对移动量
-  const deltaX = x.value - firstNodeInitialX;
-  
-  // 应用到所有选中元素
-  canvasStore.activeElements.forEach(element => {
-    if (element && element.id && element.transform) {
-      const newX = element.transform.x + deltaX;
-      canvasStore.updateNode(element.id, {
-        transform: {
-          ...element.transform,
-          x: newX
-        }
-      });
-    }
-  });
-}
-
-// 处理 Y 坐标变化 - 使用相对移动而非绝对设置
-const handleYBlur = () => {
-  if (canvasStore.activeElements.length === 0) return;
-  
-  const firstElement = canvasStore.activeElements[0];
-  if (!firstElement || !firstElement.transform) return;
-  
-  // 计算相对移动量
-  const deltaY = y.value - firstNodeInitialY;
-  
-  // 应用到所有选中元素
-  canvasStore.activeElements.forEach(element => {
-    if (element && element.id && element.transform) {
-      const newY = element.transform.y + deltaY;
-      canvasStore.updateNode(element.id, {
-        transform: {
-          ...element.transform,
-          y: newY
-        }
-      });
-    }
-  });
-}
-
 // 监听选中元素变化，更新所有属性
 watch(() => canvasStore.activeElements, (newElements) => {
   if (newElements.length > 0) {
@@ -196,10 +139,6 @@ watch(() => canvasStore.activeElements, (newElements) => {
       if (firstElement.transform) {
         x.value = firstElement.transform.x;
         y.value = firstElement.transform.y;
-        
-        // 保存第一个节点的初始坐标，用于计算相对移动
-        firstNodeInitialX = firstElement.transform.x;
-        firstNodeInitialY = firstElement.transform.y;
       }
       // 更新颜色
       if (firstElement.style) {
@@ -227,9 +166,38 @@ watch(() => canvasStore.activeElements, (newElements) => {
   }
 }, { immediate: true, deep: true })
 
-// 移除原来的 watch(x) 和 watch(y)，改用 blur 事件处理
+watch(x, (newX) => {
+  // FIXME: 多选模式下，直接将所有元素的 X 坐标设为相同值，会导致元素重叠。
+  // 建议：多选时应计算相对位移 (deltaX)，或者禁用坐标修改，或者明确这是“对齐”操作。
+  if (isMultipleSelection.value) {
+    return; // 多选时不执行此操作，避免将元素设为同一值
+  }
+  canvasStore.activeElements.forEach(element => {
+    if (element && element.id && element.transform) {
+      canvasStore.updateNode(element.id, {
+        transform: {
+          ...element.transform,
+          x: newX
+        }
+      });
+    }
+  });
+});
+
+watch(y, (newY) => {
+  // FIXME: 同上，多选模式下会导致元素重叠。
+  if (isMultipleSelection.value) {
+    return; // 多选时不执行此操作，避免将元素设为同一值
+  }
+  canvasStore.activeElements.forEach(element => {
+    if (element && element.id && element.transform) {
+      canvasStore.updateNode(element.id, {
+        transform: {
+          ...element.transform,
+          y: newY
+        }
+      });
+    }
+  });
+});
 </script>
-
-<style scoped>
-
-</style>
