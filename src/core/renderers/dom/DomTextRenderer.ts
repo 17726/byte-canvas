@@ -48,7 +48,6 @@ export class DomTextRenderer implements INodeRenderer<CSSProperties> {
       '--text-color': props.color || '#000000',
       '--line-height': props.lineHeight || 1.6,
       '--text-scale': 1,
-      '--text-decoration': props.textDecoration || 'none',
       '--text-decoration-line': props.textDecorationLine || 'none',
 
       // --- 交互属性 ---
