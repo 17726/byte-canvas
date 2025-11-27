@@ -109,8 +109,8 @@
         <!-- Shape Specific -->
         <template v-if="isShape && activeNode.shapeType === 'rect'">
           <div class="prop-item">
-            <span class="label">圆角</span>
-            <a-input-number v-model="cornerRadius" size="small" :min="0" />
+            <span class="label">圆角 (%)</span>
+            <a-slider v-model="cornerRadius" :min="0" :max="50" :step="1" show-input size="small" />
           </div>
         </template>
       </div>

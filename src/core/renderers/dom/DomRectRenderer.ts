@@ -43,7 +43,8 @@ export class DomRectRenderer implements INodeRenderer<CSSProperties> {
       // --- 特有属性 ---
       // 使用可选链(?.)和空值合并(??)处理圆角，防止 undefined 报错
       // 如果是圆形工具，逻辑层会把 cornerRadius 设为 50%
-      borderRadius: props.cornerRadius ? `${props.cornerRadius}px` : undefined,
+      // 改为百分比单位，最大 50%
+      borderRadius: props.cornerRadius ? `${props.cornerRadius}%` : undefined,
 
       // --- 交互属性 ---
       // 这里的 display 控制显隐，比如被删除或编组隐藏时
