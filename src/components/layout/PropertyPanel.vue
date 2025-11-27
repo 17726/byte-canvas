@@ -186,7 +186,7 @@ const textColor = computed({
     updateSelectedNodes((node) => {
       if (node.type === NodeType.TEXT) {
         return {
-          props: { ...(node as TextState).props, color: val },
+          props: { ...(node as TextState).props || {}, color: val },
         };
       }
       return null;
