@@ -27,6 +27,7 @@
       Y: {{ store.viewport.offsetY.toFixed(0) }}
     </div>
   </div>
+  <NodeHighlight></NodeHighlight>
 </template>
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
@@ -36,7 +37,7 @@ import RectLayer from './layers/RectLayer.vue';
 import CircleLayer from './layers/CircleLayer.vue';
 // import TextLayer from './layers/TextLayer.vue';
 import { ToolManager } from '@/core/tools/ToolManager';
-
+import NodeHighlight from './NodeHighlight.vue'
 const store = useCanvasStore();
 const stageRef = ref<HTMLElement | null>(null);
 const toolManager = new ToolManager();

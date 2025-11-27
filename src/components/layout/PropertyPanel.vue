@@ -45,21 +45,12 @@ const canvasStore = useCanvasStore()
   const viceColorChange = (val: string) => {
     canvasStore.activeElements.forEach(element => {
       if (element && element.id && element.style) {
-        if(element.type === 'rect' || element.type === 'circle'){
-          canvasStore.updateNode(element.id, {
-            style: {
-              ...element.style,
-              borderColor: val
-            }
-          });
-        }else{
-          canvasStore.updateNode(element.id, {
-            style: {
-              ...element.style,
-              color: val
-            }
-          });
-        }
+        canvasStore.updateNode(element.id, {
+          style: {
+            ...element.style,
+            borderColor: val
+          }
+        });
       }
     });
   }
