@@ -2,6 +2,7 @@
 import { defineStore } from 'pinia';
 import { ref, reactive, computed } from 'vue';
 import type { NodeState } from '@/types/state';
+import { DEFAULT_VIEWPORT } from '@/config/defaults';
 
 export const useCanvasStore = defineStore('canvas', () => {
   // 1. 核心数据
@@ -13,16 +14,7 @@ export const useCanvasStore = defineStore('canvas', () => {
   const viewport = reactive({
     canvasWidth: 0,
     canvasHeight: 0,
-    zoom: 1,
-    offsetX: 0,
-    offsetY: 0,
-
-    // --- 辅助 (并给出默认值) ---
-    rotation: 0, // 默认不旋转
-    backgroundColor: '#ffffff', // 默认白底
-    isGridVisible: true, // 默认显示网格
-    gridSize: 20, // 默认 20px 网格
-    isSnapToGrid: true, // 默认开启吸附
+    ...DEFAULT_VIEWPORT,
   });
 
   // 3. 交互状态

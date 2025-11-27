@@ -11,6 +11,19 @@ import {
   type TextState,
 } from '@/types/state';
 import { v4 as uuidv4 } from 'uuid';
+import {
+  DEFAULT_RECT_STYLE,
+  DEFAULT_RECT_PROPS,
+  DEFAULT_CIRCLE_STYLE,
+  DEFAULT_CIRCLE_PROPS,
+  DEFAULT_TEXT_STYLE,
+  DEFAULT_TEXT_PROPS,
+  DEFAULT_IMAGE_STYLE,
+  DEFAULT_IMAGE_URL,
+  DEFAULT_IMAGE_FILTERS,
+  DEFAULT_NODE_SIZE,
+  MIN_NODE_SIZE,
+} from '@/config/defaults';
 
 /**
  * 逻辑层：工具管理器
@@ -252,21 +265,12 @@ export class ToolManager {
       transform: {
         x,
         y,
-        width: 100,
-        height: 100,
+        width: DEFAULT_NODE_SIZE,
+        height: DEFAULT_NODE_SIZE,
         rotation: 0,
       },
-      style: {
-        backgroundColor: '#ffccc7',
-        borderWidth: 1,
-        borderStyle: 'solid',
-        borderColor: '#ff4d4f',
-        opacity: 1,
-        zIndex: 1,
-      },
-      props: {
-        cornerRadius: 0,
-      },
+      style: { ...DEFAULT_RECT_STYLE },
+      props: { ...DEFAULT_RECT_PROPS },
       parentId: null,
       isLocked: false,
       isVisible: true,
@@ -293,22 +297,12 @@ export class ToolManager {
       transform: {
         x,
         y,
-        width: 100,
-        height: 100,
+        width: DEFAULT_NODE_SIZE,
+        height: DEFAULT_NODE_SIZE,
         rotation: 0,
       },
-      style: {
-        backgroundColor: '#ADD8E6',
-        borderWidth: 1,
-        borderStyle: 'solid',
-        borderColor: '#87CEEB',
-        opacity: 1,
-        zIndex: 1,
-      },
-      props: {
-        // cornerRadius 是矩形专用；对于圆形设置为 0 以符合接口规范
-        cornerRadius: 0,
-      },
+      style: { ...DEFAULT_CIRCLE_STYLE },
+      props: { ...DEFAULT_CIRCLE_PROPS },
       parentId: null,
       isLocked: false,
       isVisible: true,
@@ -336,30 +330,12 @@ export class ToolManager {
       transform: {
         x,
         y,
-        width: 100,
-        height: 100,
+        width: DEFAULT_NODE_SIZE,
+        height: DEFAULT_NODE_SIZE,
         rotation: 0,
       },
-      style: {
-        backgroundColor: '#fff0', //背景色
-        borderWidth: 2,
-        borderStyle: 'solid',
-        borderColor: '#fff0', //边框透明
-        opacity: 1,
-        zIndex: 1,
-      },
-      props: {
-        content:
-          '这里采用了vue绑定，修改这里，内容会响应式改变。但编辑功能暂时没实现，mvp版本中先写死。',
-        fontFamily: 'Segoe UI',
-        fontSize: 16,
-        fontWeight: 400, // B (加粗)
-        fontStyle: 'normal', // I (斜体)
-        color: '#000',
-        lineHeight: 1.6,
-        underline: false,
-        strikethrough: false,
-      },
+      style: { ...DEFAULT_TEXT_STYLE },
+      props: { ...DEFAULT_TEXT_PROPS },
       parentId: null,
       isLocked: false,
       isVisible: true,
@@ -386,32 +362,14 @@ export class ToolManager {
       transform: {
         x,
         y,
-        width: 100,
-        height: 100,
+        width: DEFAULT_NODE_SIZE,
+        height: DEFAULT_NODE_SIZE,
         rotation: 0,
       },
-      style: {
-        backgroundColor: '#fff0', //背景色
-        borderWidth: 2,
-        borderStyle: 'solid',
-        borderColor: '#fff0', //边框透明
-        opacity: 1,
-        zIndex: 1,
-      },
+      style: { ...DEFAULT_IMAGE_STYLE },
       props: {
-        imageUrl: '/uploads/images/img-test_2.png', // 资源 URL
-        filters: {
-          //NOTE: 滤镜需要通过以下细分属性来设置
-          grayscale: 0, // 0-100
-          blur: 0, // 像素值
-          brightness: 100, // 百分比
-          contrast: 100, // 百分比
-          saturate: 100, // 百分比
-          hueRotate: 0, // 角度值
-          filterOpacity: 100, // 百分比
-          invert: 0, // 百分比
-          sepia: 0, // 百分比
-        },
+        imageUrl: DEFAULT_IMAGE_URL,
+        filters: { ...DEFAULT_IMAGE_FILTERS },
       },
       parentId: null,
       isLocked: false,
@@ -607,7 +565,7 @@ export class ToolManager {
     }
 
     // 限制最小尺寸
-    const minSize = 20;
+    const minSize = MIN_NODE_SIZE;
 
     // 圆形和矩形都使用独立的宽高限制（因为圆形现在可以拉伸成椭圆）
     if (newWidth < minSize) {
@@ -839,7 +797,7 @@ export class ToolManager {
     }
 
     // 限制最小尺寸（与其他缩放方法一致）
-    const minSize = 20;
+    const minSize = MIN_NODE_SIZE;
 
     if (newWidth < minSize) {
       newWidth = minSize;
