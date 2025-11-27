@@ -1,175 +1,409 @@
-<!-- 属性面板 -->
 <template>
-  <a-space direction="vertical" size="large" class="property-panel">
-    <!-- 1. 颜色设置 -->
-    <a-space>
-      <!-- 填充色 (仅形状) -->
-      <a-color-picker
-        v-if="showFillColor"
-        v-model="fillColor"
-        size="small"
-        show-text
-        disabled-alpha
-      />
-      <!-- 边框色 (形状) 或 文本色 (文本) -->
-      <a-color-picker v-model="strokeColor" size="small" show-text disabled-alpha />
-    </a-space>
+  <div class="property-panel">
+    <!-- Canvas Settings Mode -->
+    <div v-if="isCanvas" class="panel-content">
+      <div class="panel-header">
+        <span class="node-type">画布设置</span>
+      </div>
+      <div class="panel-section">
+        <div class="panel-section">
+          <div class="section-title">网格</div>
+          <div class="prop-item">
+            <span class="label">显示网格</span>
+            <a-switch v-model:checked="store.viewport.isGridVisible" />
+          </div>
+          <div class="prop-item">
+            <span class="label">样式</span>
+            <a-radio-group v-model="store.viewport.gridStyle" size="mini">
+              <a-radio value="dot">点</a-radio>
+              <a-radio value="line">线</a-radio>
+              <a-radio value="none">无</a-radio>
+            </a-radio-group>
+          </div>
+          <div class="prop-item">
+            <span class="label">网格颜色</span>
+            <a-color-picker v-model="store.viewport.gridDotColor" size="small" show-text />
+          </div>
+          <div class="prop-item">
+            <span class="label">间距</span>
+            <a-input-number v-model="store.viewport.gridSize" size="small" :min="8" :max="200" />
+          </div>
+          <div class="prop-item">
+            <span class="label">粗细</span>
+            <a-input-number v-model="store.viewport.gridDotSize" size="small" :min="1" :max="8" />
+          </div>
+        </div>
+      </div>
+      <a-divider style="margin: 12px 0" />
+      <div class="panel-section">
+        <div class="section-title">背景与主题</div>
+        <div class="prop-item">
+          <span class="label">背景色</span>
+          <a-color-picker v-model="store.viewport.backgroundColor" size="small" show-text />
+        </div>
+        <div class="prop-item">
+          <span class="label">主题</span>
+          <div class="preset-buttons">
+            <a-button
+              v-for="theme in presets"
+              :key="theme.name"
+              size="mini"
+              type="text"
+              @click="applyPreset(theme)"
+              >{{ theme.name }}</a-button
+            >
+          </div>
+        </div>
+      </div>
+    </div>
 
-    <!-- 2. 坐标尺寸 -->
-    <a-space>
-      <a-input-number v-model="x" :precision="2" :style="{ width: '80px' }" placeholder="X">
-        <template #prefix>X</template>
-      </a-input-number>
-      <a-input-number v-model="y" :precision="2" :style="{ width: '80px' }" placeholder="Y">
-        <template #prefix>Y</template>
-      </a-input-number>
-    </a-space>
+    <!-- Node Property Mode -->
+    <div v-else>
+      <div v-if="!activeNode" class="empty-state">
+        <a-empty description="未选中元素" />
+      </div>
+      <div v-else class="panel-content">
+        <div class="panel-header">
+          <span class="node-type">{{ activeNode?.type?.toUpperCase() }}</span>
+          <span class="node-id">#{{ activeNode?.id?.slice(-4) }}</span>
+        </div>
 
-    <!-- 3. 文本样式 (仅文本节点显示) -->
-    <a-button-group v-if="isTextSelected">
-      <a-button @click="toggleBold" :type="isBold ? 'primary' : 'secondary'">B</a-button>
-      <a-button @click="toggleItalic" :type="isItalic ? 'primary' : 'secondary'">I</a-button>
-      <a-button @click="toggleUnderline" :type="isUnderline ? 'primary' : 'secondary'">U</a-button>
-      <a-button @click="toggleStrikethrough" :type="isStrikethrough ? 'primary' : 'secondary'"
-        >S</a-button
-      >
-    </a-button-group>
+        <!-- Section 1: 变换 (Transform) -->
+        <div class="panel-section">
+          <div class="section-title">变换</div>
+          <a-row :gutter="8" class="prop-row">
+            <a-col :span="12">
+              <a-input-number v-model="transformX" size="small" mode="button">
+                <template #prefix>X</template>
+              </a-input-number>
+            </a-col>
+            <a-col :span="12">
+              <a-input-number v-model="transformY" size="small" mode="button">
+                <template #prefix>Y</template>
+              </a-input-number>
+            </a-col>
+          </a-row>
+          <a-row :gutter="8" class="prop-row">
+            <a-col :span="12">
+              <a-input-number v-model="transformW" size="small" :min="1" mode="button">
+                <template #prefix>W</template>
+              </a-input-number>
+            </a-col>
+            <a-col :span="12">
+              <a-input-number v-model="transformH" size="small" :min="1" mode="button">
+                <template #prefix>H</template>
+              </a-input-number>
+            </a-col>
+          </a-row>
+          <a-row :gutter="8" class="prop-row">
+            <a-col :span="24">
+              <a-input-number v-model="transformRotation" size="small" mode="button">
+                <template #prefix>∠</template>
+                <template #suffix>°</template>
+              </a-input-number>
+            </a-col>
+          </a-row>
+        </div>
 
-    <!-- 4. 层级操作 -->
-    <a-button-group>
-      <a-button @click="moveLayerUp">上移</a-button>
-      <a-button @click="moveLayerDown">下移</a-button>
-    </a-button-group>
-  </a-space>
+        <a-divider style="margin: 12px 0" />
+
+        <!-- Section 2: 外观 (Appearance) -->
+        <div class="panel-section">
+          <div class="section-title">外观</div>
+
+          <!-- Fill -->
+          <div class="prop-item" v-if="hasFill">
+            <span class="label">填充</span>
+            <a-color-picker v-model="fillColor" show-text size="small" />
+          </div>
+
+          <!-- Stroke -->
+          <div class="prop-item" v-if="hasStroke">
+            <span class="label">描边</span>
+            <div class="flex-row">
+              <a-color-picker v-model="strokeColor" size="small" />
+              <a-input-number v-model="strokeWidth" size="small" style="width: 80px" :min="0">
+                <template #suffix>px</template>
+              </a-input-number>
+            </div>
+          </div>
+
+          <!-- Opacity -->
+          <div class="prop-item">
+            <span class="label">不透明度</span>
+            <a-slider v-model="opacity" :min="0" :max="1" :step="0.01" show-input size="small" />
+          </div>
+        </div>
+
+        <a-divider style="margin: 12px 0" />
+
+        <!-- Section 3: 特有属性 (Specific) -->
+        <div class="panel-section" v-if="isText || isShape">
+          <div class="section-title">属性</div>
+
+          <!-- Text Specific -->
+          <template v-if="isText">
+            <div class="prop-item">
+              <span class="label">内容</span>
+              <a-textarea v-model="textContent" :auto-size="{ minRows: 2, maxRows: 5 }" />
+            </div>
+            <div class="prop-item">
+              <span class="label">字号</span>
+              <a-input-number v-model="fontSize" size="small" :min="1" />
+            </div>
+            <div class="prop-item">
+              <span class="label">字重</span>
+              <a-select v-model="fontWeight" size="small">
+                <a-option :value="400">Normal</a-option>
+                <a-option :value="700">Bold</a-option>
+              </a-select>
+            </div>
+            <div class="prop-item">
+              <span class="label">颜色</span>
+              <a-color-picker v-model="textColor" show-text size="small" />
+            </div>
+          </template>
+
+          <!-- Shape Specific -->
+          <template v-if="isRect">
+            <div class="prop-item">
+              <span class="label">圆角 (%)</span>
+              <a-slider
+                v-model="cornerRadius"
+                :min="0"
+                :max="50"
+                :step="1"
+                show-input
+                size="small"
+              />
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
+  </div>
 </template>
 
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
-import { NodeType, type NodeState, type TextState } from '@/types/state';
+import { useUIStore } from '@/store/uiStore';
+import { NodeType, type ShapeState, type TextState } from '@/types/state';
+import { DEFAULT_CANVAS_THEMES } from '@/config/defaults';
 
 const store = useCanvasStore();
+const ui = useUIStore();
+// 说明：PropertyPanel 有两种模式：'canvas' (显示画布设置) 与 'node' (显示节点属性)
+// 由 store.activePanel 决定，store.isPanelExpanded 控制面板折叠/展开
 
-// --- 核心辅助函数 (ViewModel) ---
+const activeNode = computed(() => {
+  const ids = Array.from(store.activeElementIds);
+  if (ids.length !== 1) return null;
+  const id = ids[0]!;
+  return store.nodes[id];
+});
 
-/** 获取第一个选中节点的值 (用于回显) */
-function getFirstValue<T>(getter: (node: NodeState) => T, defaultValue: T): T {
-  const first = store.activeElements[0];
-  if (!first) return defaultValue;
-  return getter(first) ?? defaultValue;
+const isCanvas = computed(() => ui.activePanel === 'canvas');
+const presets = DEFAULT_CANVAS_THEMES as {
+  name: string;
+  background: string;
+  gridColor: string;
+  gridSize: number;
+}[];
+
+/**
+ * 应用预设主题到视口：包括背景色、网格颜色与间距
+ */
+function applyPreset(theme: {
+  name: string;
+  background: string;
+  gridColor: string;
+  gridSize: number;
+}) {
+  store.viewport.backgroundColor = theme.background;
+  store.viewport.gridDotColor = theme.gridColor;
+  store.viewport.gridSize = theme.gridSize;
 }
 
-/** 批量更新所有选中节点 */
-function updateSelectedNodes(updater: (node: NodeState) => Partial<NodeState> | null) {
-  store.activeElements.forEach((node) => {
-    const patch = updater(node);
-    if (patch) {
-      store.updateNode(node.id, patch);
-    }
-  });
-}
+// --- Helpers ---
+const isShape = computed(
+  () => activeNode.value?.type === NodeType.RECT || activeNode.value?.type === NodeType.CIRCLE
+);
+const isText = computed(() => activeNode.value?.type === NodeType.TEXT);
+const isRect = computed(
+  () => isShape.value && (activeNode.value as ShapeState)?.shapeType === 'rect'
+);
+const hasFill = computed(() => isShape.value);
+const hasStroke = computed(() => isShape.value);
 
-// --- 计算属性 (双向绑定) ---
-
-// 1. 坐标 X/Y
-const x = computed({
-  get: () => getFirstValue((n) => n.transform.x, 0),
-  set: (val) => updateSelectedNodes((n) => ({ transform: { ...n.transform, x: val ?? 0 } })),
-});
-
-const y = computed({
-  get: () => getFirstValue((n) => n.transform.y, 0),
-  set: (val) => updateSelectedNodes((n) => ({ transform: { ...n.transform, y: val ?? 0 } })),
-});
-
-// 2. 颜色逻辑
-const showFillColor = computed(() => {
-  const first = store.activeElements[0];
-  return first && (first.type === NodeType.RECT || first.type === NodeType.CIRCLE);
-});
-
-const fillColor = computed({
-  get: () => getFirstValue((n) => n.style.backgroundColor, '#ffffff'),
-  set: (val) => updateSelectedNodes((n) => ({ style: { ...n.style, backgroundColor: val } })),
-});
-
-// 描边色/文本色 复用逻辑
-const strokeColor = computed({
-  get: () => {
-    const first = store.activeElements[0];
-    if (first?.type === NodeType.TEXT) {
-      return (first as TextState).props.color;
-    }
-    return first?.style.borderColor ?? '#000000';
-  },
+// --- Transform Bindings ---
+const transformX = computed({
+  get: () => activeNode.value?.transform.x || 0,
   set: (val) =>
-    updateSelectedNodes((n) => {
-      if (n.type === NodeType.TEXT) {
-        return { props: { ...(n as TextState).props, color: val } };
-      }
-      return { style: { ...n.style, borderColor: val } };
+    activeNode.value &&
+    store.updateNode(activeNode.value.id, {
+      transform: { ...activeNode.value.transform, x: val as number },
+    }),
+});
+const transformY = computed({
+  get: () => activeNode.value?.transform.y || 0,
+  set: (val) =>
+    activeNode.value &&
+    store.updateNode(activeNode.value.id, {
+      transform: { ...activeNode.value.transform, y: val as number },
+    }),
+});
+const transformW = computed({
+  get: () => activeNode.value?.transform.width || 0,
+  set: (val) =>
+    activeNode.value &&
+    store.updateNode(activeNode.value.id, {
+      transform: { ...activeNode.value.transform, width: val as number },
+    }),
+});
+const transformH = computed({
+  get: () => activeNode.value?.transform.height || 0,
+  set: (val) =>
+    activeNode.value &&
+    store.updateNode(activeNode.value.id, {
+      transform: { ...activeNode.value.transform, height: val as number },
+    }),
+});
+const transformRotation = computed({
+  get: () => activeNode.value?.transform.rotation || 0,
+  set: (val) =>
+    activeNode.value &&
+    store.updateNode(activeNode.value.id, {
+      transform: { ...activeNode.value.transform, rotation: val as number },
     }),
 });
 
-// 3. 文本样式逻辑
-const isTextSelected = computed(() => store.activeElements.some((n) => n.type === NodeType.TEXT));
+// --- Appearance Bindings ---
+const fillColor = computed({
+  get: () => (activeNode.value as ShapeState)?.style.backgroundColor || '#ffffff',
+  set: (val) =>
+    activeNode.value &&
+    store.updateNode(activeNode.value.id, {
+      style: { ...activeNode.value.style, backgroundColor: val },
+    }),
+});
+const strokeColor = computed({
+  get: () => (activeNode.value as ShapeState)?.style.borderColor || '#000000',
+  set: (val) =>
+    activeNode.value &&
+    store.updateNode(activeNode.value.id, {
+      style: { ...activeNode.value.style, borderColor: val },
+    }),
+});
+const strokeWidth = computed({
+  get: () => (activeNode.value as ShapeState)?.style.borderWidth || 0,
+  set: (val) =>
+    activeNode.value &&
+    store.updateNode(activeNode.value.id, {
+      style: { ...activeNode.value.style, borderWidth: val as number },
+    }),
+});
+const opacity = computed({
+  get: () => activeNode.value?.style.opacity ?? 1,
+  set: (val) =>
+    activeNode.value &&
+    store.updateNode(activeNode.value.id, {
+      style: { ...activeNode.value.style, opacity: val as number },
+    }),
+});
 
-const isBold = computed(() =>
-  getFirstValue((n) => (n as TextState).props?.fontWeight === 700, false)
-);
-const toggleBold = () =>
-  updateSelectedNodes((n) => {
-    if (n.type !== NodeType.TEXT) return null;
-    const textNode = n as TextState;
-    return {
-      props: { ...textNode.props, fontWeight: textNode.props.fontWeight === 700 ? 400 : 700 },
-    };
-  });
+// --- Specific Bindings ---
+// Text
+const textContent = computed({
+  get: () => (activeNode.value as TextState)?.props.content || '',
+  set: (val) =>
+    activeNode.value && store.updateNode(activeNode.value.id, { props: { content: val } }),
+});
+const fontSize = computed({
+  get: () => (activeNode.value as TextState)?.props.fontSize || 12,
+  set: (val) =>
+    activeNode.value &&
+    store.updateNode(activeNode.value.id, { props: { fontSize: val as number } }),
+});
+const fontWeight = computed({
+  get: () => (activeNode.value as TextState)?.props.fontWeight || 400,
+  set: (val) =>
+    activeNode.value &&
+    store.updateNode(activeNode.value.id, { props: { fontWeight: val as number } }),
+});
+const textColor = computed({
+  get: () => (activeNode.value as TextState)?.props.color || '#000000',
+  set: (val) =>
+    activeNode.value && store.updateNode(activeNode.value.id, { props: { color: val } }),
+});
 
-const isItalic = computed(() =>
-  getFirstValue((n) => (n as TextState).props?.fontStyle === 'italic', false)
-);
-const toggleItalic = () =>
-  updateSelectedNodes((n) => {
-    if (n.type !== NodeType.TEXT) return null;
-    const textNode = n as TextState;
-    return {
-      props: {
-        ...textNode.props,
-        fontStyle: textNode.props.fontStyle === 'italic' ? 'normal' : 'italic',
-      },
-    };
-  });
-
-const isUnderline = computed(() => getFirstValue((n) => (n as TextState).props?.underline, false));
-const toggleUnderline = () =>
-  updateSelectedNodes((n) => {
-    if (n.type !== NodeType.TEXT) return null;
-    const textNode = n as TextState;
-    return { props: { ...textNode.props, underline: !textNode.props.underline } };
-  });
-
-const isStrikethrough = computed(() =>
-  getFirstValue((n) => (n as TextState).props?.strikethrough, false)
-);
-const toggleStrikethrough = () =>
-  updateSelectedNodes((n) => {
-    if (n.type !== NodeType.TEXT) return null;
-    const textNode = n as TextState;
-    return { props: { ...textNode.props, strikethrough: !textNode.props.strikethrough } };
-  });
-
-// 4. 层级操作
-const moveLayerUp = () =>
-  updateSelectedNodes((n) => ({ style: { ...n.style, zIndex: n.style.zIndex + 1 } }));
-const moveLayerDown = () =>
-  updateSelectedNodes((n) => ({ style: { ...n.style, zIndex: n.style.zIndex - 1 } }));
+// Shape
+const cornerRadius = computed({
+  get: () => (activeNode.value as ShapeState)?.props.cornerRadius || 0,
+  set: (val) =>
+    activeNode.value &&
+    store.updateNode(activeNode.value.id, { props: { cornerRadius: val as number } }),
+});
 </script>
 
 <style scoped>
 .property-panel {
+  height: 100%;
+  background-color: var(--color-bg-2);
+  border-left: 1px solid var(--color-border);
+  overflow-y: auto;
   padding: 16px;
-  width: 100%;
-  background-color: var(--app-sidebar-bg); /* 使用主题变量 */
+}
+
+.empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--color-text-3);
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  font-weight: bold;
+  color: var(--color-text-1);
+}
+
+.node-id {
+  color: var(--color-text-3);
+  font-size: 12px;
+  font-weight: normal;
+}
+
+.section-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-3);
+  margin-bottom: 8px;
+  text-transform: uppercase;
+}
+
+.prop-row {
+  margin-bottom: 8px;
+}
+
+.prop-item {
+  margin-bottom: 12px;
+}
+
+.label {
+  display: block;
+  font-size: 12px;
+  color: var(--color-text-2);
+  margin-bottom: 4px;
+}
+
+.flex-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 </style>

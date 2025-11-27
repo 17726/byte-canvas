@@ -1,7 +1,7 @@
-import type { BaseNodeState } from '@/types/state';
+import type { NodeState } from '@/types/state';
 
 export abstract class CanvasNode {
-  constructor(public state: BaseNodeState) {}
+  constructor(public state: NodeState) {}
 
   /**
    * 业务逻辑：移动

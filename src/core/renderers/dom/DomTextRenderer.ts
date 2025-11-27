@@ -1,6 +1,6 @@
 import type { CSSProperties } from 'vue';
 import type { INodeRenderer } from '..';
-import type { BaseNodeState, TextState } from '@/types/state';
+import type { NodeState, TextState } from '@/types/state';
 
 /**
  * 【策略模式 - 具体策略】
@@ -14,12 +14,12 @@ export class DomTextRenderer implements INodeRenderer<CSSProperties> {
    * 执行渲染逻辑
    * @param node 基础节点数据
    */
-  render(node: BaseNodeState): CSSProperties {
+  render(node: NodeState): CSSProperties {
     // 1. 类型断言 (Type Assertion)
     // 我们确信传入给 TextRenderer 的一定是 TextState，所以强制告诉 TS "相信我"
     // 这样我们才能访问 props.content、props.fontFamily 等特有属性
     const shape = node as TextState;
-    const { transform, style,props } = shape;
+    const { transform, style, props } = shape;
 
     // 计算文本装饰
     const textDecoration: string[] = [];

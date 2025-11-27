@@ -1,6 +1,7 @@
 import type { InternalResizeState, ResizeHandle } from '@/types/editor';
 import { clientToWorld } from '@/core/utils/geometry';
 import { useCanvasStore } from '@/store/canvasStore';
+import { useUIStore } from '@/store/uiStore';
 import type { InternalDragState } from '@/types/editor';
 import type { ViewportState } from '@/types/state';
 import {
@@ -11,13 +12,35 @@ import {
   type TextState,
 } from '@/types/state';
 import { v4 as uuidv4 } from 'uuid';
+import {
+  DEFAULT_RECT_STYLE,
+  DEFAULT_RECT_PROPS,
+  DEFAULT_CIRCLE_STYLE,
+  DEFAULT_CIRCLE_PROPS,
+  DEFAULT_TEXT_STYLE,
+  DEFAULT_TEXT_PROPS,
+  DEFAULT_IMAGE_STYLE,
+  DEFAULT_IMAGE_URL,
+  DEFAULT_IMAGE_FILTERS,
+  DEFAULT_NODE_SIZE,
+  MIN_NODE_SIZE,
+} from '@/config/defaults';
 
 /**
  * 逻辑层：工具管理器
  * 职责：接收来自交互层（Vue组件）的原始事件，处理鼠标点击、拖拽、工具切换逻辑。
  */
+/**
+ * 工具管理器（ToolManager）
+ * 说明：负责将 UI 层（鼠标事件/键盘事件）转发为对 `store` 的状态更新。
+ * 主要职责：
+ * - 处理画布平移、缩放
+ * - 处理节点的选中/拖拽/缩放/删除/创建
+ * - 在交互时控制 `store.isInteracting` 避免额外的昂贵操作
+ */
 export class ToolManager {
   private store: ReturnType<typeof useCanvasStore>;
+  private ui: ReturnType<typeof useUIStore>;
   private isPanDragging = false;
   private lastPos = { x: 0, y: 0 };
 
@@ -54,10 +77,13 @@ export class ToolManager {
 
   constructor() {
     this.store = useCanvasStore();
+    this.ui = useUIStore();
   }
 
   /**
-   * 处理画布滚轮事件 (缩放)
+   * 处理画布滚轮事件（缩放）
+   * - e.preventDefault() 阻止页面滚动
+   * - 这里以窗口中心为基准进行缩放，可改为以鼠标为缩放中心（更符合用户期望）
    */
   handleWheel(e: WheelEvent) {
     e.preventDefault();
@@ -70,7 +96,8 @@ export class ToolManager {
   }
 
   /**
-   * 处理画布鼠标按下事件 (平移开始 / 取消选中)
+   * 处理画布鼠标按下事件（平移开始 / 取消选中）
+   * - 点击空白区，会取消所有选中并将画布置为拖拽(pan)状态
    */
   handleMouseDown(e: MouseEvent) {
     // 互斥逻辑：如果正在拖拽节点，不触发画布平移
@@ -137,7 +164,10 @@ export class ToolManager {
   }
 
   /**
-   * 处理节点鼠标按下事件 (选中)
+   * 处理节点鼠标按下事件（选中/开始拖拽）
+   * - 单击：设置单选
+   * - Ctrl/Cmd + 单击：多选切换
+   * - 选中后将右侧属性面板激活到 Node 模式（store.activePanel = 'node'）
    */
   handleNodeDown(e: MouseEvent, id: string) {
     // 1.阻止事件冒泡，避免触发画布的 handleMouseDown (导致取消选中)
@@ -159,6 +189,9 @@ export class ToolManager {
 
     // 4. 标记交互中，防止昂贵操作（如自动保存）
     this.store.isInteracting = true;
+    // 展示右侧属性面板并切换为节点模式
+    this.ui.setActivePanel('node');
+    this.ui.setPanelExpanded(true);
 
     // 5. 初始化拖拽状态（深拷贝节点初始transform，避免引用同步）
     this.dragState = {
@@ -205,7 +238,8 @@ export class ToolManager {
     const newX = this.dragState.startTransform.x + deltaX;
     const newY = this.dragState.startTransform.y + deltaY;
 
-    // TODO: Implement grid snapping logic here if viewport.isSnapToGrid is true.
+    // TODO: Implement grid snapping逻辑（如果 viewport.isSnapToGrid 为 true）
+    // 该逻辑应该在世界坐标系中进行（已转换为 world 坐标），以保证缩放/平移下 snapping 的一致性
     // Example:
     // if (viewport.isSnapToGrid) {
     //   const snapped = snapToGrid(viewport, newX, newY);
@@ -252,21 +286,12 @@ export class ToolManager {
       transform: {
         x,
         y,
-        width: 100,
-        height: 100,
+        width: DEFAULT_NODE_SIZE,
+        height: DEFAULT_NODE_SIZE,
         rotation: 0,
       },
-      style: {
-        backgroundColor: '#ffccc7',
-        borderWidth: 1,
-        borderStyle: 'solid',
-        borderColor: '#ff4d4f',
-        opacity: 1,
-        zIndex: 1,
-      },
-      props: {
-        cornerRadius: 0,
-      },
+      style: { ...DEFAULT_RECT_STYLE },
+      props: { ...DEFAULT_RECT_PROPS },
       parentId: null,
       isLocked: false,
       isVisible: true,
@@ -293,22 +318,12 @@ export class ToolManager {
       transform: {
         x,
         y,
-        width: 100,
-        height: 100,
+        width: DEFAULT_NODE_SIZE,
+        height: DEFAULT_NODE_SIZE,
         rotation: 0,
       },
-      style: {
-        backgroundColor: '#ADD8E6',
-        borderWidth: 1,
-        borderStyle: 'solid',
-        borderColor: '#87CEEB',
-        opacity: 1,
-        zIndex: 1,
-      },
-      props: {
-        // cornerRadius 是矩形专用；对于圆形设置为 0 以符合接口规范
-        cornerRadius: 0,
-      },
+      style: { ...DEFAULT_CIRCLE_STYLE },
+      props: { ...DEFAULT_CIRCLE_PROPS },
       parentId: null,
       isLocked: false,
       isVisible: true,
@@ -336,30 +351,12 @@ export class ToolManager {
       transform: {
         x,
         y,
-        width: 100,
-        height: 100,
+        width: DEFAULT_NODE_SIZE,
+        height: DEFAULT_NODE_SIZE,
         rotation: 0,
       },
-      style: {
-        backgroundColor: '#fff0', //背景色
-        borderWidth: 2,
-        borderStyle: 'solid',
-        borderColor: '#fff0', //边框透明
-        opacity: 1,
-        zIndex: 1,
-      },
-      props: {
-        content:
-          '这里采用了vue绑定，修改这里，内容会响应式改变。但编辑功能暂时没实现，mvp版本中先写死。',
-        fontFamily: 'Segoe UI',
-        fontSize: 16,
-        fontWeight: 400, // B (加粗)
-        fontStyle: 'normal', // I (斜体)
-        color: '#000',
-        lineHeight: 1.6,
-        underline:false,
-        strikethrough: false
-      },
+      style: { ...DEFAULT_TEXT_STYLE },
+      props: { ...DEFAULT_TEXT_PROPS },
       parentId: null,
       isLocked: false,
       isVisible: true,
@@ -386,31 +383,14 @@ export class ToolManager {
       transform: {
         x,
         y,
-        width: 100,
-        height: 100,
+        width: DEFAULT_NODE_SIZE,
+        height: DEFAULT_NODE_SIZE,
         rotation: 0,
       },
-      style: {
-        backgroundColor: '#fff0', //背景色
-        borderWidth: 2,
-        borderStyle: 'solid',
-        borderColor: '#fff0', //边框透明
-        opacity: 1,
-        zIndex: 1,
-      },
+      style: { ...DEFAULT_IMAGE_STYLE },
       props: {
-        imageUrl: '/uploads/images/img-test_2.png', // 资源 URL
-        filters: {  //NOTE: 滤镜需要通过以下细分属性来设置
-          grayscale: 0,      // 0-100
-          blur: 0,           // 像素值
-          brightness: 100,     // 百分比
-          contrast: 100,      // 百分比
-          saturate: 100,    // 百分比
-          hueRotate: 0,      // 角度值
-          filterOpacity: 100,        // 百分比
-          invert: 0,         // 百分比
-          sepia: 0,          // 百分比
-        },
+        imageUrl: DEFAULT_IMAGE_URL,
+        filters: { ...DEFAULT_IMAGE_FILTERS },
       },
       parentId: null,
       isLocked: false,
@@ -606,7 +586,7 @@ export class ToolManager {
     }
 
     // 限制最小尺寸
-    const minSize = 20;
+    const minSize = MIN_NODE_SIZE;
 
     // 圆形和矩形都使用独立的宽高限制（因为圆形现在可以拉伸成椭圆）
     if (newWidth < minSize) {
@@ -636,8 +616,8 @@ export class ToolManager {
 
   /**
    * 圆形缩放计算
-   * - 四个角（nw, ne, se, sw）：等比缩放，保持圆形
-   * - 四条边（n, e, s, w）：独立缩放宽高，可拉伸成椭圆
+   * - 四个角（nw, ne, se, sw）：等比缩放，保持圆形，锚点为对角
+   * - 四条边（n, e, s, w）：独立缩放宽高，可拉伸成椭圆，锚点为对边
    */
   private resizeCircle(
     handle: ResizeHandle,
@@ -654,52 +634,55 @@ export class ToolManager {
     let newX = startNodeX;
     let newY = startNodeY;
 
-    // 判断是否为角点（等比缩放）还是边点（可拉伸）
-    const isCorner = handle.length === 2; // 'nw', 'ne', 'se', 'sw' 长度为2
+    // 宽高比
+    const ratio = startWidth / startHeight;
+
+    // 判断是否为角点（等比缩放）
+    const isCorner = handle.length === 2;
 
     if (isCorner) {
-      // 角点：等比缩放，保持圆形
-      let delta = 0;
-      switch (handle) {
-        case 'nw': // 左上：取平均值
-          delta = -(dx + dy) / 2;
-          break;
-        case 'ne': // 右上：取平均值
-          delta = (dx - dy) / 2;
-          break;
-        case 'se': // 右下：取平均值
-          delta = (dx + dy) / 2;
-          break;
-        case 'sw': // 左下：取平均值
-          delta = (-dx + dy) / 2;
-          break;
+      // 角点：等比缩放，保持宽高比
+      // 以宽度变化为主导 (也可以取 max(dx, dy))
+
+      // 1. 计算基于宽度的预期新宽度
+      if (handle.includes('e')) {
+        newWidth = startWidth + dx;
+      } else {
+        newWidth = startWidth - dx;
       }
 
-      newWidth = startWidth + delta * 2;
-      newHeight = startHeight + delta * 2 * (startHeight / startWidth);
+      // 2. 根据比例计算高度
+      newHeight = newWidth / ratio;
 
-      // 根据控制点调整位置
-      if (handle.includes('w')) {
-        newX = startNodeX - delta;
-      }
-      if (handle.includes('n')) {
-        newY = startNodeY - delta;
+      // 3. 根据锚点调整位置
+      if (handle === 'se') {
+        // 锚点在左上 (startNodeX, startNodeY) -> 不变
+      } else if (handle === 'sw') {
+        // 锚点在右上 (startNodeX + startWidth, startNodeY)
+        newX = startNodeX + startWidth - newWidth;
+      } else if (handle === 'ne') {
+        // 锚点在左下 (startNodeX, startNodeY + startHeight)
+        newY = startNodeY + startHeight - newHeight;
+      } else if (handle === 'nw') {
+        // 锚点在右下 (startNodeX + startWidth, startNodeY + startHeight)
+        newX = startNodeX + startWidth - newWidth;
+        newY = startNodeY + startHeight - newHeight;
       }
     } else {
-      // 边点：独立缩放宽高，可拉伸成椭圆
+      // 边点：独立缩放宽高，可拉伸成椭圆 (与矩形逻辑一致)
       switch (handle) {
-        case 'n': // 上：只改变高度
-          newHeight = startHeight - dy * 2;
+        case 'n': // 上：只改变高度，锚点在下
+          newHeight = startHeight - dy;
           newY = startNodeY + dy;
           break;
-        case 'e': // 右：只改变宽度
-          newWidth = startWidth + dx * 2;
+        case 'e': // 右：只改变宽度，锚点在左
+          newWidth = startWidth + dx;
           break;
-        case 's': // 下：只改变高度
-          newHeight = startHeight + dy * 2;
+        case 's': // 下：只改变高度，锚点在上
+          newHeight = startHeight + dy;
           break;
-        case 'w': // 左：只改变宽度
-          newWidth = startWidth - dx * 2;
+        case 'w': // 左：只改变宽度，锚点在右
+          newWidth = startWidth - dx;
           newX = startNodeX + dx;
           break;
       }
@@ -835,7 +818,7 @@ export class ToolManager {
     }
 
     // 限制最小尺寸（与其他缩放方法一致）
-    const minSize = 20;
+    const minSize = MIN_NODE_SIZE;
 
     if (newWidth < minSize) {
       newWidth = minSize;

@@ -1,5 +1,5 @@
 import type { CSSProperties } from 'vue';
-import type { BaseNodeState } from '@/types/state';
+import type { NodeState } from '@/types/state';
 import { NodeType } from '@/types/state';
 import { DomRectRenderer } from './DomRectRenderer';
 import { DomTextRenderer } from './DomTextRenderer';
@@ -9,9 +9,9 @@ import { DomImageRenderer } from './DomImageRenderer';
 // 【单例模式】
 // 实例化渲染器缓存起来，避免每次渲染都 new 一个新对象，提升性能
 const rectRenderer = new DomRectRenderer();
-const textRenderer=new DomTextRenderer();
+const textRenderer = new DomTextRenderer();
 const cirRenderer = new DomCircleRenderer();
-const imageRenderer=new DomImageRenderer();
+const imageRenderer = new DomImageRenderer();
 
 /**
  * 【工厂模式 - 分发中心】
@@ -21,7 +21,7 @@ const imageRenderer=new DomImageRenderer();
  * @param node 节点数据
  * @returns 计算好的 CSS 样式对象
  */
-export function getDomStyle(node: BaseNodeState): CSSProperties {
+export function getDomStyle(node: NodeState): CSSProperties {
   switch (node.type) {
     case NodeType.RECT:
       return rectRenderer.render(node);
@@ -34,6 +34,7 @@ export function getDomStyle(node: BaseNodeState): CSSProperties {
     default:
       // 【Fail Fast 机制】
       // 如果出现了未知的节点类型，直接抛错，防止渲染出奇怪的东西难以排查
+      // @ts-expect-error -- fallback for unsupported node types (should be unreachable with current NodeType)
       console.warn(`[Renderer] Unsupported node type: ${node.type}`);
       return { display: 'none' }; // 安全回退：隐藏该节点
   }
