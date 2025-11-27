@@ -47,7 +47,7 @@ export class DomTextRenderer implements INodeRenderer<CSSProperties> {
       zIndex: style.zIndex,
 
       // 文本相关CSS变量
-      '--font-family':props.fontFamily || 'sans-serif',
+      '--font-family': props.fontFamily || 'sans-serif',
       '--text-size': `${props.fontSize || 16}px` ,
       '--font-weight':props.fontWeight || 400,
       '--font-style':props.fontStyle || 'normal',
