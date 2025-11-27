@@ -66,10 +66,10 @@
 
       <!-- 文本样式操作 (仅当选中包含文本时显示) -->
       <a-button-group type="text" size="small" v-if="isTextNode">
-        <a-button @click="logFeature('Bold')">B</a-button>
-        <a-button @click="logFeature('Strike')">S</a-button>
-        <a-button @click="logFeature('Italic')">I</a-button>
-        <a-button @click="logFeature('Underline')">U</a-button>
+        <a-button @click="logFeature('Bold')" aria-label="Bold">B</a-button>
+        <a-button @click="logFeature('Strike')" aria-label="Strikethrough">S</a-button>
+        <a-button @click="logFeature('Italic')" aria-label="Italic">I</a-button>
+        <a-button @click="logFeature('Underline')" aria-label="Underline">U</a-button>
       </a-button-group>
     </a-space>
   </div>
