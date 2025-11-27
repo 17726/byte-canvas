@@ -9,6 +9,7 @@
     <!--
       视口层 (Viewport Layer)
       职责：应用全局的平移(Translate)和缩放(Scale)
+      说明：所有节点都被渲染在这层上，因此此处的 transform 会影响节点在屏幕上的最终位置/大小
       对应文档：L4 渲染层 - 画布容器
     -->
     <div class="canvas-viewport" :style="viewportStyle">
@@ -29,7 +30,9 @@
       <SelectionOverlay />
     </div>
 
-    <!-- 悬浮属性栏 (Context Toolbar) - 放在视口外，但跟随节点坐标 -->
+        <!-- 悬浮属性栏 (Context Toolbar) - 放在视口外，但跟随节点坐标 -->
+        <!-- 注意：ContextToolbar 读取 store.activeElementIds 并计算屏幕位置，它不直接受 viewport transform 的 DOM 影响，
+          因此 implement 上需要使用 worldToClient 等工具方法计算位置 -->
     <ContextToolbar />
 
     <!-- 辅助信息：显示当前视口状态 -->

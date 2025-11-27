@@ -16,15 +16,16 @@
 </template>
 
 <script setup lang="ts">
-import { useCanvasStore } from '@/store/canvasStore';
+import { useUIStore } from '@/store/uiStore';
 import { IconSettings } from '@arco-design/web-vue/es/icon';
 
-const store = useCanvasStore();
+const ui = useUIStore();
+// 点击设置按钮：激活右侧属性面板并切换到画布设置模式
 // Settings are handled via the right-hand `PropertyPanel` (canvas mode), no popover here
 
 function openSettings() {
-  store.setActivePanel('canvas');
-  store.setPanelExpanded(true);
+  ui.setActivePanel('canvas');
+  ui.setPanelExpanded(true);
 }
 </script>
 

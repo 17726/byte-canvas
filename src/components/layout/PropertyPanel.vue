@@ -187,10 +187,14 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
+import { useUIStore } from '@/store/uiStore';
 import { NodeType, type ShapeState, type TextState } from '@/types/state';
 import { DEFAULT_CANVAS_THEMES } from '@/config/defaults';
 
 const store = useCanvasStore();
+const ui = useUIStore();
+// 说明：PropertyPanel 有两种模式：'canvas' (显示画布设置) 与 'node' (显示节点属性)
+// 由 store.activePanel 决定，store.isPanelExpanded 控制面板折叠/展开
 
 const activeNode = computed(() => {
   const ids = Array.from(store.activeElementIds);
@@ -199,7 +203,7 @@ const activeNode = computed(() => {
   return store.nodes[id];
 });
 
-const isCanvas = computed(() => store.activePanel === 'canvas');
+const isCanvas = computed(() => ui.activePanel === 'canvas');
 const presets = DEFAULT_CANVAS_THEMES as {
   name: string;
   background: string;
@@ -207,6 +211,9 @@ const presets = DEFAULT_CANVAS_THEMES as {
   gridSize: number;
 }[];
 
+/**
+ * 应用预设主题到视口：包括背景色、网格颜色与间距
+ */
 function applyPreset(theme: {
   name: string;
   background: string;

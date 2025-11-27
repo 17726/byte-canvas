@@ -1,6 +1,7 @@
 import type { InternalResizeState, ResizeHandle } from '@/types/editor';
 import { clientToWorld } from '@/core/utils/geometry';
 import { useCanvasStore } from '@/store/canvasStore';
+import { useUIStore } from '@/store/uiStore';
 import type { InternalDragState } from '@/types/editor';
 import type { ViewportState } from '@/types/state';
 import {
@@ -29,8 +30,17 @@ import {
  * 逻辑层：工具管理器
  * 职责：接收来自交互层（Vue组件）的原始事件，处理鼠标点击、拖拽、工具切换逻辑。
  */
+/**
+ * 工具管理器（ToolManager）
+ * 说明：负责将 UI 层（鼠标事件/键盘事件）转发为对 `store` 的状态更新。
+ * 主要职责：
+ * - 处理画布平移、缩放
+ * - 处理节点的选中/拖拽/缩放/删除/创建
+ * - 在交互时控制 `store.isInteracting` 避免额外的昂贵操作
+ */
 export class ToolManager {
   private store: ReturnType<typeof useCanvasStore>;
+  private ui: ReturnType<typeof useUIStore>;
   private isPanDragging = false;
   private lastPos = { x: 0, y: 0 };
 
@@ -67,10 +77,13 @@ export class ToolManager {
 
   constructor() {
     this.store = useCanvasStore();
+    this.ui = useUIStore();
   }
 
   /**
-   * 处理画布滚轮事件 (缩放)
+   * 处理画布滚轮事件（缩放）
+   * - e.preventDefault() 阻止页面滚动
+   * - 这里以窗口中心为基准进行缩放，可改为以鼠标为缩放中心（更符合用户期望）
    */
   handleWheel(e: WheelEvent) {
     e.preventDefault();
@@ -83,7 +96,8 @@ export class ToolManager {
   }
 
   /**
-   * 处理画布鼠标按下事件 (平移开始 / 取消选中)
+   * 处理画布鼠标按下事件（平移开始 / 取消选中）
+   * - 点击空白区，会取消所有选中并将画布置为拖拽(pan)状态
    */
   handleMouseDown(e: MouseEvent) {
     // 互斥逻辑：如果正在拖拽节点，不触发画布平移
@@ -150,7 +164,10 @@ export class ToolManager {
   }
 
   /**
-   * 处理节点鼠标按下事件 (选中)
+   * 处理节点鼠标按下事件（选中/开始拖拽）
+   * - 单击：设置单选
+   * - Ctrl/Cmd + 单击：多选切换
+   * - 选中后将右侧属性面板激活到 Node 模式（store.activePanel = 'node'）
    */
   handleNodeDown(e: MouseEvent, id: string) {
     // 1.阻止事件冒泡，避免触发画布的 handleMouseDown (导致取消选中)
@@ -173,8 +190,8 @@ export class ToolManager {
     // 4. 标记交互中，防止昂贵操作（如自动保存）
     this.store.isInteracting = true;
     // 展示右侧属性面板并切换为节点模式
-    this.store.setActivePanel('node');
-    this.store.setPanelExpanded(true);
+    this.ui.setActivePanel('node');
+    this.ui.setPanelExpanded(true);
 
     // 5. 初始化拖拽状态（深拷贝节点初始transform，避免引用同步）
     this.dragState = {
@@ -221,7 +238,8 @@ export class ToolManager {
     const newX = this.dragState.startTransform.x + deltaX;
     const newY = this.dragState.startTransform.y + deltaY;
 
-    // TODO: Implement grid snapping logic here if viewport.isSnapToGrid is true.
+    // TODO: Implement grid snapping逻辑（如果 viewport.isSnapToGrid 为 true）
+    // 该逻辑应该在世界坐标系中进行（已转换为 world 坐标），以保证缩放/平移下 snapping 的一致性
     // Example:
     // if (viewport.isSnapToGrid) {
     //   const snapped = snapToGrid(viewport, newX, newY);

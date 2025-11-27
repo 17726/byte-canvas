@@ -1,6 +1,7 @@
 // import { NodeType } from '@/types/state'; // Not used, remove to satisfy lint
 
-// Viewport Defaults
+// 视口默认配置（Viewport Defaults）
+// 说明：定义画布初始的缩放/偏移/背景和网格相关的默认值
 export const DEFAULT_VIEWPORT = {
   zoom: 1,
   offsetX: 0,
@@ -88,6 +89,7 @@ export const DEFAULT_IMAGE_FILTERS = {
   sepia: 0,
 };
 
+// 预设画布主题（用于快速应用背景/网格配色）
 export const DEFAULT_CANVAS_THEMES = [
   { name: 'Soft', background: '#fbfcfe', gridColor: 'rgba(0,0,0,0.04)', gridSize: 20 },
   { name: 'Warm', background: '#fff8f0', gridColor: 'rgba(0,0,0,0.03)', gridSize: 20 },

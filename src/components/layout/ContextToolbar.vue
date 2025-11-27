@@ -116,16 +116,19 @@ import {
 
 const store = useCanvasStore();
 
-// 获取当前选中的第一个节点
+// 获取当前选中的第一个节点（ContextToolbar 仅在单选时显示）
 const activeNode = computed(() => {
   const ids = Array.from(store.activeElementIds);
   if (ids.length !== 1) return null;
   return store.nodes[ids[0]];
 });
 
+// 显示条件：有且仅有一个选中节点，并且不在其他交互中（如拖拽）
 const isVisible = computed(() => !!activeNode.value && !store.isInteracting);
 
-// 计算位置
+// 计算属性工具栏在屏幕中的位置，用 worldToClient 将世界坐标转换为 DOM 客户端坐标
+// 说明：由于 ContextToolbar 本身放在视口外层 (不受 viewport transform)，因此需要将节点的世界坐标映射到 client 坐标
+// 计算工具栏在页面中的绝对位置：以节点的中心为锚点向上偏移
 const positionStyle = computed(() => {
   if (!activeNode.value) return {};
 
@@ -156,7 +159,7 @@ const isText = computed(() => {
   return activeNode.value?.type === NodeType.TEXT;
 });
 
-// --- Common Actions ---
+// --- Common Actions (对选中节点的操作，例如置于最前 / 置于最底 / 删除) ---
 const opacity = computed({
   get: () => activeNode.value?.style.opacity ?? 1,
   set: (val) => {
