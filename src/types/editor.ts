@@ -1,4 +1,5 @@
-import { type TransformState } from './state.ts';
+// NOTE: 本地模块引用不应带后缀 .ts，当前写法在某些构建配置下会导致模块解析失败
+import { type TransformState } from './state';
 export interface InternalDragState {
   isDragging: boolean;//是否正在拖拽
   type: 'move' | null;//拖拽类型：移动/缩放/旋转
@@ -6,4 +7,4 @@ export interface InternalDragState {
   startMouseX: number;//拖拽起始时鼠标坐标
   startMouseY: number;
   startTransform: TransformState; // 拖拽起始的变换数据
-} 
+}

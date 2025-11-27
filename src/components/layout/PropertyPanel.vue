@@ -4,16 +4,14 @@
   <a-space direction="vertical" size="large">
     <a-space>
       <a-color-picker  @change="fillColorChange" v-model="fillColor" />
-      <a-color-picker  @change="viceColorChange" v-model="viceColor" />
-      <a-input-number value = "x" :disabled="!hasSelection" v-model="x" :style="{width:'80px'}" placeholder="X" class="input-demo"/>
-      <a-input-number value = "y" :disabled="!hasSelection" v-model="y" :style="{width:'80px'}" placeholder="Y" class="input-demo"/>
+      <a-color-picker  @change="borderColorChange" v-model="borderColor" />
+      <!-- 使用 precision 属性控制显示精度，而不是修改底层数据 -->
+      <a-input-number value = "x" :disabled="!hasSelection" v-model="x" :precision="2" :style="{width:'80px'}" placeholder="X" class="input-demo"/>
+      <a-input-number value = "y" :disabled="!hasSelection" v-model="y" :precision="2" :style="{width:'80px'}" placeholder="Y" class="input-demo"/>
       <a-button-group>
       <a-button @click="moveLayerUp" type="primary">上移</a-button>
       <a-button @click="moveLayerDown" type="primary">下移</a-button>
-      <a-button @click="toggleFontBold" type="primary" style="background-color: white;color: black;border: 0;">B</a-button>
-      <a-button @click="toggleFontStrikethrough" type="primary" style="background-color: white;color: black;border: 0;">S</a-button>
-      <a-button @click="setFontItalic" type="primary" style="background-color: white;color: black;border: 0;">I</a-button>
-      <a-button @click="toggleFontUnderline" type="primary" style="background-color: white;color: black;border: 0;">U</a-button>
+      <!-- TODO: 样式硬编码，以后可以提取为公共样式，并尽量用 UI 库原生的 props 或 theme 机制 -->
       <a-input-number  @change="updateBorderWidth" v-model="activeStyleValue" :style="{width:'120px'}" placeholder="Please Enter" class="input-demo" :min="0"/>
       </a-button-group>
     </a-space>
@@ -21,11 +19,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
 import { useCanvasStore } from '@/store/canvasStore'
-const canvasStore = useCanvasStore()
+import { computed, ref, watch } from 'vue'
+  const canvasStore = useCanvasStore()
   const fillColor = ref('#ffccc7')
-  const viceColor = ref('#ff4d4f')
+  const borderColor = ref('#ff4d4f')
   const hasSelection = computed(() => canvasStore.activeElements.length > 0)
   const x = ref(0)
   const y = ref(0)
@@ -42,15 +40,16 @@ const canvasStore = useCanvasStore()
       }
     });
   }
-  const viceColorChange = (val: string) => {
+  const borderColorChange = (val: string) => {
+    // FIXME: 文本节点实际用 props.color/CSS 变量渲染，这里改 style 颜色无法改变文字颜色，需分支处理。
     canvasStore.activeElements.forEach(element => {
       if (element && element.id && element.style) {
-        canvasStore.updateNode(element.id, {
-          style: {
-            ...element.style,
-            borderColor: val
-          }
-        });
+          canvasStore.updateNode(element.id, {
+            style: {
+              ...element.style,
+              borderColor: val
+            }
+          });
       }
     });
   }
@@ -77,18 +76,6 @@ const canvasStore = useCanvasStore()
         })
       }
     })
-  }
-  const toggleFontBold = () => {
-    console.log('字体加粗')
-  }
-  const toggleFontStrikethrough = () => {
-    console.log('字体删除线')
-  }
-  const setFontItalic = () => {
-    console.log('字体斜体')
-  }
-  const toggleFontUnderline = () => {
-    console.log('字体下划线')
   }
   const updateBorderWidth = () => {
     canvasStore.activeElements.forEach(element => {
@@ -118,18 +105,10 @@ const canvasStore = useCanvasStore()
           if (firstElement.style.backgroundColor) {
             fillColor.value = firstElement.style.backgroundColor;
           }
-          // 设置边框色或文字颜色
-          if (firstElement.type === 'rect' || firstElement.type === 'circle') {
-            // 形状元素使用边框色
-            if (firstElement.style.borderColor) {
-              viceColor.value = firstElement.style.borderColor;
+          // 设置边框色
+          if (firstElement.style.borderColor) {
+              borderColor.value = firstElement.style.borderColor;
             }
-          } else {
-            // 其他元素（如文本）使用文字颜色
-            if (firstElement.style.color) {
-              viceColor.value = firstElement.style.color;
-            }
-          }
           if(firstElement.style.borderWidth){
             activeStyleValue.value = firstElement.style.borderWidth;
           }
@@ -138,6 +117,8 @@ const canvasStore = useCanvasStore()
     }
   }, { immediate: true, deep: true })
   watch(x, (newX) => {
+    // FIXME: 多选模式下，直接将所有元素的 X 坐标设为相同值，会导致元素重叠。
+    // 建议：多选时应计算相对位移 (deltaX)，或者禁用坐标修改，或者明确这是“对齐”操作。
     canvasStore.activeElements.forEach(element => {
       if (element && element.id && element.transform) {
         canvasStore.updateNode(element.id, {
@@ -150,6 +131,7 @@ const canvasStore = useCanvasStore()
     });
   });
   watch(y, (newY) => {
+    // FIXME: 同上，多选模式下会导致元素重叠。
     canvasStore.activeElements.forEach(element => {
       if (element && element.id && element.transform) {
         canvasStore.updateNode(element.id, {

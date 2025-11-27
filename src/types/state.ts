@@ -32,14 +32,12 @@ export interface BaseNodeState {
   readonly id: string;
   readonly type: NodeType;
   name: string;
-
   transform: TransformState;
   style: StyleState;
-
   parentId: string | null;
   isLocked: boolean;
   isVisible: boolean;
-
+  props: Record<string, unknown>;
 }
 /** 画布（视口）状态：控制画布的平移、缩放、尺寸等全局操作 */
 export interface ViewportState {
@@ -80,6 +78,9 @@ export interface TextState extends BaseNodeState {
     fontWeight: string | number; // B (加粗)
     fontStyle: 'normal' | 'italic'; // I (斜体)
     color: string;
+    lineHeight: number;
+    textDecoration: string; // underline 删除线
+    textDecorationLine:string // line-through 下划线
   };
 }
 
