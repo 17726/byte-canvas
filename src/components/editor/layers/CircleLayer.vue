@@ -21,7 +21,10 @@ const props = defineProps<{
 
 const store = useCanvasStore();
 // 注入父组件提供的 toolManager 实例
-const toolManager = inject<ToolManager>('toolManager')!;
+const toolManager = inject<ToolManager>('toolManager');
+if (!toolManager) {
+  throw new Error('toolManager must be provided by parent component');
+}
 
 // 获取样式 (使用策略模式分离的渲染器)
 const style = computed(() => {
