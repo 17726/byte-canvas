@@ -176,7 +176,7 @@ const borderColor = computed({
 const textColor = computed({
   get: () =>
     getFirstSelectionValue((n) => {
-      if (n.type === NodeType.TEXT) {
+      if (n.type === NodeType.TEXT && (n as TextState).props) {
         return (n as TextState).props.color;
       }
       return '#000000';
