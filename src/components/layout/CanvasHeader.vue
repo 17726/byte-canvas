@@ -22,8 +22,8 @@ import PropertyPanel from '@/components/layout/PropertyPanel.vue';
 
 <style scoped>
 .extra {
-  width: auto;
+  width: 100%;
+  max-width: 700px;
   height: 100%;
-  /* border-style: dotted; */
 }
 </style>

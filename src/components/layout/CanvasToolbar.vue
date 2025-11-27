@@ -14,6 +14,10 @@
         <template #icon><icon-plus /></template>
         文本
       </a-button>
+      <a-button type="primary" shape="square" @click="addText">
+        <template #icon><icon-plus /></template>
+        文本
+      </a-button>
       <a-button>图片</a-button>
 
       <a-divider direction="vertical" />
@@ -24,9 +28,6 @@
       </a-button>
     </a-space>
   </div>
-  <div class="property-panel">
-    <PropertyPanel></PropertyPanel>
-  </div>
 </template>
 
 <script setup lang="ts">
@@ -35,7 +36,7 @@ import { useCanvasStore } from '@/store/canvasStore';
 import { IconDelete, IconPlus } from '@arco-design/web-vue/es/icon';
 import { computed } from 'vue';
 
-import PropertyPanel from '@/components/layout/PropertyPanel.vue';
+
 const store = useCanvasStore();
 const toolManager = new ToolManager();
 

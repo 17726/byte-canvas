@@ -27,6 +27,7 @@
       Y: {{ store.viewport.offsetY.toFixed(0) }}
     </div>
   </div>
+  <NodeHighlight></NodeHighlight>
 </template>
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, provide } from 'vue';
@@ -36,6 +37,8 @@ import RectLayer from './layers/RectLayer.vue';
 import TextLayer from './layers/TextLayer.vue';
 import CircleLayer from './layers/CircleLayer.vue';
 import { ToolManager } from '@/core/tools/ToolManager';
+import NodeHighlight from './NodeHighlight.vue'
+import ImageLayer from './layers/ImageLayer.vue';
 
 const store = useCanvasStore();
 const stageRef = ref<HTMLElement | null>(null);
@@ -52,13 +55,16 @@ const viewportStyle = computed(() => ({
 
 // 2. 组件映射工厂
 const getComponentType = (type: NodeType) => {
+  // Removed excessive debug log
   switch (type) {
     case NodeType.RECT:
       return RectLayer;
     case NodeType.CIRCLE:
-      return CircleLayer; // 暂时用 Rect 代替
+      return CircleLayer;
     case NodeType.TEXT:
       return TextLayer;
+    case NodeType.IMAGE:
+      return ImageLayer;
     default:
       return 'div';
   }

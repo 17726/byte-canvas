@@ -83,9 +83,8 @@ const handleResizeHandleDown = (e: MouseEvent, handle: ResizeHandle) => {
   color: var(--text-color);
   line-height: var(--line-height);
   transform: scale(var(--text-scale));
+  text-decoration-line: var(--text-decoration-line);
   transform-origin: top left;
-  text-decoration: var(--text-decoration); /* 应用文本装饰 */
-
   /* 确保文本正确显示 */
   white-space: pre-wrap;
   word-wrap: break-word;

@@ -32,13 +32,12 @@ export interface BaseNodeState {
   readonly id: string;
   readonly type: NodeType;
   name: string;
-
   transform: TransformState;
   style: StyleState;
-
   parentId: string | null;
   isLocked: boolean;
   isVisible: boolean;
+  props: Record<string, unknown>;
 }
 /** 画布（视口）状态：控制画布的平移、缩放、尺寸等全局操作 */
 export interface ViewportState {
@@ -107,10 +106,17 @@ export interface TextState extends BaseNodeState {
 export interface ImageState extends BaseNodeState {
   type: NodeType.IMAGE;
   props: {
-    src: string; // 资源 URL (不存 HTMLImageElement)
-    filters: {
-      blur: number;
-      brightness: number;
+    imageUrl: string; // 资源 URL (不存 HTMLImageElement)
+    filters: {  //NOTE: 滤镜需要通过以下细分属性来设置
+      grayscale?: number;      // 0-100
+      blur?: number;           // 像素值
+      brightness?: number;     // 百分比
+      contrast?: number;       // 百分比
+      saturate?: number;       // 百分比
+      hueRotate?: number;      // 角度值
+      filterOpacity?: number;  // 百分比 (滤镜透明度, 对应 CSS filter: opacity(); 与 style.opacity 区分)
+      invert?: number;         // 百分比
+      sepia?: number;          // 百分比
     };
   };
 }

@@ -96,9 +96,8 @@ function onMenuItemClick(key: string) {
       selectedKeys.value = [key];
       break;
     case MenuKey.AddImage:
-      console.log("照片被点击");
-      //TODO：等待照片元素创建接口
-      // toolManager.createImage();
+      console.log("图片被点击");
+      toolManager.createImage();
       selectedKeys.value = [key];
       break;
     case MenuKey.Delete:
