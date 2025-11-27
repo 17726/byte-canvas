@@ -8,7 +8,8 @@
     >
       <template #extra>
         <div class="extra">
-          扩展位置
+          <!-- TODO：Header额外功能预留空间，用于添加额外功能组件 -->
+          <PropertyPanel/>
         </div>
       </template>
     </a-page-header>
@@ -16,12 +17,13 @@
 </template>
 
 <script setup lang="ts">
+import PropertyPanel from '@/components/layout/PropertyPanel.vue';
 </script>
 
 <style scoped>
 .extra {
-  width: 100px;
+  width: auto;
   height: 100%;
-  border-style: dotted;
+  /* border-style: dotted; */
 }
 </style>

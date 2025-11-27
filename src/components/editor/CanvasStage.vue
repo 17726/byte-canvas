@@ -29,7 +29,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue';
+import { ref, computed, onMounted, onUnmounted, provide } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
 import { NodeType } from '@/types/state';
 import RectLayer from './layers/RectLayer.vue';
@@ -40,6 +40,9 @@ import { ToolManager } from '@/core/tools/ToolManager';
 const store = useCanvasStore();
 const stageRef = ref<HTMLElement | null>(null);
 let toolManager: ToolManager; // 改为let，延迟初始化
+
+// 将 toolManager 提供给子组件
+provide('toolManager', toolManager);
 
 // 1. 视口样式计算
 const viewportStyle = computed(() => ({

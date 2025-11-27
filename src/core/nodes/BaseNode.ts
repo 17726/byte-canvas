@@ -23,4 +23,15 @@ export abstract class CanvasNode {
     this.state.transform.width = width;
     this.state.transform.height = height;
   }
+
+  /**
+   * 业务逻辑：调整大小并更新位置（用于从左侧或顶部拖拽时）
+   */
+  resizeWithPosition(x: number, y: number, width: number, height: number) {
+    if (this.state.isLocked) return; // 锁定节点不允许调整大小
+    this.state.transform.x = x;
+    this.state.transform.y = y;
+    this.state.transform.width = width;
+    this.state.transform.height = height;
+  }
 }
