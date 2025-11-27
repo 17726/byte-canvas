@@ -51,11 +51,13 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue';
 import { IconPlus, IconEdit, IconImage, IconDelete } from '@arco-design/web-vue/es/icon';
-import { Square, Round } from '@icon-park/vue-next';
+//TODO：UI开发完成后优化icon-park库的导入，针对导入？
+import { Square , Round } from '@icon-park/vue-next';
 import { useCanvasStore } from '@/store/canvasStore';
 import { ToolManager } from '@/core/tools/ToolManager';
 import { Notification } from '@arco-design/web-vue';
 
+//NOTE：按钮返回值需提前在MenuKey进行注册
 enum MenuKey {
   AddRect   = 'addRect',
   AddCircle = 'addCircle',
@@ -82,25 +84,22 @@ function onMenuItemClick(key: string) {
       console.log("矩形被点击");
       toolManager.createRect();
       selectedKeys.value = [key];
-      setTimeout(() => { selectedKeys.value = []; }, 200);
       break;
     case MenuKey.AddCircle:
       console.log("圆被点击");
       toolManager.createCircle();
       selectedKeys.value = [key];
-      setTimeout(() => { selectedKeys.value = []; }, 200);
       break;
     case MenuKey.AddText:
       console.log("文本被点击");
       toolManager.createText();
       selectedKeys.value = [key];
-      setTimeout(() => { selectedKeys.value = []; }, 200);
       break;
     case MenuKey.AddImage:
       console.log("照片被点击");
+      //TODO：等待照片元素创建接口
       // toolManager.createImage();
       selectedKeys.value = [key];
-      setTimeout(() => { selectedKeys.value = []; }, 200);
       break;
     case MenuKey.Delete:
       if (!hasSelection.value) return;
