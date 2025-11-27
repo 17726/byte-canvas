@@ -53,11 +53,6 @@ const addText = () => {
   console.log('文本被点击');
   toolManager.createText();
 };
-//添加文本
-const addText = () => {
-  console.log('文本被点击');
-  toolManager.createText();
-};
 
 // 添加圆形
 const addCircle = () => {
