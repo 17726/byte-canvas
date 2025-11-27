@@ -52,7 +52,7 @@
 import { ref, computed } from 'vue';
 import { IconPlus, IconEdit, IconImage, IconDelete } from '@arco-design/web-vue/es/icon';
 //TODO：UI开发完成后优化icon-park库的导入，针对导入？
-import { Square , Round } from '@icon-park/vue-next';
+import { Square, Round } from '@icon-park/vue-next';
 import { useCanvasStore } from '@/store/canvasStore';
 import { ToolManager } from '@/core/tools/ToolManager';
 import { Notification } from '@arco-design/web-vue';
