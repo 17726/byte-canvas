@@ -550,7 +550,6 @@ export class ToolManager {
       startNodeX: node.transform.x,
       startNodeY: node.transform.y,
     };
-
   }
 
   /**

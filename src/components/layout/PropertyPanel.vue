@@ -112,13 +112,13 @@
           <div class="section-title">外观</div>
 
           <!-- Fill -->
-          <div class="prop-item" v-if="hasFill">
+          <div class="prop-item" v-if="!isImage">
             <span class="label">填充</span>
             <a-color-picker v-model="fillColor" show-text size="small" />
           </div>
 
           <!-- Stroke -->
-          <div class="prop-item" v-if="hasStroke">
+          <div class="prop-item">
             <span class="label">描边</span>
             <div class="flex-row">
               <a-color-picker v-model="strokeColor" size="small" />
@@ -138,7 +138,7 @@
         <a-divider style="margin: 12px 0" />
 
         <!-- Section 3: 特有属性 (Specific) -->
-        <div class="panel-section" v-if="isText || isShape">
+        <div class="panel-section" v-if="isText || isShape || isImage">
           <div class="section-title">属性</div>
 
           <!-- Text Specific -->
@@ -178,6 +178,67 @@
               />
             </div>
           </template>
+
+          <!-- Image Specific -->
+          <template v-if="isImage">
+            <div class="prop-item">
+              <span class="label">滤镜</span>
+              <div class="filter-options">
+                <!-- 黑白滤镜 -->
+                <div class="filter-item" @click="selectFilter('grayscale')">
+                  <div
+                    class="filter-preview"
+                    :class="{ active: selectedFilter === 'grayscale' }"
+                    :style="{
+                      backgroundImage: 'url(' + (previewImage || defaultImage) + ')',
+                      filter: 'grayscale(100%) contrast(110%) brightness(95%)',
+                    }"
+                  ></div>
+                  <span class="filter-name">黑白</span>
+                </div>
+
+                <!-- 模糊滤镜 -->
+                <div class="filter-item" @click="selectFilter('blur')">
+                  <div
+                    class="filter-preview"
+                    :class="{ active: selectedFilter === 'blur' }"
+                    :style="{
+                      backgroundImage: 'url(' + (previewImage || defaultImage) + ')',
+                      filter: 'blur(8px) brightness(98%) opacity(95%)',
+                    }"
+                  ></div>
+                  <span class="filter-name">模糊</span>
+                </div>
+
+                <!-- 复古滤镜 -->
+                <div class="filter-item" @click="selectFilter('vintage')">
+                  <div
+                    class="filter-preview"
+                    :class="{ active: selectedFilter === 'vintage' }"
+                    :style="{
+                      backgroundImage: 'url(' + (previewImage || defaultImage) + ')',
+                      filter:
+                        'sepia(60%) contrast(115%) brightness(95%) saturate(85%) hue-rotate(-10deg) ',
+                    }"
+                  ></div>
+                  <span class="filter-name">复古</span>
+                </div>
+
+                <!-- 重置滤镜 -->
+                <div class="filter-item" @click="selectFilter('reset')">
+                  <div
+                    class="filter-preview"
+                    :class="{ active: selectedFilter === 'reset' }"
+                    :style="{
+                      backgroundImage: 'url(' + (previewImage || defaultImage) + ')',
+                      filter: 'none',
+                    }"
+                  ></div>
+                  <span class="filter-name">重置</span>
+                </div>
+              </div>
+            </div>
+          </template>
         </div>
       </div>
     </div>
@@ -185,11 +246,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { ref, computed } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
 import { useUIStore } from '@/store/uiStore';
-import { NodeType, type ShapeState, type TextState } from '@/types/state';
-import { DEFAULT_CANVAS_THEMES } from '@/config/defaults';
+import { NodeType, type ImageState, type ShapeState, type TextState } from '@/types/state';
+import { DEFAULT_CANVAS_THEMES, DEFAULT_IMAGE_FILTERS, DEFAULT_IMAGE_URL } from '@/config/defaults';
 
 const store = useCanvasStore();
 const ui = useUIStore();
@@ -233,8 +294,9 @@ const isText = computed(() => activeNode.value?.type === NodeType.TEXT);
 const isRect = computed(
   () => isShape.value && (activeNode.value as ShapeState)?.shapeType === 'rect'
 );
-const hasFill = computed(() => isShape.value);
-const hasStroke = computed(() => isShape.value);
+const isImage = computed(() => activeNode.value?.type === NodeType.IMAGE);
+// const hasFill = computed(() => isShape.value);
+// const hasStroke = computed(() => isShape.value);
 
 // --- Transform Bindings ---
 const transformX = computed({
@@ -318,27 +380,33 @@ const textContent = computed({
   get: () => (activeNode.value as TextState)?.props.content || '',
 
   set: (val) =>
-    activeNode.value && store.updateNode(activeNode.value.id, { props: { content: val } } as any),
+    activeNode.value &&
+    store.updateNode(activeNode.value.id, { props: { content: val } } as Partial<TextState>),
 });
 const fontSize = computed({
   get: () => (activeNode.value as TextState)?.props.fontSize || 12,
 
   set: (val) =>
     activeNode.value &&
-    store.updateNode(activeNode.value.id, { props: { fontSize: val as number } } as any),
+    store.updateNode(activeNode.value.id, {
+      props: { fontSize: val as number },
+    } as Partial<TextState>),
 });
 const fontWeight = computed({
   get: () => (activeNode.value as TextState)?.props.fontWeight || 400,
 
   set: (val) =>
     activeNode.value &&
-    store.updateNode(activeNode.value.id, { props: { fontWeight: val as number } } as any),
+    store.updateNode(activeNode.value.id, {
+      props: { fontWeight: val as number },
+    } as Partial<TextState>),
 });
 const textColor = computed({
   get: () => (activeNode.value as TextState)?.props.color || '#000000',
 
   set: (val) =>
-    activeNode.value && store.updateNode(activeNode.value.id, { props: { color: val } } as any),
+    activeNode.value &&
+    store.updateNode(activeNode.value.id, { props: { color: val } } as Partial<TextState>),
 });
 
 // Shape
@@ -347,8 +415,110 @@ const cornerRadius = computed({
 
   set: (val) =>
     activeNode.value &&
-    store.updateNode(activeNode.value.id, { props: { cornerRadius: val as number } } as any),
+    store.updateNode(activeNode.value.id, {
+      props: { cornerRadius: val as number },
+    } as Partial<ShapeState>),
 });
+
+//Image
+
+// 选中的滤镜
+const selectedFilter = ref(null);
+
+// 预览图片（可以使用当前选中图片的缩略图）
+const previewImage = computed(() => {
+  // 这里可以返回当前选中图片的URL
+  return (activeNode.value as ImageState)?.props?.imageUrl || DEFAULT_IMAGE_URL;
+});
+
+// 默认预览图片（当没有选中图片时使用）
+const defaultImage = DEFAULT_IMAGE_URL;
+
+// 选择滤镜
+const selectFilter = (filterType) => {
+  selectedFilter.value = filterType;
+
+  switch (filterType) {
+    case 'grayscale':
+      grayscaleFilter();
+      break;
+    case 'blur':
+      blurFilter();
+      break;
+    case 'vintage':
+      vintageFilter();
+      break;
+    case 'reset':
+      resetFilter();
+      break;
+  }
+};
+
+const grayscaleFilter = () => {
+  store.activeElements.forEach((element) => {
+    if (element && element.id && element.type === 'image') {
+      store.updateNode(element.id, {
+        props: {
+          ...element.props,
+          filters: {
+            grayscale: 100,
+            contrast: 110,
+            brightness: 95,
+          },
+        },
+      });
+    }
+  });
+};
+
+const blurFilter = () => {
+  store.activeElements.forEach((element) => {
+    if (element && element.id && element.type === 'image') {
+      store.updateNode(element.id, {
+        props: {
+          ...element.props,
+          filters: {
+            blur: 8,
+            brightness: 98,
+            filterOpacity: 95,
+          },
+        },
+      });
+    }
+  });
+};
+
+const vintageFilter = () => {
+  store.activeElements.forEach((element) => {
+    if (element && element.id && element.type === 'image') {
+      store.updateNode(element.id, {
+        props: {
+          ...element.props,
+          filters: {
+            sepia: 60, // 棕褐色调
+            contrast: 115, // 增强对比度
+            brightness: 95, // 降低亮度
+            saturate: 85, // 降低饱和度
+            hueRotate: -10, // 轻微色相偏移
+          },
+        },
+      });
+    }
+  });
+};
+
+const resetFilter = () => {
+  store.activeElements.forEach((element) => {
+    if (element && element.id && element.type === 'image') {
+      store.updateNode(element.id, {
+        props: {
+          ...element.props,
+          filters: DEFAULT_IMAGE_FILTERS,
+        },
+      });
+    }
+  });
+};
 </script>
 
 <style scoped>
@@ -402,6 +572,8 @@ const cornerRadius = computed({
 .label {
   display: block;
   font-size: 12px;
+  margin-bottom: 8px;
+  font-weight: bold;
   color: var(--color-text-2);
   margin-bottom: 4px;
 }
@@ -410,5 +582,49 @@ const cornerRadius = computed({
   display: flex;
   gap: 8px;
   align-items: center;
+}
+
+.filter-selector {
+  margin: 10px 0;
+}
+
+.filter-options {
+  display: flex;
+  gap: 10px;
+  max-width: 100%; /* 或者固定宽度 */
+  overflow-x: auto; /* 水平方向滚动 */
+  padding: 5px;
+}
+
+.filter-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+}
+
+.filter-preview {
+  width: 60px;
+  height: 60px;
+  border-radius: 8px;
+  background-size: cover;
+  background-position: center;
+  border: 2px solid #e5e5e5;
+  transition: all 0.2s ease;
+}
+
+.filter-preview.active {
+  border-color: #1890ff;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+}
+
+.filter-preview:hover {
+  transform: scale(1.05);
+}
+
+.filter-name {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #666;
 }
 </style>

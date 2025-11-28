@@ -77,7 +77,7 @@ const hasSelection = computed(() => store.activeElementIds.size > 0);
 // Settings handled by header component now
 
 // 元素控制底层组件
-const toolManager = new ToolManager();
+const toolManager = new ToolManager(null);
 
 // 高亮控制
 const selectedKeys = ref<string[]>([]);
