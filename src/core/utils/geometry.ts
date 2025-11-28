@@ -89,7 +89,7 @@ export function isHasPointInRect(
         const rx = nodeW / 2; // 椭圆水平半轴（长/短轴）
         const ry = nodeH / 2; // 椭圆垂直半轴（长/短轴）
 
-        // 步骤1：判断矩形内是否有點在椭圆内（取矩形关键点校验）
+        // 步骤1：判断矩形内是否有点在椭圆内（取矩形关键点校验）
         // 矩形的四个顶点
         const rectPoints = [
           { x: minRectWorldX, y: minRectWorldY }, // 左上
