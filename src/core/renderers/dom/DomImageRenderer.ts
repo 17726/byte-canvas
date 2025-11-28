@@ -1,4 +1,4 @@
-import type { BaseNodeState, ImageState } from '@/types/state';
+import type { NodeState, ImageState } from '@/types/state';
 import type { CSSProperties } from 'vue';
 import type { INodeRenderer } from '..';
 
@@ -14,7 +14,7 @@ export class DomImageRenderer implements INodeRenderer<CSSProperties> {
    * 执行渲染逻辑
    * @param node 基础节点数据
    */
-  render(node: BaseNodeState): CSSProperties {
+  render(node: NodeState): CSSProperties {
     // NOTE: 类型断言：确信传入给 ImageRenderer 的一定是 ImageState
     const image = node as ImageState;
     const { transform, style } = image;

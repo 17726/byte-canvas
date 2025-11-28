@@ -1,4 +1,4 @@
-import type { BaseNodeState } from '@/types/state';
+import type { NodeState } from '@/types/state';
 
 /**
  * 【策略模式 - 抽象接口】
@@ -14,5 +14,5 @@ export interface INodeRenderer<T> {
    * @param node 传入的数据节点 (Store 中的 State)
    * @returns 返回渲染产物 (样式或空)
    */
-  render(node: BaseNodeState): T;
+  render(node: NodeState): T;
 }

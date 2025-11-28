@@ -24,7 +24,6 @@ export interface StyleState {
   borderColor: string; // 边框色
   opacity: number; // 透明度
   zIndex: number; // 层级
-  color?: string;// 文本颜色
 }
 
 /** 节点数据基类（核心） */
@@ -32,13 +31,12 @@ export interface BaseNodeState {
   readonly id: string;
   readonly type: NodeType;
   name: string;
-
   transform: TransformState;
   style: StyleState;
-
   parentId: string | null;
   isLocked: boolean;
   isVisible: boolean;
+  // props: Record<string, unknown>; // 已移除：由具体子接口定义更精确的 props 类型
 }
 /** 画布（视口）状态：控制画布的平移、缩放、尺寸等全局操作 */
 export interface ViewportState {
@@ -57,6 +55,10 @@ export interface ViewportState {
   isGridVisible: boolean; // 是否显示网格
   gridSize: number; // 网格大小（px）
   isSnapToGrid: boolean; // 是否开启吸附到网格
+  // Grid rendering options
+  gridStyle?: 'dot' | 'line' | 'none';
+  gridDotColor?: string;
+  gridDotSize?: number;
 }
 
 /** 缩放控制点类型 */
@@ -94,10 +96,12 @@ export interface TextState extends BaseNodeState {
     content: string;
     fontFamily: string;
     fontSize: number;
-    fontWeight: string | number; // B (加粗)
+    fontWeight: number; // B (加粗)
     fontStyle: 'normal' | 'italic'; // I (斜体)
     color: string;
     lineHeight: number;
+    underline: boolean;
+    strikethrough: boolean;
   };
 }
 
@@ -106,16 +110,17 @@ export interface ImageState extends BaseNodeState {
   type: NodeType.IMAGE;
   props: {
     imageUrl: string; // 资源 URL (不存 HTMLImageElement)
-    filters: {  //NOTE: 滤镜需要通过以下细分属性来设置
-      grayscale?: number;      // 0-100
-      blur?: number;           // 像素值
-      brightness?: number;     // 百分比
-      contrast?: number;       // 百分比
-      saturate?: number;       // 百分比
-      hueRotate?: number;      // 角度值
-      filterOpacity?: number;  // 百分比 (滤镜透明度, 对应 CSS filter: opacity(); 与 style.opacity 区分)
-      invert?: number;         // 百分比
-      sepia?: number;          // 百分比
+    filters: {
+      //NOTE: 滤镜需要通过以下细分属性来设置
+      grayscale?: number; // 0-100
+      blur?: number; // 像素值
+      brightness?: number; // 百分比
+      contrast?: number; // 百分比
+      saturate?: number; // 百分比
+      hueRotate?: number; // 角度值
+      filterOpacity?: number; // 百分比 (滤镜透明度, 对应 CSS filter: opacity(); 与 style.opacity 区分)
+      invert?: number; // 百分比
+      sepia?: number; // 百分比
     };
   };
 }

@@ -1,12 +1,6 @@
 <template>
   <div class="node-image" :style="style" :class="{ 'is-selected': isSelected }">
     <img :src="imageUrl" :alt="node.name || 'Image'" :style="filterStyle" />
-        <!-- 选中时显示缩放控制点（隐藏显示） -->
-        <ResizeHandles
-      v-if="isSelected"
-      class="text-resize-handles"
-      @handle-down="handleResizeHandleDown"
-    />
   </div>
 </template>
 
@@ -14,20 +8,11 @@
 import { getDomStyle } from '@/core/renderers/dom';
 import { useCanvasStore } from '@/store/canvasStore';
 import type { ImageState } from '@/types/state';
-import { computed,inject } from 'vue';
-import type { ResizeHandle } from '@/types/editor';
-import ResizeHandles from '../ResizeHandles.vue';
-import { ToolManager } from '@/core/tools/ToolManager';
+import { computed } from 'vue';
 
 const props = defineProps<{
   node: ImageState;
 }>();
-
-// 注入父组件提供的 toolManager 实例
-const toolManager = inject<ToolManager>('toolManager');
-if (!toolManager) {
-  throw new Error('toolManager must be provided by parent component');
-}
 
 const store = useCanvasStore();
 
@@ -38,7 +23,7 @@ const style = computed(() => getDomStyle(props.node));
 const isSelected = computed(() => store.activeElementIds.has(props.node.id));
 
 // 图片URL
-const imageUrl = computed(() => props.node.props.imageUrl || '/uploads/images/img-test_1.jpg');
+const imageUrl = computed(() => props.node.props.imageUrl || import.meta.env.BASE_URL + 'uploads/images/img-test_1.jpg');
 
 // 滤镜样式
 const filterStyle = computed(() => {
@@ -53,10 +38,7 @@ const filterStyle = computed(() => {
   }
 
   // 模糊滤镜 (default: 0px)
-  if (
-    props.node.props.filters?.blur !== undefined &&
-    props.node.props.filters.blur !== 0
-  ) {
+  if (props.node.props.filters?.blur !== undefined && props.node.props.filters.blur !== 0) {
     filters.push(`blur(${props.node.props.filters.blur}px)`);
   }
 
@@ -101,18 +83,12 @@ const filterStyle = computed(() => {
   }
 
   // 反转滤镜 (default: 0%)
-  if (
-    props.node.props.filters?.invert !== undefined &&
-    props.node.props.filters.invert !== 0
-  ) {
+  if (props.node.props.filters?.invert !== undefined && props.node.props.filters.invert !== 0) {
     filters.push(`invert(${props.node.props.filters.invert}%)`);
   }
 
   // 棕褐色滤镜 (default: 0%)
-  if (
-    props.node.props.filters?.sepia !== undefined &&
-    props.node.props.filters.sepia !== 0
-  ) {
+  if (props.node.props.filters?.sepia !== undefined && props.node.props.filters.sepia !== 0) {
     filters.push(`sepia(${props.node.props.filters.sepia}%)`);
   }
 
@@ -120,11 +96,6 @@ const filterStyle = computed(() => {
     filter: filters.length > 0 ? filters.join(' ') : 'none',
   };
 });
-
-// 处理缩放控制点鼠标按下事件
-const handleResizeHandleDown = (e: MouseEvent, handle: ResizeHandle) => {
-  toolManager.handleResizeHandleDown(e, props.node.id, handle);
-};
 </script>
 
 <style scoped>
