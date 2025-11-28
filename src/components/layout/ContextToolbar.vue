@@ -284,8 +284,8 @@ const toggleStrikethrough = () => {
 };
 
 const handleDelete = () => {
-  if (activeTextNode.value) {
-    store.deleteNode(activeTextNode.value.id);
+  if (activeNode.value) {
+    store.deleteNode(activeNode.value.id);
   }
 };
 </script>
