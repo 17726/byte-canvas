@@ -1,5 +1,5 @@
 import type { InternalResizeState, ResizeHandle } from '@/types/editor';
-import { clientToWorld } from '@/core/utils/geometry';
+import { clientToWorld, isHasPointInRect } from '@/core/utils/geometry';
 import { useCanvasStore } from '@/store/canvasStore';
 import { useUIStore } from '@/store/uiStore';
 import type { InternalDragState } from '@/types/editor';
@@ -80,7 +80,6 @@ export class ToolManager {
   private boxSelectStart = { x: 0, y: 0 };
   private boxSelectEnd = { x: 0, y: 0 };
 
-  // 修正：仅保留一个构造函数（带stageEl参数）
   constructor(stageEl: HTMLElement | null) {
     this.store = useCanvasStore();
     this.ui = useUIStore();
@@ -142,13 +141,11 @@ export class ToolManager {
   handleMouseMove(e: MouseEvent) {
     // 优先处理节点拖拽
     if (this.dragState.isDragging) {
-      console.log('🚀 Dragging node');
       this.handleNodeMove(e); // 调用节点拖拽计算逻辑
       return;
     }
 
     if (this.resizeState.isResizing) {
-      console.log('🔧 Resizing, calling handleResizeMove');
       this.handleResizeMove(e);
       return;
     }
@@ -236,17 +233,7 @@ export class ToolManager {
       const baseNode = node as BaseNodeState;
       if (baseNode.isLocked) return;
 
-      const nodeMinX = baseNode.transform.x;
-      const nodeMaxX = baseNode.transform.x + baseNode.transform.width;
-      const nodeMinY = baseNode.transform.y;
-      const nodeMaxY = baseNode.transform.y + baseNode.transform.height;
-
-      if (
-        nodeMinX < worldMax.x &&
-        nodeMaxX > worldMin.x &&
-        nodeMinY < worldMax.y &&
-        nodeMaxY > worldMin.y
-      ) {
+      if (isHasPointInRect(worldMax.x,worldMax.y,worldMin.x,worldMin.y,baseNode) ) {
         selectedIds.push(id);
       }
     });
