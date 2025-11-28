@@ -50,7 +50,7 @@ const isSelected = computed(() => store.activeElementIds.has(props.node.id));
 
 .is-selected {
   /* 选中时的视觉反馈 - 使用 outline 和阴影来突出显示 */
-  outline: 2px solid #1890ff;
-  box-shadow: 0 0 0 4px rgba(24, 144, 255, 0.2);
+  /* outline: 2px solid #1890ff; */
+  /* box-shadow: 0 0 0 4px rgba(24, 144, 255, 0.2); */
 }
 </style>
