@@ -322,7 +322,7 @@ export class ToolManager {
       this.handleNodeUp();
       return;
     }
-    // 2. 获取视口状态（画布缩放/平移/网格配置
+    // 2. 获取视口状态（画布缩放/平移/网格配置）
     const viewport = this.store.viewport as ViewportState;
     const baseNode = this.store.nodes[this.dragState.nodeId] as BaseNodeState;
     if (!baseNode) return;
