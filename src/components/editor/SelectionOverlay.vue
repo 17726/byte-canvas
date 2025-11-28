@@ -14,19 +14,23 @@
       class="resize-handle"
       :class="`handle-${handle}`"
       :style="getHandleStyle(handle)"
-      @mousedown.stop="onHandleDown($event, handle)"
+      @mousedown.stop.prevent="onHandleDown($event, handle)"
     ></div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, inject } from 'vue';
+import { computed, inject, type Ref } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
 import type { ToolManager } from '@/core/tools/ToolManager';
 import type { ResizeHandle } from '@/types/editor';
 
 const store = useCanvasStore();
-const toolManager = inject('toolManager') as ToolManager;
+const toolManagerRef = inject<Ref<ToolManager | null>>('toolManager');
+
+if (!toolManagerRef) {
+  console.error('❌ SelectionOverlay: toolManager not provided!');
+}
 
 const handles: ResizeHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
 
@@ -72,8 +76,21 @@ const getHandleStyle = (handle: ResizeHandle) => {
 };
 
 const onHandleDown = (e: MouseEvent, handle: ResizeHandle) => {
-  if (selectedNode.value) {
-    toolManager.handleResizeHandleDown(e, selectedNode.value.id, handle);
+  console.log(
+    '🖱️ Handle mousedown:',
+    handle,
+    'toolManager:',
+    !!toolManagerRef?.value,
+    'selectedNode:',
+    !!selectedNode.value
+  );
+  if (selectedNode.value && toolManagerRef?.value) {
+    toolManagerRef.value.handleResizeHandleDown(e, selectedNode.value.id, handle);
+  } else {
+    console.error('❌ Missing toolManager or selectedNode!', {
+      toolManager: !!toolManagerRef?.value,
+      selectedNode: !!selectedNode.value,
+    });
   }
 };
 </script>
