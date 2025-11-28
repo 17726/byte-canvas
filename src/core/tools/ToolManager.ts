@@ -508,8 +508,8 @@ export class ToolManager {
 
       case NodeType.IMAGE:
         // 图片：等比缩放（保持宽高比）
-        // TODO: 实现图片等比缩放逻辑
-        this.resizeRect(
+        // 使用 resizeCircle 逻辑，它在角点拖拽时保持宽高比，边拖拽时允许拉伸（裁剪）
+        this.resizeCircle(
           handle,
           dx,
           dy,

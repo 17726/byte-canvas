@@ -120,7 +120,7 @@ const store = useCanvasStore();
 const activeNode = computed(() => {
   const ids = Array.from(store.activeElementIds);
   if (ids.length !== 1) return null;
-  return store.nodes[ids[0]];
+  return store.nodes[ids[0]!];
 });
 
 // 显示条件：有且仅有一个选中节点，并且不在其他交互中（如拖拽）
@@ -223,55 +223,65 @@ const strokeWidth = computed({
 });
 
 // --- Text Actions ---
+// 1. 安全获取当前文本节点 (Computed)
+// 这样后面就不用每次都写 (activeNode.value as TextState) 了
+const activeTextNode = computed(() => {
+  const node = store.activeElements[0];
+  if (node?.type === NodeType.TEXT) {
+    return node as TextState;
+  }
+  return null;
+});
+
+// 2. 封装通用更新函数 (核心优化)
+// key 是 TextState['props'] 的键名，value 是对应的值
+const updateTextProp = (key: keyof TextState['props'], value: any) => {
+  if (!activeTextNode.value) return;
+
+  // ✅ 关键点：使用 as Partial<TextState> 告诉 TS 这是文本节点的更新补丁
+  store.updateNode(activeTextNode.value.id, {
+    props: { [key]: value },
+  } as Partial<TextState>);
+};
+
+// --- 具体的属性绑定 ---
+
 const fontSize = computed({
-  get: () => (activeNode.value as TextState)?.props.fontSize || 14,
-  set: (val) => store.updateNode(activeNode.value!.id, { props: { fontSize: val as number } }),
+  get: () => activeTextNode.value?.props.fontSize || 14,
+  set: (val) => updateTextProp('fontSize', val),
 });
-
-const isBold = computed(() => {
-  return ((activeNode.value as TextState)?.props.fontWeight || 400) >= 700;
-});
-
-const toggleBold = () => {
-  const current = (activeNode.value as TextState)?.props.fontWeight || 400;
-  store.updateNode(activeNode.value!.id, { props: { fontWeight: current >= 700 ? 400 : 700 } });
-};
-
-const isItalic = computed(() => {
-  return (activeNode.value as TextState)?.props.fontStyle === 'italic';
-});
-
-const toggleItalic = () => {
-  const current = (activeNode.value as TextState)?.props.fontStyle || 'normal';
-  store.updateNode(activeNode.value!.id, {
-    props: { fontStyle: current === 'italic' ? 'normal' : 'italic' },
-  });
-};
-
-const isUnderline = computed(() => {
-  return (activeNode.value as TextState)?.props.underline || false;
-});
-
-const toggleUnderline = () => {
-  const current = (activeNode.value as TextState)?.props.underline || false;
-  store.updateNode(activeNode.value!.id, { props: { underline: !current } });
-};
-
-const isStrikethrough = computed(() => {
-  return (activeNode.value as TextState)?.props.strikethrough || false;
-});
-
-const toggleStrikethrough = () => {
-  const current = (activeNode.value as TextState)?.props.strikethrough || false;
-  store.updateNode(activeNode.value!.id, { props: { strikethrough: !current } });
-};
 
 const textColor = computed({
-  get: () => (activeNode.value as TextState)?.props.color || '#000000',
-  set: (val) => store.updateNode(activeNode.value!.id, { props: { color: val } }),
+  get: () => activeTextNode.value?.props.color || '#000000',
+  set: (val) => updateTextProp('color', val),
 });
 
-// --- Common Actions ---
+// --- 样式开关 (Toggle) ---
+
+const isBold = computed(() => {
+  const fw = activeTextNode.value?.props.fontWeight || 400;
+  return fw >= 700;
+});
+const toggleBold = () => {
+  // 如果当前是粗体，设为 400，否则设为 700
+  updateTextProp('fontWeight', isBold.value ? 400 : 700);
+};
+
+const isItalic = computed(() => activeTextNode.value?.props.fontStyle === 'italic');
+const toggleItalic = () => {
+  updateTextProp('fontStyle', isItalic.value ? 'normal' : 'italic');
+};
+
+const isUnderline = computed(() => activeTextNode.value?.props.underline || false);
+const toggleUnderline = () => {
+  updateTextProp('underline', !isUnderline.value);
+};
+
+const isStrikethrough = computed(() => activeTextNode.value?.props.strikethrough || false);
+const toggleStrikethrough = () => {
+  updateTextProp('strikethrough', !isStrikethrough.value);
+};
+
 const handleDelete = () => {
   if (activeNode.value) {
     store.deleteNode(activeNode.value.id);

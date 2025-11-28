@@ -68,7 +68,8 @@ export const useCanvasStore = defineStore('canvas', () => {
 
       // 合并除 props 外的其他属性 (transform, style, etc.)
       const rest = { ...(patch as Partial<NodeState>) };
-      delete (rest as Partial<NodeState>).props;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      delete (rest as any).props;
       Object.assign(node, rest);
     } else {
       // 普通更新
