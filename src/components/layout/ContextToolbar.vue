@@ -235,6 +235,7 @@ const activeTextNode = computed(() => {
 
 // 2. 封装通用更新函数 (核心优化)
 // key 是 TextState['props'] 的键名，value 是对应的值
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const updateTextProp = (key: keyof TextState['props'], value: any) => {
   if (!activeTextNode.value) return;
 

@@ -316,37 +316,37 @@ const opacity = computed({
 // Text
 const textContent = computed({
   get: () => (activeNode.value as TextState)?.props.content || '',
-   
   set: (val) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     activeNode.value && store.updateNode(activeNode.value.id, { props: { content: val } } as any),
 });
 const fontSize = computed({
   get: () => (activeNode.value as TextState)?.props.fontSize || 12,
-   
   set: (val) =>
     activeNode.value &&
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     store.updateNode(activeNode.value.id, { props: { fontSize: val as number } } as any),
 });
 const fontWeight = computed({
   get: () => (activeNode.value as TextState)?.props.fontWeight || 400,
-   
   set: (val) =>
     activeNode.value &&
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     store.updateNode(activeNode.value.id, { props: { fontWeight: val as number } } as any),
 });
 const textColor = computed({
   get: () => (activeNode.value as TextState)?.props.color || '#000000',
-   
   set: (val) =>
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     activeNode.value && store.updateNode(activeNode.value.id, { props: { color: val } } as any),
 });
 
 // Shape
 const cornerRadius = computed({
   get: () => (activeNode.value as ShapeState)?.props.cornerRadius || 0,
-   
   set: (val) =>
     activeNode.value &&
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     store.updateNode(activeNode.value.id, { props: { cornerRadius: val as number } } as any),
 });
 </script>
