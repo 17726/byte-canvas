@@ -113,7 +113,7 @@ const filterStyle = computed(() => {
 .node-image img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: fill;
   display: block;
   /** NOTE: 让鼠标事件从img穿透到父容器div
       因为我们监听的是div上的mousedown 同时禁止事件冒泡 这里不穿透的话光标在img上时无法拖拽*/

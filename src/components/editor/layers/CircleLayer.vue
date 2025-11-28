@@ -46,6 +46,11 @@ const isSelected = computed(() => store.activeElementIds.has(props.node.id));
   display: flex;
   align-items: center;
   justify-content: center;
+  cursor: move; /* 显示拖拽光标 */
+  user-select: none; /* 禁止文本选择，防止出现输入光标 */
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
 }
 
 .is-selected {

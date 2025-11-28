@@ -508,8 +508,7 @@ export class ToolManager {
 
       case NodeType.IMAGE:
         // 图片：等比缩放（保持宽高比）
-        // TODO: 实现图片等比缩放逻辑
-        this.resizeRect(
+        this.resizeImage(
           handle,
           dx,
           dy,
@@ -694,6 +693,25 @@ export class ToolManager {
       x: newX,
       y: newY,
     });
+  }
+
+  /**
+   * 图片缩放计算
+   * - 角点：等比缩放
+   * - 边点：独立缩放（拉伸）
+   */
+  private resizeImage(
+    handle: ResizeHandle,
+    dx: number,
+    dy: number,
+    startWidth: number,
+    startHeight: number,
+    startNodeX: number,
+    startNodeY: number,
+    callback: (result: { width: number; height: number; x: number; y: number }) => void
+  ) {
+    // 图片现在默认使用自由缩放（允许畸变），逻辑与矩形一致
+    this.resizeRect(handle, dx, dy, startWidth, startHeight, startNodeX, startNodeY, callback);
   }
 
   /**
