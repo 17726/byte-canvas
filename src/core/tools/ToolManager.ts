@@ -554,7 +554,6 @@ export class ToolManager {
       startNodeY: node.transform.y,
     };
 
-    console.log('✅ Resize state initialized:', this.resizeState);
   }
 
   /**
