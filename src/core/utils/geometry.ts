@@ -28,8 +28,10 @@ export function worldToClient(
   };
 }
 
-//判断矩形框内是否包含某元素
-export function isHasPointInRect(
+// 判断矩形框内是否包含某元素
+// TODO: 目前仅基于 AABB (Axis-Aligned Bounding Box) 进行判断，未考虑节点的旋转 (rotation) 属性。
+// 后续需要引入 SAT (Separating Axis Theorem) 或将矩形点逆旋转后判断，以支持旋转后的精确框选。
+export function isNodeInRect(
   maxRectWorldX: number,
   maxRectWorldY: number,
   minRectWorldX: number,
@@ -124,7 +126,21 @@ export function isHasPointInRect(
         });
         if (hasEllipsePointInRect) return true;
 
-        // 步骤3：最后检查椭圆中心是否在矩形内（兜底）
+        // 步骤3：采样椭圆边界点，检查是否有点落在矩形内（补充更全面的交集判定）
+        const ellipseSampleCount = 36; // 每10度采样一个点
+        for (let i = 0; i < ellipseSampleCount; i++) {
+          const theta = (2 * Math.PI * i) / ellipseSampleCount;
+          const ex = cx + rx * Math.cos(theta);
+          const ey = cy + ry * Math.sin(theta);
+          if (
+            ex >= minRectWorldX && ex <= maxRectWorldX &&
+            ey >= minRectWorldY && ey <= maxRectWorldY
+          ) {
+            return true;
+          }
+        }
+
+        // 步骤4：最后检查椭圆中心是否在矩形内（兜底）
         return cx >= minRectWorldX && cx <= maxRectWorldX &&
                cy >= minRectWorldY && cy <= maxRectWorldY;
       }

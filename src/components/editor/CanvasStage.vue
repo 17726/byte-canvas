@@ -159,11 +159,18 @@ const boxSelectStyle = computed(() => {
   const width = Math.abs(endX - startX);
   const height = Math.abs(endY - startY);
 
+  // 修正：如果 left/top 小于 0，需要调整 width/height 以保持视觉一致性
+  // 否则 Math.max(0, left) 会导致框选框“粘”在边缘但尺寸不变，造成视觉误差
+  const clampedLeft = Math.max(0, left);
+  const clampedTop = Math.max(0, top);
+  const clampedWidth = Math.max(0, width - (clampedLeft - left));
+  const clampedHeight = Math.max(0, height - (clampedTop - top));
+
   return {
-    left: `${Math.max(0, left)}px`,
-    top: `${Math.max(0, top)}px`,
-    width: `${Math.max(0, width)}px`,
-    height: `${Math.max(0, height)}px`,
+    left: `${clampedLeft}px`,
+    top: `${clampedTop}px`,
+    width: `${clampedWidth}px`,
+    height: `${clampedHeight}px`,
   };
 });
 

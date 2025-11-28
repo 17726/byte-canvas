@@ -1,5 +1,5 @@
 import type { InternalResizeState, ResizeHandle } from '@/types/editor';
-import { clientToWorld, isHasPointInRect } from '@/core/utils/geometry';
+import { clientToWorld, isNodeInRect } from '@/core/utils/geometry';
 import { useCanvasStore } from '@/store/canvasStore';
 import { useUIStore } from '@/store/uiStore';
 import type { InternalDragState } from '@/types/editor';
@@ -233,7 +233,7 @@ export class ToolManager {
       const baseNode = node as BaseNodeState;
       if (baseNode.isLocked) return;
 
-      if (isHasPointInRect(worldMax.x,worldMax.y,worldMin.x,worldMin.y,baseNode) ) {
+      if (isNodeInRect(worldMax.x, worldMax.y, worldMin.x, worldMin.y, baseNode)) {
         selectedIds.push(id);
       }
     });
@@ -256,18 +256,15 @@ export class ToolManager {
     if (this.resizeState.isResizing) return;
 
     // 2. 多选逻辑核心修改：框选后点击已选中节点不取消多选
-    let isMultiSelect = false;
     if (e.ctrlKey || e.shiftKey) {
       // Ctrl/Shift + 点击：切换选中状态（多选模式）
       this.store.toggleSelection(id);
-      isMultiSelect = true;
     } else {
       // 无快捷键时：
       // - 点击已选中的节点 → 保留现有多选
       // - 点击未选中的节点 → 重置为单选
       if (this.store.activeElementIds.has(id)) {
         // 点击已选中的节点，不修改选中状态（保留多选）
-        isMultiSelect = true;
       } else {
         // 点击未选中的节点，重置为单选
         this.store.setActive([id]);
@@ -568,8 +565,6 @@ export class ToolManager {
       return;
     }
 
-    console.log('📐 handleResizeMove called:', handle);
-
     // 如果没有按住鼠标左键，强制结束缩放
     if ((e.buttons & 1) === 0) {
       this.resizeState.isResizing = false;
@@ -582,7 +577,7 @@ export class ToolManager {
     const node = this.store.nodes[nodeId];
     if (!node) return;
 
-    // 计算鼠标移动的距离（考虑缩放
+    // 计算鼠标移动的距离（考虑缩放）
     const dx = (e.clientX - startX) / this.store.viewport.zoom;
     const dy = (e.clientY - startY) / this.store.viewport.zoom;
 
