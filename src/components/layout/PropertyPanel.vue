@@ -118,7 +118,7 @@
           </div>
 
           <!-- Stroke -->
-          <div class="prop-item" >
+          <div class="prop-item">
             <span class="label">描边</span>
             <div class="flex-row">
               <a-color-picker v-model="strokeColor" size="small" />
@@ -184,7 +184,6 @@
             <div class="prop-item">
               <span class="label">滤镜</span>
               <div class="filter-options">
-
                 <!-- 黑白滤镜 -->
                 <div class="filter-item" @click="selectFilter('grayscale')">
                   <div
@@ -192,7 +191,7 @@
                     :class="{ active: selectedFilter === 'grayscale' }"
                     :style="{
                       backgroundImage: 'url(' + (previewImage || defaultImage) + ')',
-                      filter: 'grayscale(100%) contrast(110%) brightness(95%)'
+                      filter: 'grayscale(100%) contrast(110%) brightness(95%)',
                     }"
                   ></div>
                   <span class="filter-name">黑白</span>
@@ -205,7 +204,7 @@
                     :class="{ active: selectedFilter === 'blur' }"
                     :style="{
                       backgroundImage: 'url(' + (previewImage || defaultImage) + ')',
-                      filter: 'blur(8px) brightness(98%) opacity(95%)'
+                      filter: 'blur(8px) brightness(98%) opacity(95%)',
                     }"
                   ></div>
                   <span class="filter-name">模糊</span>
@@ -218,7 +217,8 @@
                     :class="{ active: selectedFilter === 'vintage' }"
                     :style="{
                       backgroundImage: 'url(' + (previewImage || defaultImage) + ')',
-                      filter: 'sepia(60%) contrast(115%) brightness(95%) saturate(85%) hue-rotate(-10deg) '
+                      filter:
+                        'sepia(60%) contrast(115%) brightness(95%) saturate(85%) hue-rotate(-10deg) ',
                     }"
                   ></div>
                   <span class="filter-name">复古</span>
@@ -231,7 +231,7 @@
                     :class="{ active: selectedFilter === 'reset' }"
                     :style="{
                       backgroundImage: 'url(' + (previewImage || defaultImage) + ')',
-                      filter: 'none'
+                      filter: 'none',
                     }"
                   ></div>
                   <span class="filter-name">重置</span>
@@ -380,27 +380,33 @@ const textContent = computed({
   get: () => (activeNode.value as TextState)?.props.content || '',
 
   set: (val) =>
-    activeNode.value && store.updateNode(activeNode.value.id, { props: { content: val } } as any),
+    activeNode.value &&
+    store.updateNode(activeNode.value.id, { props: { content: val } } as Partial<TextState>),
 });
 const fontSize = computed({
   get: () => (activeNode.value as TextState)?.props.fontSize || 12,
 
   set: (val) =>
     activeNode.value &&
-    store.updateNode(activeNode.value.id, { props: { fontSize: val as number } } as any),
+    store.updateNode(activeNode.value.id, {
+      props: { fontSize: val as number },
+    } as Partial<TextState>),
 });
 const fontWeight = computed({
   get: () => (activeNode.value as TextState)?.props.fontWeight || 400,
 
   set: (val) =>
     activeNode.value &&
-    store.updateNode(activeNode.value.id, { props: { fontWeight: val as number } } as any),
+    store.updateNode(activeNode.value.id, {
+      props: { fontWeight: val as number },
+    } as Partial<TextState>),
 });
 const textColor = computed({
   get: () => (activeNode.value as TextState)?.props.color || '#000000',
 
   set: (val) =>
-    activeNode.value && store.updateNode(activeNode.value.id, { props: { color: val } } as any),
+    activeNode.value &&
+    store.updateNode(activeNode.value.id, { props: { color: val } } as Partial<TextState>),
 });
 
 // Shape
@@ -409,7 +415,9 @@ const cornerRadius = computed({
 
   set: (val) =>
     activeNode.value &&
-    store.updateNode(activeNode.value.id, { props: { cornerRadius: val as number } } as any),
+    store.updateNode(activeNode.value.id, {
+      props: { cornerRadius: val as number },
+    } as Partial<ShapeState>),
 });
 
 //Image
@@ -430,7 +438,7 @@ const defaultImage = DEFAULT_IMAGE_URL;
 const selectFilter = (filterType) => {
   selectedFilter.value = filterType;
 
-  switch(filterType) {
+  switch (filterType) {
     case 'grayscale':
       grayscaleFilter();
       break;
@@ -447,7 +455,7 @@ const selectFilter = (filterType) => {
 };
 
 const grayscaleFilter = () => {
-  store.activeElements.forEach(element => {
+  store.activeElements.forEach((element) => {
     if (element && element.id && element.type === 'image') {
       store.updateNode(element.id, {
         props: {
@@ -455,16 +463,16 @@ const grayscaleFilter = () => {
           filters: {
             grayscale: 100,
             contrast: 110,
-            brightness: 95
-          }
-        }
+            brightness: 95,
+          },
+        },
       });
     }
   });
 };
 
 const blurFilter = () => {
-  store.activeElements.forEach(element => {
+  store.activeElements.forEach((element) => {
     if (element && element.id && element.type === 'image') {
       store.updateNode(element.id, {
         props: {
@@ -472,41 +480,41 @@ const blurFilter = () => {
           filters: {
             blur: 8,
             brightness: 98,
-            filterOpacity: 95
-          }
-        }
+            filterOpacity: 95,
+          },
+        },
       });
     }
   });
 };
 
 const vintageFilter = () => {
-  store.activeElements.forEach(element => {
+  store.activeElements.forEach((element) => {
     if (element && element.id && element.type === 'image') {
       store.updateNode(element.id, {
         props: {
           ...element.props,
           filters: {
-            sepia: 60,             // 棕褐色调
-            contrast: 115,         // 增强对比度
-            brightness: 95,        // 降低亮度
-            saturate: 85,          // 降低饱和度
-            hueRotate: -10         // 轻微色相偏移
-          }
-        }
+            sepia: 60, // 棕褐色调
+            contrast: 115, // 增强对比度
+            brightness: 95, // 降低亮度
+            saturate: 85, // 降低饱和度
+            hueRotate: -10, // 轻微色相偏移
+          },
+        },
       });
     }
   });
 };
 
 const resetFilter = () => {
-  store.activeElements.forEach(element => {
+  store.activeElements.forEach((element) => {
     if (element && element.id && element.type === 'image') {
       store.updateNode(element.id, {
         props: {
           ...element.props,
-          filters: DEFAULT_IMAGE_FILTERS
-        }
+          filters: DEFAULT_IMAGE_FILTERS,
+        },
       });
     }
   });

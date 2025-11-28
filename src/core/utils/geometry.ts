@@ -105,7 +105,7 @@ export function isNodeInRect(
         ];
 
         // 检查矩形关键点是否在椭圆内（满足椭圆方程则相交）
-        const hasPointInEllipse = rectPoints.some(point => {
+        const hasPointInEllipse = rectPoints.some((point) => {
           const dx = (point.x - cx) / rx;
           const dy = (point.y - cy) / ry;
           return dx * dx + dy * dy <= 1.001; // 加微小容差，避免浮点精度问题
@@ -120,9 +120,13 @@ export function isNodeInRect(
           { x: cx - rx, y: cy }, // 左顶点
           { x: cx + rx, y: cy }, // 右顶点
         ];
-        const hasEllipsePointInRect = ellipsePoints.some(point => {
-          return point.x >= minRectWorldX && point.x <= maxRectWorldX &&
-                 point.y >= minRectWorldY && point.y <= maxRectWorldY;
+        const hasEllipsePointInRect = ellipsePoints.some((point) => {
+          return (
+            point.x >= minRectWorldX &&
+            point.x <= maxRectWorldX &&
+            point.y >= minRectWorldY &&
+            point.y <= maxRectWorldY
+          );
         });
         if (hasEllipsePointInRect) return true;
 
@@ -133,16 +137,19 @@ export function isNodeInRect(
           const ex = cx + rx * Math.cos(theta);
           const ey = cy + ry * Math.sin(theta);
           if (
-            ex >= minRectWorldX && ex <= maxRectWorldX &&
-            ey >= minRectWorldY && ey <= maxRectWorldY
+            ex >= minRectWorldX &&
+            ex <= maxRectWorldX &&
+            ey >= minRectWorldY &&
+            ey <= maxRectWorldY
           ) {
             return true;
           }
         }
 
         // 步骤4：最后检查椭圆中心是否在矩形内（兜底）
-        return cx >= minRectWorldX && cx <= maxRectWorldX &&
-               cy >= minRectWorldY && cy <= maxRectWorldY;
+        return (
+          cx >= minRectWorldX && cx <= maxRectWorldX && cy >= minRectWorldY && cy <= maxRectWorldY
+        );
       }
 
     default:

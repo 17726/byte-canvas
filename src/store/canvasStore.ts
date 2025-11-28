@@ -1,7 +1,7 @@
 // stores/canvasStore.ts
 import { defineStore } from 'pinia';
 import { ref, reactive, computed } from 'vue';
-import type { NodeState } from '@/types/state';
+import type { NodeState, ShapeState, TextState, ImageState } from '@/types/state';
 import { DEFAULT_VIEWPORT } from '@/config/defaults';
 
 // 全局画布状态管理（Pinia store）
@@ -67,9 +67,9 @@ export const useCanvasStore = defineStore('canvas', () => {
       };
 
       // 合并除 props 外的其他属性 (transform, style, etc.)
-      const rest = { ...(patch as Partial<NodeState>) };
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      delete (rest as any).props;
+      // 使用解构赋值分离 props，避免使用 delete 和 any
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { props, ...rest } = patch as Partial<ShapeState | TextState | ImageState>;
       Object.assign(node, rest);
     } else {
       // 普通更新
