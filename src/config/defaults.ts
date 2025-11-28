@@ -76,7 +76,8 @@ export const DEFAULT_IMAGE_STYLE = {
   opacity: 1,
   zIndex: 1,
 };
-export const DEFAULT_IMAGE_URL = '/uploads/images/img-test_2.png';
+// 使用 import.meta.env.BASE_URL 确保在子路径部署时也能正确访问
+export const DEFAULT_IMAGE_URL = import.meta.env.BASE_URL + 'uploads/images/img-test_2.png';
 export const DEFAULT_IMAGE_FILTERS = {
   grayscale: 0,
   blur: 0,
