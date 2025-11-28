@@ -871,7 +871,7 @@ export class ToolManager {
         newHeight = startHeight + dy;
         newX = startNodeX + dx;
         break;
-      case 'w': // 左下
+      case 'w': // 左
         newWidth = startWidth - dx;
         newX = startNodeX + dx;
         break;
