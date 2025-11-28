@@ -50,7 +50,7 @@ export class ToolManager {
    */
   private dragState: InternalDragState & {
     // 改为TransformState类型（与节点的transform类型一致）
-    startTransformMap: Record<string, TransformState>
+    startTransformMap: Record<string, TransformState>;
   } = {
     isDragging: false,
     type: null,
@@ -124,10 +124,12 @@ export class ToolManager {
     this.lastPos.x = e.clientX;
     this.lastPos.y = e.clientY;
 
-    if (e.button === 1) { // 中键平移：取消所有选中
+    if (e.button === 1) {
+      // 中键平移：取消所有选中
       this.isPanDragging = true;
       this.store.setActive([]);
-    } else if (e.button === 0) { // 左键框选：点击空白才会触发框选（后续取消选中）
+    } else if (e.button === 0) {
+      // 左键框选：点击空白才会触发框选（后续取消选中）
       this.isBoxSelecting = true;
       this.boxSelectStart = { x: e.clientX, y: e.clientY };
       this.boxSelectEnd = { x: e.clientX, y: e.clientY };
@@ -140,7 +142,7 @@ export class ToolManager {
   handleMouseMove(e: MouseEvent) {
     // 优先处理节点拖拽
     if (this.dragState.isDragging) {
-      this.handleNodeMove(e);// 调用节点拖拽计算逻辑
+      this.handleNodeMove(e); // 调用节点拖拽计算逻辑
       return;
     }
 
@@ -261,6 +263,9 @@ export class ToolManager {
     // 1.阻止事件冒泡，避免触发画布的 handleMouseDown (导致取消选中)
     e.stopPropagation();
 
+    // 如果正在缩放，不处理节点拖拽
+    if (this.resizeState.isResizing) return;
+
     // 2. 多选逻辑核心修改：框选后点击已选中节点不取消多选
     let isMultiSelect = false;
     if (e.ctrlKey || e.shiftKey) {
@@ -291,7 +296,7 @@ export class ToolManager {
     this.ui.setPanelExpanded(true);
 
     // 5. 初始化拖拽状态（适配多选拖拽）
-    const activeIds = Array.from(this.store.activeElementIds).filter(activeId => {
+    const activeIds = Array.from(this.store.activeElementIds).filter((activeId) => {
       // 过滤锁定节点，避免拖拽锁定节点
       const activeNode = this.store.nodes[activeId] as BaseNodeState;
       return activeNode && !activeNode.isLocked;
@@ -299,7 +304,7 @@ export class ToolManager {
 
     // 初始化多节点初始变换状态映射
     const startTransformMap: Record<string, typeof node.transform> = {};
-    activeIds.forEach(activeId => {
+    activeIds.forEach((activeId) => {
       const activeNode = this.store.nodes[activeId] as BaseNodeState;
       startTransformMap[activeId] = { ...activeNode.transform };
     });
@@ -350,8 +355,8 @@ export class ToolManager {
       if (!node || node.isLocked) return;
 
       // 计算节点新位置（初始位置 + 偏移）
-      let newX = startTransform.x + deltaX;
-      let newY = startTransform.y + deltaY;
+      const newX = startTransform.x + deltaX;
+      const newY = startTransform.y + deltaY;
 
       // TODO: Implement grid snapping逻辑（如果 viewport.isSnapToGrid 为 true）
       // 该逻辑应该在世界坐标系中进行（已转换为 world 坐标），以保证缩放/平移下 snapping 的一致性
@@ -535,12 +540,18 @@ export class ToolManager {
    */
   handleResizeHandleDown(e: MouseEvent, nodeId: string, handle: ResizeHandle) {
     e.stopPropagation();
+    e.preventDefault(); // 阻止默认行为
 
     const node = this.store.nodes[nodeId];
     if (!node || node.isLocked) return;
 
     // 标记交互中
     this.store.isInteracting = true;
+
+    // 重置拖拽状态，确保不会与缩放冲突
+    this.dragState.isDragging = false;
+    this.dragState.type = null;
+    this.dragState.nodeId = '';
 
     this.resizeState = {
       isResizing: true,
@@ -553,6 +564,8 @@ export class ToolManager {
       startNodeX: node.transform.x,
       startNodeY: node.transform.y,
     };
+
+    console.log('✅ Resize state initialized:', this.resizeState);
   }
 
   /**
@@ -834,37 +847,37 @@ export class ToolManager {
     let newY = startNodeY;
 
     switch (handle) {
-      case 'nw':// 左上
+      case 'nw': // 左上
         newWidth = startWidth - dx;
         newHeight = startHeight - dy;
         newX = startNodeX + dx;
         newY = startNodeY + dy;
         break;
-      case 'n':// 上
+      case 'n': // 上
         newHeight = startHeight - dy;
         newY = startNodeY + dy;
         break;
-      case 'ne':// 右上
+      case 'ne': // 右上
         newWidth = startWidth + dx;
         newHeight = startHeight - dy;
         newY = startNodeY + dy;
         break;
-      case 'e':// 右
+      case 'e': // 右
         newWidth = startWidth + dx;
         break;
-      case 'se':// 右下
+      case 'se': // 右下
         newWidth = startWidth + dx;
         newHeight = startHeight + dy;
         break;
-      case 's':// 下
+      case 's': // 下
         newHeight = startHeight + dy;
         break;
-      case 'sw':// 左下
+      case 'sw': // 左下
         newWidth = startWidth - dx;
         newHeight = startHeight + dy;
         newX = startNodeX + dx;
         break;
-      case 'w':// 左下
+      case 'w': // 左下
         newWidth = startWidth - dx;
         newX = startNodeX + dx;
         break;
@@ -900,37 +913,37 @@ export class ToolManager {
     // 文本容器的缩放逻辑与矩形相同
     // 区别在于：文本的字体大小（fontSize）不会随容器缩放而改变
     switch (handle) {
-      case 'nw':// 左上
+      case 'nw': // 左上
         newWidth = startWidth - dx;
         newHeight = startHeight - dy;
         newX = startNodeX + dx;
         newY = startNodeY + dy;
         break;
-      case 'n':// 上
+      case 'n': // 上
         newHeight = startHeight - dy;
         newY = startNodeY + dy;
         break;
-      case 'ne':// 右上
+      case 'ne': // 右上
         newWidth = startWidth + dx;
         newHeight = startHeight - dy;
         newY = startNodeY + dy;
         break;
-      case 'e':// 右
+      case 'e': // 右
         newWidth = startWidth + dx;
         break;
-      case 'se':// 右下
+      case 'se': // 右下
         newWidth = startWidth + dx;
         newHeight = startHeight + dy;
         break;
-      case 's':// 下
+      case 's': // 下
         newHeight = startHeight + dy;
         break;
-      case 'sw':// 左下
+      case 'sw': // 左下
         newWidth = startWidth - dx;
         newHeight = startHeight + dy;
         newX = startNodeX + dx;
         break;
-      case 'w':// 左
+      case 'w': // 左
         newWidth = startWidth - dx;
         newX = startNodeX + dx;
         break;

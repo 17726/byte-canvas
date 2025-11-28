@@ -14,7 +14,7 @@
       class="resize-handle"
       :class="`handle-${handle}`"
       :style="getHandleStyle(handle)"
-      @mousedown.stop="onHandleDown($event, handle)"
+      @mousedown.stop.prevent="onHandleDown($event, handle)"
     ></div>
   </div>
 </template>
@@ -72,8 +72,18 @@ const getHandleStyle = (handle: ResizeHandle) => {
 };
 
 const onHandleDown = (e: MouseEvent, handle: ResizeHandle) => {
-  if (selectedNode.value) {
+  console.log(
+    '🖱️ Handle mousedown:',
+    handle,
+    'toolManager:',
+    !!toolManager,
+    'selectedNode:',
+    !!selectedNode.value
+  );
+  if (selectedNode.value && toolManager) {
     toolManager.handleResizeHandleDown(e, selectedNode.value.id, handle);
+  } else {
+    console.error('❌ Missing toolManager or selectedNode!');
   }
 };
 </script>
