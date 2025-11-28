@@ -13,11 +13,7 @@
       对应文档：L4 渲染层 - 画布容器
     -->
     <!-- 框选视觉层 -->
-    <div
-      v-if="isBoxSelecting"
-      class="box-select-overlay"
-      :style="boxSelectStyle"
-    ></div>
+    <div v-if="isBoxSelecting" class="box-select-overlay" :style="boxSelectStyle"></div>
 
     <!-- 视口层 -->
     <div class="canvas-viewport" :style="viewportStyle">
@@ -39,8 +35,8 @@
       <SelectionOverlay />
     </div>
 
-        <!-- 悬浮属性栏 (Context Toolbar) - 放在视口外，但跟随节点坐标 -->
-        <!-- 注意：ContextToolbar 读取 store.activeElementIds 并计算屏幕位置，它不直接受 viewport transform 的 DOM 影响，
+    <!-- 悬浮属性栏 (Context Toolbar) - 放在视口外，但跟随节点坐标 -->
+    <!-- 注意：ContextToolbar 读取 store.activeElementIds 并计算屏幕位置，它不直接受 viewport transform 的 DOM 影响，
           因此 implement 上需要使用 worldToClient 等工具方法计算位置 -->
     <ContextToolbar />
 
@@ -73,7 +69,10 @@ import {
 
 const store = useCanvasStore();
 const stageRef = ref<HTMLElement | null>(null);
-let toolManager: ToolManager; // 延迟初始化
+
+// 创建 toolManager ref 并立即 provide（解决依赖注入时序问题）
+const toolManagerRef = ref<ToolManager | null>(null);
+provide('toolManager', toolManagerRef);
 
 // 1. 视口样式计算
 const viewportStyle = computed(() => ({
@@ -170,51 +169,50 @@ const boxSelectStyle = computed(() => {
 
 // 3. 事件转发 -> 逻辑层
 const handleWheel = (e: WheelEvent) => {
-  if (!toolManager) return; // 防御性判断
-  toolManager.handleWheel(e);
+  if (!toolManagerRef.value) return; // 防御性判断
+  toolManagerRef.value.handleWheel(e);
 };
 // 鼠标按下
 const handleMouseDown = (e: MouseEvent) => {
-  if (!toolManager) return;
-  toolManager.handleMouseDown(e);
+  if (!toolManagerRef.value) return;
+  toolManagerRef.value.handleMouseDown(e);
 };
 // 鼠标移动
 const handleMouseMove = (e: MouseEvent) => {
-  if (!toolManager) return;
-  toolManager.handleMouseMove(e);
+  if (!toolManagerRef.value) return;
+  toolManagerRef.value.handleMouseMove(e);
   // 同步框选状态到Vue组件
-  const boxState = toolManager.getBoxSelectState();
+  const boxState = toolManagerRef.value.getBoxSelectState();
   isBoxSelecting.value = boxState.isBoxSelecting;
   boxSelectStart.value = boxState.boxSelectStart;
   boxSelectEnd.value = boxState.boxSelectEnd;
 };
 // 鼠标抬起
 const handleMouseUp = () => {
-  if (!toolManager) return;
-  toolManager.handleMouseUp();
+  if (!toolManagerRef.value) return;
+  toolManagerRef.value.handleMouseUp();
   isBoxSelecting.value = false;
 };
 
 // 节点交互转发
 const handleNodeDown = (e: MouseEvent, id: string) => {
-    // 注意：这里传入 e，以便 ToolManager 处理 stopPropagation 或其他逻辑
-  if (!toolManager) return;
-  toolManager.handleNodeDown(e, id);
+  // 注意：这里传入 e，以便 ToolManager 处理 stopPropagation 或其他逻辑
+  if (!toolManagerRef.value) return;
+  toolManagerRef.value.handleNodeDown(e, id);
 };
 
 // 暴露创建节点的方法（供父组件/子组件调用）
-const createRect = () => toolManager?.createRect();
-const createCircle = () => toolManager?.createCircle();
-const createText = () => toolManager?.createText();
-const deleteSelected = () => toolManager?.deleteSelected();
+const createRect = () => toolManagerRef.value?.createRect();
+const createCircle = () => toolManagerRef.value?.createCircle();
+const createText = () => toolManagerRef.value?.createText();
+const deleteSelected = () => toolManagerRef.value?.deleteSelected();
 
 // 全局事件监听
 onMounted(() => {
-  // 1. 先初始化toolManager（核心修复：顺序调整）
-  toolManager = new ToolManager(stageRef.value);
-  // 2. 再provide给子组件（确保注入的是有效实例）
-  provide('toolManager', toolManager);
-  // 3. 暴露方法给父组件（可选，若需要外部调用）
+  // 1. 初始化 toolManager 并赋值给 ref
+  toolManagerRef.value = new ToolManager(stageRef.value);
+
+  // 2. 暴露方法给父组件（可选，若需要外部调用）
   provide('createRect', createRect);
   provide('createCircle', createCircle);
   provide('createText', createText);
@@ -247,7 +245,7 @@ onUnmounted(() => {
 .canvas-viewport {
   width: 100%;
   height: 100%;
-   /* 硬件加速 */
+  /* 硬件加速 */
   will-change: transform;
 }
 

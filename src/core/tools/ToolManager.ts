@@ -142,11 +142,13 @@ export class ToolManager {
   handleMouseMove(e: MouseEvent) {
     // 优先处理节点拖拽
     if (this.dragState.isDragging) {
+      console.log('🚀 Dragging node');
       this.handleNodeMove(e); // 调用节点拖拽计算逻辑
       return;
     }
 
     if (this.resizeState.isResizing) {
+      console.log('🔧 Resizing, calling handleResizeMove');
       this.handleResizeMove(e);
       return;
     }
@@ -575,7 +577,12 @@ export class ToolManager {
     const { handle, nodeId, startX, startY, startWidth, startHeight, startNodeX, startNodeY } =
       this.resizeState;
 
-    if (!handle || !nodeId) return;
+    if (!handle || !nodeId) {
+      console.log('⚠️ handleResizeMove: no handle or nodeId', { handle, nodeId });
+      return;
+    }
+
+    console.log('📐 handleResizeMove called:', handle);
 
     // 如果没有按住鼠标左键，强制结束缩放
     if ((e.buttons & 1) === 0) {
