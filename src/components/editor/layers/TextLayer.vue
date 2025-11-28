@@ -7,42 +7,26 @@
         {{ node.props.content }}
       </div>
     </div>
-    <!-- 选中时显示缩放控制点（隐藏显示） -->
-    <ResizeHandles
-      v-if="isSelected"
-      class="text-resize-handles"
-      @handle-down="handleResizeHandleDown"
-    />
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, inject } from 'vue';
+import { computed } from 'vue';
 import type { TextState } from '@/types/state';
 import { useCanvasStore } from '@/store/canvasStore';
 import { getDomStyle } from '@/core/renderers/dom';
-import { ToolManager } from '@/core/tools/ToolManager';
-import type { ResizeHandle } from '@/types/editor';
-import ResizeHandles from '../ResizeHandles.vue';
 
 const props = defineProps<{
   node: TextState;
 }>();
 
 const store = useCanvasStore();
-// 注入父组件提供的 toolManager 实例
-const toolManager = inject<ToolManager>('toolManager')!;
 
 // 获取文本框+文本样式 (使用策略模式分离的渲染器)
 const style = computed(() => getDomStyle(props.node));
 
 // 选中状态
 const isSelected = computed(() => store.activeElementIds.has(props.node.id));
-
-// 处理缩放控制点鼠标按下事件
-const handleResizeHandleDown = (e: MouseEvent, handle: ResizeHandle) => {
-  toolManager.handleResizeHandleDown(e, props.node.id, handle);
-};
 </script>
 
 <style scoped>
@@ -83,26 +67,11 @@ const handleResizeHandleDown = (e: MouseEvent, handle: ResizeHandle) => {
   color: var(--text-color);
   line-height: var(--line-height);
   transform: scale(var(--text-scale));
+  text-decoration-line: var(--text-decoration-line);
   transform-origin: top left;
-
   /* 确保文本正确显示 */
   white-space: pre-wrap;
   word-wrap: break-word;
   overflow-wrap: break-word;
-}
-
-/* 隐藏文本缩放控制点的显示 */
-.text-resize-handles :deep(.resize-handle) {
-  opacity: 0;
-  pointer-events: auto; /* 保留交互功能 */
-}
-
-/* 鼠标悬停时显示控制点（可选） */
-.text-layer-wrapper:hover .text-resize-handles :deep(.resize-handle) {
-  opacity: 0.5;
-}
-
-.text-resize-handles :deep(.resize-handle):hover {
-  opacity: 1 !important;
 }
 </style>
