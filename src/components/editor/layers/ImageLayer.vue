@@ -23,7 +23,7 @@ const style = computed(() => getDomStyle(props.node));
 const isSelected = computed(() => store.activeElementIds.has(props.node.id));
 
 // 图片URL
-const imageUrl = computed(() => props.node.props.imageUrl || '/uploads/images/img-test_1.jpg');
+const imageUrl = computed(() => props.node.props.imageUrl || import.meta.env.BASE_URL + 'uploads/images/img-test_1.jpg');
 
 // 滤镜样式
 const filterStyle = computed(() => {
