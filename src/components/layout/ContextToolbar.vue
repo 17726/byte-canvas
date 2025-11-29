@@ -50,8 +50,8 @@
 
     <!-- Text Controls -->
     <template v-if="isText">
-      <div class="tool-item">
-        字号：
+      <div class="tool-item" style="width: 85px;">
+        字号: 
         <a-input-number
           size="mini"
           v-model="fontSize"
