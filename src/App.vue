@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { watch } from 'vue';
+import { watch, onMounted } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
 import { useUIStore } from '@/store/uiStore';
 import { Left as IconLeft, Right as IconRight } from '@icon-park/vue-next';
@@ -10,6 +10,11 @@ import PropertyPanel from '@/components/layout/PropertyPanel.vue';
 
 const store = useCanvasStore();
 const ui = useUIStore();
+
+// 应用启动时从 localStorage 恢复画布状态
+onMounted(() => {
+  store.initFromStorage();
+});
 
 // 监听选中状态，自动展开/折叠
 watch(
