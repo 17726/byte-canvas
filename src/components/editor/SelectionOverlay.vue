@@ -1,18 +1,28 @@
 <template>
-  <!-- 多选大框覆盖层：单个大框替代原有多个节点的小框 -->
-  <div v-if="hasSelectedNodes && !allNodesLocked" class="selection-overlay" :style="overlayStyle">
-    <!-- 多选大框边框 -->
-    <div class="selection-border"></div>
-
-    <!-- 8个控制点（绑定到大框上） -->
+  <div v-if="hasSelectedNodes && !allNodesLocked" class="selection-container">
+    <!-- 多选时：显示每个元素的单独选中框 -->
     <div
-      v-for="handle in handles"
-      :key="handle"
-      class="resize-handle"
-      :class="`handle-${handle}`"
-      :style="getHandleStyle(handle)"
-      @mousedown.stop.prevent="onHandleDown($event, handle)"
+      v-for="node in selectedNodes"
+      :key="node.id"
+      class="individual-selection"
+      :style="getIndividualStyle(node)"
     ></div>
+
+    <!-- 主选中框（单选/多选大框） -->
+    <div class="selection-overlay" :style="overlayStyle">
+      <!-- 选中框边框 -->
+      <div class="selection-border"></div>
+
+      <!-- 8个控制点（绑定到大框上） -->
+      <div
+        v-for="handle in handles"
+        :key="handle"
+        class="resize-handle"
+        :class="`handle-${handle}`"
+        :style="getHandleStyle(handle)"
+        @mousedown.stop.prevent="onHandleDown($event, handle)"
+      ></div>
+    </div>
   </div>
 </template>
 
@@ -38,30 +48,101 @@ const allNodesLocked = computed(() =>
   store.activeElements.every((node) => (node as BaseNodeState).isLocked)
 );
 
-// 2. 计算多选大框的包围盒（核心：包裹所有选中节点的最小矩形）
+// 选中的节点列表
+const selectedNodes = computed(() => store.activeElements as BaseNodeState[]);
+
+// 单个元素选中框样式
+const getIndividualStyle = (node: BaseNodeState) => {
+  const { x, y, width, height, rotation } = node.transform;
+  return {
+    transform: `translate(${x}px, ${y}px) rotate(${rotation}deg)`,
+    transformOrigin: `${width / 2}px ${height / 2}px`,
+    width: `${width}px`,
+    height: `${height}px`,
+  };
+};
+
+/**
+ * 计算旋转后的节点边界框（AABB）
+ * 将节点四个角点按旋转角度变换后，求最小外接矩形
+ */
+const getRotatedBounds = (node: BaseNodeState) => {
+  const { x, y, width, height, rotation } = node.transform;
+
+  // 如果没有旋转，直接返回原始边界
+  if (rotation === 0) {
+    return { minX: x, maxX: x + width, minY: y, maxY: y + height };
+  }
+
+  // 计算旋转中心（节点中心点）
+  const cx = x + width / 2;
+  const cy = y + height / 2;
+
+  // 节点四个角点（相对于左上角）
+  const corners = [
+    { x: x, y: y }, // 左上
+    { x: x + width, y: y }, // 右上
+    { x: x + width, y: y + height }, // 右下
+    { x: x, y: y + height }, // 左下
+  ];
+
+  // 旋转角度转弧度
+  const rad = (rotation * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+
+  // 旋转所有角点，找出边界
+  let minX = Infinity,
+    maxX = -Infinity,
+    minY = Infinity,
+    maxY = -Infinity;
+
+  corners.forEach((corner) => {
+    // 相对于中心点的坐标
+    const dx = corner.x - cx;
+    const dy = corner.y - cy;
+    // 旋转变换
+    const rx = cx + dx * cos - dy * sin;
+    const ry = cy + dx * sin + dy * cos;
+    // 更新边界
+    minX = Math.min(minX, rx);
+    maxX = Math.max(maxX, rx);
+    minY = Math.min(minY, ry);
+    maxY = Math.max(maxY, ry);
+  });
+
+  return { minX, maxX, minY, maxY };
+};
+
+// 2. 计算多选大框的包围盒（核心：包裹所有选中节点的最小矩形，考虑旋转）
 const selectionBounds = computed(() => {
   const nodes = store.activeElements as BaseNodeState[];
   if (nodes.length === 0) return null;
-  // 新增：检查 startState 是否存在，不存在则跳过当前节点
   if (!nodes[0]) return null;
 
-  // 初始化包围盒为第一个节点的范围
-  let minX = nodes[0].transform.x;
-  let maxX = nodes[0].transform.x + nodes[0].transform.width;
-  let minY = nodes[0].transform.y;
-  let maxY = nodes[0].transform.y + nodes[0].transform.height;
+  // 单选时：返回节点原始边界（选中框会跟着旋转）
+  if (nodes.length === 1) {
+    const node = nodes[0];
+    return {
+      x: node.transform.x,
+      y: node.transform.y,
+      width: node.transform.width,
+      height: node.transform.height,
+    };
+  }
 
-  // 遍历所有选中节点，扩展包围盒
+  // 多选时：计算所有节点旋转后的 AABB 并合并
+  let minX = Infinity,
+    maxX = -Infinity,
+    minY = Infinity,
+    maxY = -Infinity;
+
   nodes.forEach((node) => {
-    const nodeX = node.transform.x;
-    const nodeY = node.transform.y;
-    const nodeW = node.transform.width;
-    const nodeH = node.transform.height;
-
-    minX = Math.min(minX, nodeX);
-    maxX = Math.max(maxX, nodeX + nodeW);
-    minY = Math.min(minY, nodeY);
-    maxY = Math.max(maxY, nodeY + nodeH);
+    const bounds = getRotatedBounds(node);
+    minX = Math.min(minX, bounds.minX);
+    maxX = Math.max(maxX, bounds.maxX);
+    minY = Math.min(minY, bounds.minY);
+    maxY = Math.max(maxY, bounds.maxY);
   });
 
   return {
@@ -77,8 +158,13 @@ const overlayStyle = computed(() => {
   const bounds = selectionBounds.value;
   if (!bounds) return {};
 
+  const nodes = store.activeElements as BaseNodeState[];
+  // 单选时，选中框跟随节点旋转
+  const rotation = nodes.length === 1 && nodes[0] ? nodes[0].transform.rotation : 0;
+
   return {
-    transform: `translate(${bounds.x}px, ${bounds.y}px)`,
+    transform: `translate(${bounds.x}px, ${bounds.y}px) rotate(${rotation}deg)`,
+    transformOrigin: `${bounds.width / 2}px ${bounds.height / 2}px`,
     width: `${bounds.width}px`,
     height: `${bounds.height}px`,
   };
@@ -121,6 +207,25 @@ const onHandleDown = (e: MouseEvent, handle: ResizeHandle) => {
 </script>
 
 <style scoped>
+.selection-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.individual-selection {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border: 1px dashed #1890ff;
+  pointer-events: none;
+  box-sizing: border-box;
+  z-index: 998;
+}
+
 .selection-overlay {
   position: absolute;
   top: 0;
