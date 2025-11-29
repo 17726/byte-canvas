@@ -284,7 +284,7 @@ export const useCanvasStore = defineStore('canvas', () => {
       // 生成新的 ID
       const newId = uuidv4();
       const newNode: NodeState = {
-        ...JSON.parse(JSON.stringify(node)),
+        ...node,
         id: newId,
         transform: {
           ...node.transform,
