@@ -1,4 +1,9 @@
-import type { InternalResizeState, ResizeHandle, InternalMultiResizeState, NodeStartState } from '@/types/editor';
+import type {
+  InternalResizeState,
+  ResizeHandle,
+  InternalMultiResizeState,
+  NodeStartState,
+} from '@/types/editor';
 import { clientToWorld, isNodeInRect } from '@/core/utils/geometry';
 import { useCanvasStore } from '@/store/canvasStore';
 import { useUIStore } from '@/store/uiStore';
@@ -45,7 +50,7 @@ export class ToolManager {
   private lastPos = { x: 0, y: 0 };
   private stageEl: HTMLElement | null; // 画布根元素
 
-   /**
+  /**
    *临时拖动状态
    */
   private dragState: InternalDragState & {
@@ -97,7 +102,6 @@ export class ToolManager {
     nodeStartStates: {},
   };
 
-
   constructor(stageEl: HTMLElement | null) {
     this.store = useCanvasStore();
     this.ui = useUIStore();
@@ -122,8 +126,11 @@ export class ToolManager {
     const activeIds = Array.from(this.store.activeElementIds);
     if (activeIds.length === 0) return null;
 
-    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    activeIds.forEach(id => {
+    let minX = Infinity,
+      minY = Infinity,
+      maxX = -Infinity,
+      maxY = -Infinity;
+    activeIds.forEach((id) => {
       const node = this.store.nodes[id] as BaseNodeState;
       if (!node) return;
       const { x, y, width, height } = node.transform;
@@ -137,7 +144,7 @@ export class ToolManager {
       x: minX,
       y: minY,
       width: maxX - minX,
-      height: maxY - minY
+      height: maxY - minY,
     };
   }
 
@@ -160,12 +167,14 @@ export class ToolManager {
     );
 
     // 1. 判断是否在选中区域包围盒内
-    if (!(
-      worldPos.x >= bounds.x &&
-      worldPos.x <= bounds.x + bounds.width &&
-      worldPos.y >= bounds.y &&
-      worldPos.y <= bounds.y + bounds.height
-    )) {
+    if (
+      !(
+        worldPos.x >= bounds.x &&
+        worldPos.x <= bounds.x + bounds.width &&
+        worldPos.y >= bounds.y &&
+        worldPos.y <= bounds.y + bounds.height
+      )
+    ) {
       return false;
     }
 
@@ -239,12 +248,12 @@ export class ToolManager {
         const bounds = this.getSelectedNodesBounds()!;
 
         // 初始化拖拽状态
-        const activeIds = Array.from(this.store.activeElementIds).filter(id => {
+        const activeIds = Array.from(this.store.activeElementIds).filter((id) => {
           const node = this.store.nodes[id] as BaseNodeState;
           return node && !node.isLocked;
         });
         const startTransformMap: Record<string, TransformState> = {};
-        activeIds.forEach(id => {
+        activeIds.forEach((id) => {
           const node = this.store.nodes[id] as BaseNodeState;
           startTransformMap[id] = { ...node.transform };
         });
@@ -261,8 +270,8 @@ export class ToolManager {
           // 计算鼠标相对于选中区域左上角的偏移
           multiDragOffset: {
             x: worldPos.x - bounds.x,
-            y: worldPos.y - bounds.y
-          }
+            y: worldPos.y - bounds.y,
+          },
         };
         return; // 阻止后续框选逻辑
       }
@@ -340,7 +349,7 @@ export class ToolManager {
       startTransform: { x: 0, y: 0, width: 0, height: 0, rotation: 0 },
       startTransformMap: {}, // 新增：重置多节点初始状态映射
       isMultiAreaDrag: false,
-      multiDragOffset: { x: 0, y: 0 }
+      multiDragOffset: { x: 0, y: 0 },
     };
 
     // 重置单选缩放状态
@@ -460,10 +469,9 @@ export class ToolManager {
       startTransform: { ...node.transform }, // 基准节点初始状态
       startTransformMap, // 新增：所有选中节点的初始状态
       isMultiAreaDrag: false, // 非区域拖拽
-      multiDragOffset: { x: 0, y: 0 }
+      multiDragOffset: { x: 0, y: 0 },
     };
   }
-
 
   /**
    * 节点鼠标移动事件（处理拖拽位移计算）
@@ -480,7 +488,11 @@ export class ToolManager {
 
     const viewport = this.store.viewport as ViewportState;
     const stageRect = this.stageEl?.getBoundingClientRect() || { left: 0, top: 0 };
-    const currentWorldPos = clientToWorld(viewport, e.clientX - stageRect.left, e.clientY - stageRect.top);
+    const currentWorldPos = clientToWorld(
+      viewport,
+      e.clientX - stageRect.left,
+      e.clientY - stageRect.top
+    );
     const startWorldPos = clientToWorld(
       viewport,
       this.dragState.startMouseX - stageRect.left,
@@ -530,7 +542,7 @@ export class ToolManager {
       startTransform: { x: 0, y: 0, width: 0, height: 0, rotation: 0 },
       startTransformMap: {}, // 新增：重置多节点初始状态映射
       isMultiAreaDrag: false,
-      multiDragOffset: { x: 0, y: 0 }
+      multiDragOffset: { x: 0, y: 0 },
     };
     // 解除交互锁
     this.store.isInteracting = false;
@@ -728,7 +740,7 @@ export class ToolManager {
     this.resizeState.isResizing = false;
 
     // 过滤锁定节点
-    const validNodeIds = nodeIds.filter(id => {
+    const validNodeIds = nodeIds.filter((id) => {
       const node = this.store.nodes[id];
       return node && !node.isLocked;
     });
@@ -736,7 +748,7 @@ export class ToolManager {
 
     // 初始化每个节点的初始状态（替换any为显式类型）
     const nodeStartStates: Record<string, NodeStartState> = {};
-    validNodeIds.forEach(id => {
+    validNodeIds.forEach((id) => {
       const node = this.store.nodes[id] as BaseNodeState;
       // 计算节点相对于大框的偏移比例和尺寸比例
       const offsetX = (node.transform.x - startBounds.x) / startBounds.width;
@@ -972,11 +984,11 @@ export class ToolManager {
     newBounds.height = Math.max(MIN_NODE_SIZE, newBounds.height);
 
     // 遍历所有节点同步更新
-    nodeIds.forEach(id => {
+    nodeIds.forEach((id) => {
       const startState = nodeStartStates[id];
       const node = this.store.nodes[id] as BaseNodeState;
       if (!node) return;
-      if( !startState) return;
+      if (!startState) return;
       // 按比例计算新尺寸和位置
       const newWidth = startState.scaleX * newBounds.width;
       const newHeight = startState.scaleY * newBounds.height;

@@ -1,10 +1,6 @@
 <template>
   <!-- 多选大框覆盖层：单个大框替代原有多个节点的小框 -->
-  <div
-    v-if="hasSelectedNodes && !allNodesLocked"
-    class="selection-overlay"
-    :style="overlayStyle"
-  >
+  <div v-if="hasSelectedNodes && !allNodesLocked" class="selection-overlay" :style="overlayStyle">
     <!-- 多选大框边框 -->
     <div class="selection-border"></div>
 
@@ -39,15 +35,15 @@ const handles: ResizeHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
 // 1. 多选判断：选中节点数 ≥ 1 且未全部锁定
 const hasSelectedNodes = computed(() => store.activeElements.length > 0);
 const allNodesLocked = computed(() =>
-  store.activeElements.every(node => (node as BaseNodeState).isLocked)
+  store.activeElements.every((node) => (node as BaseNodeState).isLocked)
 );
 
 // 2. 计算多选大框的包围盒（核心：包裹所有选中节点的最小矩形）
 const selectionBounds = computed(() => {
   const nodes = store.activeElements as BaseNodeState[];
   if (nodes.length === 0) return null;
-   // 新增：检查 startState 是否存在，不存在则跳过当前节点
-  if(!nodes[0]) return null;
+  // 新增：检查 startState 是否存在，不存在则跳过当前节点
+  if (!nodes[0]) return null;
 
   // 初始化包围盒为第一个节点的范围
   let minX = nodes[0].transform.x;
@@ -56,7 +52,7 @@ const selectionBounds = computed(() => {
   let maxY = nodes[0].transform.y + nodes[0].transform.height;
 
   // 遍历所有选中节点，扩展包围盒
-  nodes.forEach(node => {
+  nodes.forEach((node) => {
     const nodeX = node.transform.x;
     const nodeY = node.transform.y;
     const nodeW = node.transform.width;
@@ -117,15 +113,10 @@ const onHandleDown = (e: MouseEvent, handle: ResizeHandle) => {
   if (!bounds || !toolManagerRef?.value || store.activeElements.length === 0) return;
 
   // 获取选中节点ID列表
-  const nodeIds = store.activeElements.map(node => (node as BaseNodeState).id);
+  const nodeIds = store.activeElements.map((node) => (node as BaseNodeState).id);
 
   // 调用多选缩放初始化方法
-  toolManagerRef.value.handleMultiResizeDown(
-    e,
-    handle,
-    bounds,
-    nodeIds
-  );
+  toolManagerRef.value.handleMultiResizeDown(e, handle, bounds, nodeIds);
 };
 </script>
 
