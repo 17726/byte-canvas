@@ -46,12 +46,14 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onUnmounted, inject, type Ref } from 'vue';
+import { ref, computed, onUnmounted } from 'vue';
 import { IconImage } from '@arco-design/web-vue/es/icon';
 import { ToolManager } from '@/core/tools/ToolManager';
 import { DEFAULT_IMAGE_URL } from '@/config/defaults';
 // 导入图片库配置和类型
 import imageLibraryConfig, { type ImageItem } from '@/config/imageLibrary';
+
+const toolManager = new ToolManager(null);
 
 // 响应式数据
 const isImageMenuLoaded = ref(false);
@@ -60,26 +62,12 @@ const loadedImageIndexes = ref<Set<number>>(new Set());
 const imageObserver = ref<IntersectionObserver | null>(null);
 let loadTimeout: ReturnType<typeof setTimeout> | null = null;
 
-// 注入 toolManager
-const toolManagerRef = inject<Ref<ToolManager | null>>('toolManager');
-// 使用可选链和非空断言
-function getToolManager() {
-  if (!toolManagerRef?.value) {
-    console.error('ToolManager 未初始化');
-    return null;
-  }
-  return toolManagerRef.value;
-}
-
-// 使用
-const toolManager = getToolManager();
-
 // 使用导入的图片库配置
 const imageLibrary = ref<ImageItem[]>([...imageLibraryConfig]);
 
 // 可见图片数量控制
-const initialLoadCount = 9; // 首次加载9张
-const lazyLoadCount = 7;    // 每次懒加载7张
+const initialLoadCount = 22; // 现在加载22张 没什么负担 如果需要优化再改这里
+const lazyLoadCount = 6;    // 以后每次懒加载6张
 
 //NOTE: 懒加载占位符数量计算
 const remainingPlaceholders = computed(() => {
@@ -184,10 +172,10 @@ const handleImageGridClick = (event: Event) => {
   // 4. 如果有URL，调用创建图片的函数
   if (imageUrl) {
     console.log("url:"+imageUrl);
-    toolManager!.createImageWithUrl(imageUrl);
+    toolManager.createImageWithUrl(imageUrl);
   }else{
     console.log("创建默认图片");
-    toolManager!.createImageWithUrl(DEFAULT_IMAGE_URL);
+    toolManager.createImageWithUrl(DEFAULT_IMAGE_URL);
   }
 };
 

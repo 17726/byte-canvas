@@ -53,7 +53,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, inject, type Ref } from 'vue';
+import { ref, computed } from 'vue';
 import { IconPlus, IconEdit,  IconDelete } from '@arco-design/web-vue/es/icon';
 //TODO：UI开发完成后优化icon-park库的导入，针对按需导入减小打包体积
 import { Square, Round } from '@icon-park/vue-next';
@@ -76,19 +76,8 @@ const store = useCanvasStore();
 const hasSelection = computed(() => store.activeElementIds.size > 0);
 // Settings handled by header component now
 
-// 注入 toolManager
-const toolManagerRef = inject<Ref<ToolManager | null>>('toolManager');
-// 使用可选链和非空断言
-function getToolManager() {
-  if (!toolManagerRef?.value) {
-    console.error('ToolManager 未初始化');
-    return null;
-  }
-  return toolManagerRef.value;
-}
-
-// 使用
-const toolManager = getToolManager();
+// 元素控制底层组件
+const toolManager = new ToolManager(null);
 
 // 高亮控制
 const selectedKeys = ref<string[]>([]);
@@ -96,21 +85,22 @@ const selectedKeys = ref<string[]>([]);
 // 弹窗确认-弹窗开关
 const delModalVisible = ref(false);
 
+
 function onMenuItemClick(key: string) {
   switch (key) {
     case MenuKey.AddRect:
       console.log('矩形被点击');
-      toolManager!.createRect();
+      toolManager.createRect();
       selectedKeys.value = [key];
       break;
     case MenuKey.AddCircle:
       console.log('圆被点击');
-      toolManager!.createCircle();
+      toolManager.createCircle();
       selectedKeys.value = [key];
       break;
     case MenuKey.AddText:
       console.log('文本被点击');
-      toolManager!.createText();
+      toolManager.createText();
       selectedKeys.value = [key];
       break;
     //NOTE: 菜单项不支持预览图 故创建图片独立出去处理
@@ -130,7 +120,7 @@ function onMenuItemClick(key: string) {
 }
 
 function onDeleteConfirm() {
-  toolManager!.deleteSelected();
+  toolManager.deleteSelected();
   Notification.success({
     content: '删除成功！',
     closable: true,
