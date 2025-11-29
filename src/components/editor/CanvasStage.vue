@@ -214,6 +214,43 @@ const createCircle = () => toolManagerRef.value?.createCircle();
 const createText = () => toolManagerRef.value?.createText();
 const deleteSelected = () => toolManagerRef.value?.deleteSelected();
 
+// 键盘快捷键处理
+const handleKeyDown = (e: KeyboardEvent) => {
+  // 忽略输入框内的键盘事件
+  const target = e.target as HTMLElement;
+  if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+    return;
+  }
+
+  // Ctrl/Cmd + C: 复制
+  if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
+    e.preventDefault();
+    store.copySelected();
+    return;
+  }
+
+  // Ctrl/Cmd + X: 剪切
+  if ((e.ctrlKey || e.metaKey) && e.key === 'x') {
+    e.preventDefault();
+    store.cutSelected();
+    return;
+  }
+
+  // Ctrl/Cmd + V: 粘贴
+  if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+    e.preventDefault();
+    store.paste();
+    return;
+  }
+
+  // Delete / Backspace: 删除选中元素
+  if (e.key === 'Delete' || e.key === 'Backspace') {
+    e.preventDefault();
+    deleteSelected();
+    return;
+  }
+};
+
 // 全局事件监听
 onMounted(() => {
   // 1. 初始化 toolManager 并赋值给 ref
@@ -228,11 +265,13 @@ onMounted(() => {
   // 绑定事件
   window.addEventListener('mousemove', handleMouseMove);
   window.addEventListener('mouseup', handleMouseUp);
+  window.addEventListener('keydown', handleKeyDown);
 });
 
 onUnmounted(() => {
   window.removeEventListener('mousemove', handleMouseMove);
   window.removeEventListener('mouseup', handleMouseUp);
+  window.removeEventListener('keydown', handleKeyDown);
 });
 </script>
 
