@@ -1,8 +1,9 @@
 // stores/canvasStore.ts
 import { defineStore } from 'pinia';
-import { ref, reactive, computed } from 'vue';
-import type { NodeState, ShapeState, TextState, ImageState } from '@/types/state';
+import { ref, reactive, computed, watch } from 'vue';
+import type { NodeState, ShapeState, TextState, ImageState, ViewportState } from '@/types/state';
 import { DEFAULT_VIEWPORT } from '@/config/defaults';
+import { loadFromLocalStorage, createDebouncedSave, clearLocalStorage } from './persistence';
 
 // 全局画布状态管理（Pinia store）
 // 说明：该 store 管理整个编辑器的核心状态，包括节点、渲染顺序、视口、交互态等。
@@ -109,6 +110,81 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
   }
 
+  // ==================== 持久化功能 ====================
+
+  // 创建防抖保存函数（500ms 防抖，避免频繁写入）
+  const debouncedSave = createDebouncedSave(500);
+
+  /**
+   * 初始化：从 localStorage 恢复状态
+   * 说明：应在应用启动时调用一次
+   */
+  function initFromStorage() {
+    const stored = loadFromLocalStorage();
+    if (!stored) return;
+
+    const { data } = stored;
+
+    // 恢复节点数据
+    if (data.nodes) {
+      nodes.value = data.nodes;
+    }
+
+    // 恢复节点顺序
+    if (data.nodeOrder) {
+      nodeOrder.value = data.nodeOrder;
+    }
+
+    // 恢复视口状态（保留动态计算的 canvasWidth/canvasHeight）
+    if (data.viewport) {
+      Object.assign(viewport, data.viewport);
+    }
+
+    console.log('[CanvasStore] 状态已从 localStorage 恢复');
+  }
+
+  /**
+   * 手动保存当前状态到 localStorage
+   */
+  function saveToStorage() {
+    debouncedSave(nodes.value, nodeOrder.value, viewport as ViewportState);
+  }
+
+  /**
+   * 清除 localStorage 中的状态并重置画布
+   */
+  function clearStorage() {
+    clearLocalStorage();
+    nodes.value = {};
+    nodeOrder.value = [];
+    activeElementIds.value = new Set();
+    Object.assign(viewport, DEFAULT_VIEWPORT);
+    version.value = 0;
+    console.log('[CanvasStore] 画布已重置');
+  }
+
+  // 监听状态变化，自动保存（使用 version 作为脏标记）
+  // 注意：仅在非交互状态时保存，避免拖拽过程中频繁写入
+  watch(
+    () => version.value,
+    () => {
+      if (!isInteracting.value) {
+        saveToStorage();
+      }
+    }
+  );
+
+  // 监听交互状态结束后保存
+  watch(
+    () => isInteracting.value,
+    (newVal, oldVal) => {
+      // 交互结束时触发保存
+      if (oldVal === true && newVal === false) {
+        saveToStorage();
+      }
+    }
+  );
+
   return {
     nodes,
     nodeOrder,
@@ -123,6 +199,10 @@ export const useCanvasStore = defineStore('canvas', () => {
     deleteNode,
     setActive,
     toggleSelection,
+    // 持久化相关
+    initFromStorage,
+    saveToStorage,
+    clearStorage,
     // UI 状态请使用 uiStore 中的 activePanel 和 isPanelExpanded
   };
 });
