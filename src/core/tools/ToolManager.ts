@@ -626,7 +626,7 @@ export class ToolManager {
         break;
 
       case NodeType.IMAGE:
-        // 图片：等比缩放（保持宽高比）
+        // 图片：自由缩放（允许畸变）
         this.resizeImage(
           handle,
           dx,
@@ -816,8 +816,7 @@ export class ToolManager {
 
   /**
    * 图片缩放计算
-   * - 角点：等比缩放
-   * - 边点：独立缩放（拉伸）
+   * - 角点和边点均允许宽高独立缩放（自由缩放，允许畸变）
    */
   private resizeImage(
     handle: ResizeHandle,
