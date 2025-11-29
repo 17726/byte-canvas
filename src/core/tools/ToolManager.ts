@@ -626,7 +626,7 @@ export class ToolManager {
         break;
 
       case NodeType.IMAGE:
-        // 图片：等比缩放（保持宽高比）
+        // 图片：自由缩放（允许畸变）
         this.resizeImage(
           handle,
           dx,
