@@ -626,9 +626,8 @@ export class ToolManager {
         break;
 
       case NodeType.IMAGE:
-        // 图片：等比缩放（保持宽高比）
-        // 使用 resizeCircle 逻辑，它在角点拖拽时保持宽高比，边拖拽时允许拉伸（裁剪）
-        this.resizeCircle(
+        // 图片：自由缩放（允许畸变）
+        this.resizeImage(
           handle,
           dx,
           dy,
@@ -813,6 +812,24 @@ export class ToolManager {
       x: newX,
       y: newY,
     });
+  }
+
+  /**
+   * 图片缩放计算
+   * - 角点和边点均允许宽高独立缩放（自由缩放，允许畸变）
+   */
+  private resizeImage(
+    handle: ResizeHandle,
+    dx: number,
+    dy: number,
+    startWidth: number,
+    startHeight: number,
+    startNodeX: number,
+    startNodeY: number,
+    callback: (result: { width: number; height: number; x: number; y: number }) => void
+  ) {
+    // 图片现在默认使用自由缩放（允许畸变），逻辑与矩形一致
+    this.resizeRect(handle, dx, dy, startWidth, startHeight, startNodeX, startNodeY, callback);
   }
 
   /**

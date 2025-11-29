@@ -29,13 +29,14 @@
     <!-- Shape Controls -->
     <template v-if="isShape">
       <div class="tool-item">
-        <a-color-picker size="mini" v-model="fillColor" trigger="hover" show-text disabled-alpha />
+        <a-color-picker size="mini" v-model="fillColor" trigger="hover" disabled-alpha />
       </div>
       <div class="divider"></div>
       <div class="tool-item">
         <a-color-picker size="mini" v-model="strokeColor" trigger="hover" />
       </div>
       <div class="tool-item">
+        边框：
         <a-input-number
           size="mini"
           v-model="strokeWidth"
@@ -49,7 +50,8 @@
 
     <!-- Text Controls -->
     <template v-if="isText">
-      <div class="tool-item">
+      <div class="tool-item" style="width: 85px;">
+        字号: 
         <a-input-number
           size="mini"
           v-model="fontSize"

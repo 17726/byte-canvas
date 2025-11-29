@@ -114,7 +114,7 @@
           <!-- Fill -->
           <div class="prop-item" v-if="!isImage">
             <span class="label">填充</span>
-            <a-color-picker v-model="fillColor" show-text size="small" />
+            <a-color-picker v-model="fillColor" size="small" />
           </div>
 
           <!-- Stroke -->
