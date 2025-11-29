@@ -1,0 +1,286 @@
+<template>
+  <div
+    class="canvas-stage"
+    ref="stageRef"
+    @mousedown="handleMouseDown"
+    @wheel="handleWheel"
+    :style="stageStyle"
+  >
+    <!--
+      视口层 (Viewport Layer)
+      职责：应用全局的平移(Translate)和缩放(Scale)
+      说明：所有节点都被渲染在这层上，因此此处的 transform 会影响节点在屏幕上的最终位置/大小
+      对应文档：L4 渲染层 - 画布容器
+    -->
+    <!-- 框选视觉层 -->
+    <div v-if="isBoxSelecting" class="box-select-overlay" :style="boxSelectStyle"></div>
+
+    <!-- 视口层 -->
+    <div class="canvas-viewport" :style="viewportStyle">
+      <!--
+        图元渲染层 (Node Rendering Layer)
+        职责：遍历 Store 中的节点列表进行渲染
+        对应文档：L4 渲染层 - 响应式渲染
+      -->
+      <!-- 图元渲染层 -->
+      <component
+        v-for="node in store.renderList"
+        :key="node!.id"
+        :is="getComponentType(node!.type)"
+        :node="node"
+        @mousedown="handleNodeDown($event, node!.id)"
+      />
+
+      <!-- 选中覆盖层 (处理拖拽缩放) -->
+      <SelectionOverlay />
+    </div>
+
+    <!-- 悬浮属性栏 (Context Toolbar) - 放在视口外，但跟随节点坐标 -->
+    <!-- 注意：ContextToolbar 读取 store.activeElementIds 并计算屏幕位置，它不直接受 viewport transform 的 DOM 影响，
+          因此 implement 上需要使用 worldToClient 等工具方法计算位置 -->
+    <ContextToolbar />
+
+    <!-- 辅助信息：显示当前视口状态 -->
+    <div class="debug-info" @click="resetViewport" title="点击恢复默认视图">
+      Zoom: {{ (store.viewport.zoom * 100).toFixed(0) }}% <br />
+      X: {{ store.viewport.offsetX.toFixed(0) }} <br />
+      Y: {{ store.viewport.offsetY.toFixed(0) }}
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { ref, computed, onMounted, onUnmounted, provide, type CSSProperties } from 'vue';
+import { useCanvasStore } from '@/store/canvasStore';
+import { NodeType } from '@/types/state';
+import RectLayer from './layers/RectLayer.vue';
+import TextLayer from './layers/TextLayer.vue';
+import CircleLayer from './layers/CircleLayer.vue';
+import ImageLayer from './layers/ImageLayer.vue';
+import SelectionOverlay from './SelectionOverlay.vue';
+import ContextToolbar from '../layout/ContextToolbar.vue'; // Import ContextToolbar
+import { ToolManager } from '@/core/tools/ToolManager';
+import {
+  DEFAULT_VIEWPORT,
+  DEFAULT_CANVAS_BG,
+  DEFAULT_GRID_DOT_COLOR,
+  DEFAULT_GRID_DOT_SIZE,
+} from '@/config/defaults';
+
+const store = useCanvasStore();
+const stageRef = ref<HTMLElement | null>(null);
+
+// 创建 toolManager ref 并立即 provide（解决依赖注入时序问题）
+const toolManagerRef = ref<ToolManager | null>(null);
+provide('toolManager', toolManagerRef);
+
+// 1. 视口样式计算
+const viewportStyle = computed(() => ({
+  transform: `translate(${store.viewport.offsetX}px, ${store.viewport.offsetY}px) scale(${store.viewport.zoom})`,
+  transformOrigin: '0 0', // 从左上角开始变换
+}));
+
+// 背景样式计算 (点阵效果)
+const stageStyle = computed(() => {
+  const bg = store.viewport.backgroundColor || DEFAULT_CANVAS_BG; // use store setting
+
+  if (!store.viewport.isGridVisible) {
+    return { backgroundColor: bg };
+  }
+
+  const gridSize = Math.max(8, store.viewport.gridSize) * store.viewport.zoom; // 防止 zoom=0 或 gridSize 太小影响显示
+  const offsetX = store.viewport.offsetX;
+  const offsetY = store.viewport.offsetY;
+  const dotColor = store.viewport.gridDotColor || DEFAULT_GRID_DOT_COLOR;
+  const dotSize = store.viewport.gridDotSize || DEFAULT_GRID_DOT_SIZE; // px
+  const gridStyle = store.viewport.gridStyle || 'dot';
+
+  const style: CSSProperties = { backgroundColor: bg };
+  if (gridStyle === 'dot') {
+    style.backgroundImage = `radial-gradient(${dotColor} ${dotSize}px, transparent ${dotSize}px)`;
+    style.backgroundSize = `${gridSize}px ${gridSize}px`;
+    style.backgroundPosition = `${offsetX}px ${offsetY}px`;
+  } else if (gridStyle === 'line') {
+    // Use two repeating-linear-gradients to draw grid lines
+    const lineColor = dotColor;
+    style.backgroundImage = `linear-gradient(0deg, ${lineColor} 1px, transparent 1px), linear-gradient(90deg, ${lineColor} 1px, transparent 1px)`;
+    style.backgroundSize = `${gridSize}px ${gridSize}px`;
+    style.backgroundPosition = `${offsetX}px ${offsetY}px`;
+  }
+
+  return style;
+});
+
+// 重置视口
+const resetViewport = () => {
+  store.viewport.zoom = DEFAULT_VIEWPORT.zoom;
+  store.viewport.offsetX = DEFAULT_VIEWPORT.offsetX;
+  store.viewport.offsetY = DEFAULT_VIEWPORT.offsetY;
+};
+
+// 2. 组件映射工厂
+const getComponentType = (type: NodeType) => {
+  // Removed excessive debug log
+  switch (type) {
+    case NodeType.RECT:
+      return RectLayer;
+    case NodeType.CIRCLE:
+      return CircleLayer;
+    case NodeType.TEXT:
+      return TextLayer;
+    case NodeType.IMAGE:
+      return ImageLayer;
+    default:
+      return 'div';
+  }
+};
+// 3. 事件转发 -> 逻辑层 (ToolManager)
+// 滚轮缩放
+// 框选状态响应式数据
+const isBoxSelecting = ref(false);
+const boxSelectStart = ref({ x: 0, y: 0 });
+const boxSelectEnd = ref({ x: 0, y: 0 });
+
+// 框选样式计算
+const boxSelectStyle = computed(() => {
+  const stageEl = stageRef.value;
+  const stageRect = stageEl ? stageEl.getBoundingClientRect() : { left: 0, top: 0 };
+  const start = boxSelectStart.value;
+  const end = boxSelectEnd.value;
+
+  // 转换为相对于画布的坐标
+  const startX = start.x - stageRect.left;
+  const startY = start.y - stageRect.top;
+  const endX = end.x - stageRect.left;
+  const endY = end.y - stageRect.top;
+
+  const left = Math.min(startX, endX);
+  const top = Math.min(startY, endY);
+  const width = Math.abs(endX - startX);
+  const height = Math.abs(endY - startY);
+
+  // 修正：如果 left/top 小于 0，需要调整 width/height 以保持视觉一致性
+  // 否则 Math.max(0, left) 会导致框选框“粘”在边缘但尺寸不变，造成视觉误差
+  const clampedLeft = Math.max(0, left);
+  const clampedTop = Math.max(0, top);
+  const clampedWidth = Math.max(0, width - (clampedLeft - left));
+  const clampedHeight = Math.max(0, height - (clampedTop - top));
+
+  return {
+    left: `${clampedLeft}px`,
+    top: `${clampedTop}px`,
+    width: `${clampedWidth}px`,
+    height: `${clampedHeight}px`,
+  };
+});
+
+// 3. 事件转发 -> 逻辑层
+const handleWheel = (e: WheelEvent) => {
+  if (!toolManagerRef.value) return; // 防御性判断
+  toolManagerRef.value.handleWheel(e);
+};
+// 鼠标按下
+const handleMouseDown = (e: MouseEvent) => {
+  if (!toolManagerRef.value) return;
+  toolManagerRef.value.handleMouseDown(e);
+};
+// 鼠标移动
+const handleMouseMove = (e: MouseEvent) => {
+  if (!toolManagerRef.value) return;
+  toolManagerRef.value.handleMouseMove(e);
+  // 同步框选状态到Vue组件
+  const boxState = toolManagerRef.value.getBoxSelectState();
+  isBoxSelecting.value = boxState.isBoxSelecting;
+  boxSelectStart.value = boxState.boxSelectStart;
+  boxSelectEnd.value = boxState.boxSelectEnd;
+};
+// 鼠标抬起
+const handleMouseUp = () => {
+  if (!toolManagerRef.value) return;
+  toolManagerRef.value.handleMouseUp();
+  isBoxSelecting.value = false;
+};
+
+// 节点交互转发
+const handleNodeDown = (e: MouseEvent, id: string) => {
+  // 注意：这里传入 e，以便 ToolManager 处理 stopPropagation 或其他逻辑
+  if (!toolManagerRef.value) return;
+  toolManagerRef.value.handleNodeDown(e, id);
+};
+
+// 暴露创建节点的方法（供父组件/子组件调用）
+const createRect = () => toolManagerRef.value?.createRect();
+const createCircle = () => toolManagerRef.value?.createCircle();
+const createText = () => toolManagerRef.value?.createText();
+const deleteSelected = () => toolManagerRef.value?.deleteSelected();
+
+// 全局事件监听
+onMounted(() => {
+  // 1. 初始化 toolManager 并赋值给 ref
+  toolManagerRef.value = new ToolManager(stageRef.value);
+
+  // 2. 暴露方法给父组件（可选，若需要外部调用）
+  provide('createRect', createRect);
+  provide('createCircle', createCircle);
+  provide('createText', createText);
+  provide('deleteSelected', deleteSelected);
+
+  // 绑定事件
+  window.addEventListener('mousemove', handleMouseMove);
+  window.addEventListener('mouseup', handleMouseUp);
+});
+
+onUnmounted(() => {
+  window.removeEventListener('mousemove', handleMouseMove);
+  window.removeEventListener('mouseup', handleMouseUp);
+});
+</script>
+
+<style scoped>
+.canvas-stage {
+  width: 100%;
+  height: 100%;
+  overflow: hidden; /* 隐藏超出视口的内容 */
+  /* background color moved to inline stageStyle */
+  position: relative;
+  /* cursor: grab; */ /* 暂时禁用拖拽手势 */
+}
+/* .canvas-stage:active {
+  cursor: grabbing;
+} */
+
+.canvas-viewport {
+  width: 100%;
+  height: 100%;
+  /* 硬件加速 */
+  will-change: transform;
+}
+
+.debug-info {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  background: rgba(0, 0, 0, 0.5);
+  color: white;
+  padding: 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  pointer-events: auto;
+  cursor: pointer;
+  user-select: none;
+  transition: background-color 0.2s;
+}
+
+/* 框选样式 */
+.box-select-overlay {
+  position: absolute;
+  background: rgba(66, 133, 244, 0.2);
+  border: 1px solid rgba(66, 133, 244, 0.8);
+  pointer-events: none;
+  z-index: 100;
+}
+
+.debug-info:hover {
+  background: rgba(0, 0, 0, 0.7);
+}
+</style>
