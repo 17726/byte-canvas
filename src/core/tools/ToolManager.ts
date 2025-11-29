@@ -480,7 +480,7 @@ export class ToolManager {
   /**
    * 业务逻辑：创建图片
    */
-  createImage() {
+  createImageWithUrl(imageUrl = DEFAULT_IMAGE_URL) {
     const id = uuidv4();
     // 随机位置
     const x = Math.random() * 800;
@@ -499,7 +499,7 @@ export class ToolManager {
       },
       style: { ...DEFAULT_IMAGE_STYLE },
       props: {
-        imageUrl: DEFAULT_IMAGE_URL,
+        imageUrl: imageUrl,
         filters: { ...DEFAULT_IMAGE_FILTERS },
       },
       parentId: null,

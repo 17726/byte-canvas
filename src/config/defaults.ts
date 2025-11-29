@@ -77,7 +77,7 @@ export const DEFAULT_IMAGE_STYLE = {
   zIndex: 1,
 };
 // 使用 import.meta.env.BASE_URL 确保在子路径部署时也能正确访问
-export const DEFAULT_IMAGE_URL = import.meta.env.BASE_URL + 'uploads/images/img-test_1.jpg';
+export const DEFAULT_IMAGE_URL = import.meta.env.BASE_URL + '/uploads/images/ori/animals_1.jpg';
 export const DEFAULT_IMAGE_FILTERS = {
   grayscale: 0,
   blur: 0,
