@@ -211,6 +211,7 @@ const onHandleDown = (e: MouseEvent, handle: ResizeHandle) => {
     // 多选时，调用多选缩放初始化方法
     toolManagerRef.value.handleMultiResizeDown(e, handle, bounds, nodeIds);
   }
+};
 </script>
 
 <style scoped>
