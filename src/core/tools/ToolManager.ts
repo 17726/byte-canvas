@@ -58,8 +58,6 @@ export class ToolManager {
     startTransformMap: Record<string, TransformState>;
     // 新增：是否为多选区域拖拽（点击空白区域拖拽选中节点）
     isMultiAreaDrag: boolean;
-    // 新增：多选区域拖拽时，鼠标相对于选中区域的偏移
-    multiDragOffset: { x: number; y: number };
   } = {
     isDragging: false,
     type: null,
@@ -70,7 +68,6 @@ export class ToolManager {
     startTransform: { x: 0, y: 0, width: 0, height: 0, rotation: 0 } as TransformState,
     startTransformMap: {}, // 初始值为空对象，类型匹配
     isMultiAreaDrag: false,
-    multiDragOffset: { x: 0, y: 0 },
   };
 
   /** 单选缩放状态（修正：移到类属性区，与dragState同级） */
@@ -238,14 +235,6 @@ export class ToolManager {
       if (hasActiveNodes && isClickInArea) {
         // 启动多选区域拖拽
         this.store.isInteracting = true;
-        const viewport = this.store.viewport as ViewportState;
-        const stageRect = this.stageEl?.getBoundingClientRect() || { left: 0, top: 0 };
-        const worldPos = clientToWorld(
-          viewport,
-          e.clientX - stageRect.left,
-          e.clientY - stageRect.top
-        );
-        const bounds = this.getSelectedNodesBounds()!;
 
         // 初始化拖拽状态
         const activeIds = Array.from(this.store.activeElementIds).filter((id) => {
@@ -268,11 +257,6 @@ export class ToolManager {
           startTransform: { x: 0, y: 0, width: 0, height: 0, rotation: 0 },
           startTransformMap,
           isMultiAreaDrag: true,
-          // 计算鼠标相对于选中区域左上角的偏移
-          multiDragOffset: {
-            x: worldPos.x - bounds.x,
-            y: worldPos.y - bounds.y,
-          },
         };
         return; // 阻止后续框选逻辑
       }
@@ -350,7 +334,6 @@ export class ToolManager {
       startTransform: { x: 0, y: 0, width: 0, height: 0, rotation: 0 },
       startTransformMap: {}, // 新增：重置多节点初始状态映射
       isMultiAreaDrag: false,
-      multiDragOffset: { x: 0, y: 0 },
     };
 
     // 重置单选缩放状态
@@ -470,7 +453,6 @@ export class ToolManager {
       startTransform: { ...node.transform }, // 基准节点初始状态
       startTransformMap, // 新增：所有选中节点的初始状态
       isMultiAreaDrag: false, // 非区域拖拽
-      multiDragOffset: { x: 0, y: 0 },
     };
   }
 
@@ -510,8 +492,8 @@ export class ToolManager {
       if (!node || node.isLocked) return;
 
       // 计算节点新位置（初始位置 + 偏移）
-      let newX = startTransform.x + deltaX;
-      let newY = startTransform.y + deltaY;
+      const newX = startTransform.x + deltaX;
+      const newY = startTransform.y + deltaY;
 
       // TODO: Implement grid snapping逻辑（如果 viewport.isSnapToGrid 为 true）
       // 该逻辑应该在世界坐标系中进行（已转换为 world 坐标），以保证缩放/平移下 snapping 的一致性
@@ -543,7 +525,6 @@ export class ToolManager {
       startTransform: { x: 0, y: 0, width: 0, height: 0, rotation: 0 },
       startTransformMap: {}, // 新增：重置多节点初始状态映射
       isMultiAreaDrag: false,
-      multiDragOffset: { x: 0, y: 0 },
     };
     // 解除交互锁
     this.store.isInteracting = false;
@@ -813,7 +794,6 @@ export class ToolManager {
     };
   }
 
-  // 建议的新注释：
   /**
    * 处理选中多个节点时，调整大小控制点上的鼠标按下事件。
    *
@@ -824,7 +804,7 @@ export class ToolManager {
    * @param {MouseEvent} e - 按下调整大小控制点时触发的鼠标事件。
    * @param {ResizeHandle} handle - 表示调整方向的控制点（例如：'nw'、'se'）。
    * @param {{ x: number; y: number; width: number; height: number }} startBounds - 被选中节点在调整开始时的边界矩形。
-   * @param {string[]} nodes - 包含在多选区域中的节点ID列表。
+   * @param {string[]} nodeIds - 包含在多选区域中的节点ID列表。
    */
   handleMultiResizeDown(
     e: MouseEvent,
@@ -1052,7 +1032,31 @@ export class ToolManager {
     });
   }
 
-  /** 新增：多选缩放过程中的鼠标移动计算 */
+  /**
+   * 处理多选缩放过程中的鼠标移动计算
+   *
+   * 根据拖动的控制点和鼠标移动，计算新的选中区域边界矩形。
+   * 确定宽度和高度的缩放因子，然后对每个选中的节点应用等比缩放，
+   * 更新它们相对于新边界的位置和大小。
+   *
+   * 缩放操作会保持每个节点在选中矩形内的相对位置和大小。
+   * 计算过程考虑了当前的缩放级别、初始鼠标位置和选区的初始边界。
+   *
+   * @param {MouseEvent} e - 包含当前光标位置的鼠标事件。
+   *   使用 e.clientX 和 e.clientY 来确定相对于初始鼠标位置的移动增量。
+   *   移动量会使用当前视口的缩放比例转换为世界坐标。
+   *
+   * 算法：
+   *   1. 计算世界坐标系下的鼠标移动增量 (dx, dy)。
+   *   2. 根据拖动的控制点，调整选区边界。
+   *   3. 计算宽度和高度的缩放因子。
+   *   4. 对于每个选中的节点，根据选区边界的变化，按比例计算其新的位置和大小。
+   *   5. 更新每个节点的变换属性以反映新的位置和大小。
+   *
+   * 边界情况：
+   *   - 如果释放鼠标按钮或没有选中节点，操作将被取消。
+   *   - 可能会在其他地方强制执行最小节点尺寸限制。
+   */
   private handleMultiResizeMove(e: MouseEvent) {
     const {
       isMultiResizing,

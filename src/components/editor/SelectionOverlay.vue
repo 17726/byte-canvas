@@ -1,13 +1,14 @@
 <template>
   <div v-if="hasSelectedNodes && !allNodesLocked" class="selection-container">
     <!-- 多选时：显示每个元素的单独选中框 -->
-    <div
-      v-for="node in selectedNodes"
-      :key="node.id"
-      class="individual-selection"
-      :style="getIndividualStyle(node)"
-      v-if="selectedNodes.length > 1"
-    ></div>
+    <template v-if="selectedNodes.length > 1">
+      <div
+        v-for="node in selectedNodes"
+        :key="node.id"
+        class="individual-selection"
+        :style="getIndividualStyle(node)"
+      ></div>
+    </template>
 
     <!-- 主选中框（单选/多选大框） -->
     <div class="selection-overlay" :style="overlayStyle">
