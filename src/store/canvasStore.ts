@@ -3,7 +3,16 @@ import { defineStore } from 'pinia';
 import { ref, reactive, computed, watch } from 'vue';
 import type { NodeState, ShapeState, TextState, ImageState, ViewportState } from '@/types/state';
 import { DEFAULT_VIEWPORT } from '@/config/defaults';
-import { loadFromLocalStorage, createDebouncedSave, clearLocalStorage } from './persistence';
+import {
+  loadFromLocalStorage,
+  createDebouncedSave,
+  clearLocalStorage,
+  saveClipboard,
+  loadClipboard,
+  clearClipboard,
+  type ClipboardData,
+} from './persistence';
+import { v4 as uuidv4 } from 'uuid';
 
 // 全局画布状态管理（Pinia store）
 // 说明：该 store 管理整个编辑器的核心状态，包括节点、渲染顺序、视口、交互态等。
@@ -185,6 +194,121 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
   );
 
+  // ==================== 复制/剪切/粘贴功能 ====================
+
+  // 粘贴偏移量（避免重叠）
+  const PASTE_OFFSET = 20;
+  // 记录连续粘贴次数（用于递增偏移）
+  let pasteCount = 0;
+  let lastClipboardTimestamp = 0;
+
+  /**
+   * 复制选中的元素
+   */
+  function copySelected(): boolean {
+    const selectedIds = Array.from(activeElementIds.value);
+    if (selectedIds.length === 0) {
+      console.log('[Clipboard] 没有选中的元素');
+      return false;
+    }
+
+    // 深拷贝选中的节点
+    const nodesToCopy: NodeState[] = selectedIds
+      .map((id) => nodes.value[id])
+      .filter(Boolean)
+      .map((node) => JSON.parse(JSON.stringify(node)));
+
+    const clipboardData: ClipboardData = {
+      type: 'copy',
+      nodes: nodesToCopy,
+      timestamp: Date.now(),
+    };
+
+    saveClipboard(clipboardData);
+    pasteCount = 0; // 重置粘贴计数
+    return true;
+  }
+
+  /**
+   * 剪切选中的元素
+   */
+  function cutSelected(): boolean {
+    const selectedIds = Array.from(activeElementIds.value);
+    if (selectedIds.length === 0) {
+      console.log('[Clipboard] 没有选中的元素');
+      return false;
+    }
+
+    // 深拷贝选中的节点
+    const nodesToCut: NodeState[] = selectedIds
+      .map((id) => nodes.value[id])
+      .filter(Boolean)
+      .map((node) => JSON.parse(JSON.stringify(node)));
+
+    const clipboardData: ClipboardData = {
+      type: 'cut',
+      nodes: nodesToCut,
+      timestamp: Date.now(),
+    };
+
+    saveClipboard(clipboardData);
+
+    // 删除原节点
+    selectedIds.forEach((id) => deleteNode(id));
+    pasteCount = 0; // 重置粘贴计数
+    return true;
+  }
+
+  /**
+   * 粘贴元素
+   */
+  function paste(): boolean {
+    const clipboardData = loadClipboard();
+    if (!clipboardData || clipboardData.nodes.length === 0) {
+      console.log('[Clipboard] 剪贴板为空');
+      return false;
+    }
+
+    // 检查是否是新的剪贴板内容，重置粘贴计数
+    if (clipboardData.timestamp !== lastClipboardTimestamp) {
+      pasteCount = 0;
+      lastClipboardTimestamp = clipboardData.timestamp;
+    }
+
+    pasteCount++;
+    const offset = PASTE_OFFSET * pasteCount;
+
+    const newIds: string[] = [];
+
+    clipboardData.nodes.forEach((node) => {
+      // 生成新的 ID
+      const newId = uuidv4();
+      const newNode: NodeState = {
+        ...JSON.parse(JSON.stringify(node)),
+        id: newId,
+        transform: {
+          ...node.transform,
+          x: node.transform.x + offset,
+          y: node.transform.y + offset,
+        },
+      };
+
+      addNode(newNode);
+      newIds.push(newId);
+    });
+
+    // 选中新粘贴的元素
+    setActive(newIds);
+
+    // 如果是剪切操作，粘贴后清除剪贴板（只能粘贴一次）
+    if (clipboardData.type === 'cut') {
+      clearClipboard();
+    }
+
+    console.log(`[Clipboard] 粘贴 ${newIds.length} 个元素`);
+    return true;
+  }
+
   return {
     nodes,
     nodeOrder,
@@ -203,6 +327,10 @@ export const useCanvasStore = defineStore('canvas', () => {
     initFromStorage,
     saveToStorage,
     clearStorage,
+    // 复制/剪切/粘贴
+    copySelected,
+    cutSelected,
+    paste,
     // UI 状态请使用 uiStore 中的 activePanel 和 isPanelExpanded
   };
 });

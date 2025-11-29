@@ -6,6 +6,7 @@ import type { NodeState, ViewportState } from '@/types/state';
 
 // localStorage key
 const STORAGE_KEY = 'byte-canvas-state';
+const CLIPBOARD_KEY = 'byte-canvas-clipboard';
 const STORAGE_VERSION = 1; // 用于未来数据格式升级
 
 /**
@@ -116,4 +117,54 @@ export function createDebouncedSave(delay = 500) {
       timeoutId = null;
     }, delay);
   };
+}
+
+// ==================== 剪贴板持久化 ====================
+
+/**
+ * 剪贴板数据结构
+ */
+export interface ClipboardData {
+  type: 'copy' | 'cut';
+  nodes: NodeState[];
+  timestamp: number;
+}
+
+/**
+ * 保存剪贴板数据到 localStorage
+ */
+export function saveClipboard(data: ClipboardData): void {
+  try {
+    localStorage.setItem(CLIPBOARD_KEY, JSON.stringify(data));
+    console.log(
+      `[Clipboard] ${data.type === 'copy' ? '复制' : '剪切'} ${data.nodes.length} 个元素`
+    );
+  } catch (error) {
+    console.error('[Clipboard] 保存剪贴板失败:', error);
+  }
+}
+
+/**
+ * 从 localStorage 加载剪贴板数据
+ */
+export function loadClipboard(): ClipboardData | null {
+  try {
+    const stored = localStorage.getItem(CLIPBOARD_KEY);
+    if (!stored) return null;
+    return JSON.parse(stored) as ClipboardData;
+  } catch (error) {
+    console.error('[Clipboard] 加载剪贴板失败:', error);
+    return null;
+  }
+}
+
+/**
+ * 清除剪贴板
+ */
+export function clearClipboard(): void {
+  try {
+    localStorage.removeItem(CLIPBOARD_KEY);
+  } catch (error) {
+    console.error('[Clipboard] 清除剪贴板失败:', error);
+  }
 }
