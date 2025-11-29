@@ -899,12 +899,22 @@ export class ToolManager {
         );
         break;
       default:
-        this.resizeRect(handle, dx, dy, startWidth, startHeight, startNodeX, startNodeY, (res) => {
-          newWidth = res.width;
-          newHeight = res.height;
-          newX = res.x;
-          newY = res.y;
-        });
+        // 默认使用矩形缩放逻辑
+        this.resizeRect(
+          handle,
+          dx,
+          dy,
+          startWidth,
+          startHeight,
+          startNodeX,
+          startNodeY,
+          (result) => {
+            newWidth = result.width;
+            newHeight = result.height;
+            newX = result.x;
+            newY = result.y;
+          }
+        );
         break;
     }
 
