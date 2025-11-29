@@ -9,6 +9,9 @@ const STORAGE_KEY = 'byte-canvas-state';
 const CLIPBOARD_KEY = 'byte-canvas-clipboard';
 const STORAGE_VERSION = 1; // 用于未来数据格式升级
 
+// 过期时间配置（24小时，单位：毫秒）
+const STATE_EXPIRY_MS = 24 * 60 * 60 * 1000;
+
 /**
  * 持久化数据结构
  */
@@ -83,7 +86,17 @@ export function loadFromLocalStorage(): PersistedState | null {
     // 版本校验（未来可用于数据迁移）
     if (state.version !== STORAGE_VERSION) {
       console.warn('[Persistence] 状态版本不匹配，已拒绝加载旧版本数据');
-      // 这里可以添加迁移逻辑
+      clearLocalStorage();
+      return null;
+    }
+
+    // 过期时间校验（24小时后自动清除）
+    const age = Date.now() - state.timestamp;
+    if (age > STATE_EXPIRY_MS) {
+      console.warn(
+        `[Persistence] 状态已过期（${Math.floor(age / 3600000)}小时前保存），已自动清除`
+      );
+      clearLocalStorage();
       return null;
     }
 

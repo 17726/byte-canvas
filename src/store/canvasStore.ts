@@ -206,15 +206,27 @@ export const useCanvasStore = defineStore('canvas', () => {
     console.log('[CanvasStore] 画布已重置');
   }
 
-  // 统一监听持久化条件：version 变化 + 交互状态
+  // 统一监听持久化条件：version 变化 + 交互状态 + 视口变化
   // 保存时机：
   // 1. version 变化且非交互状态时立即保存
   // 2. 交互结束时（isInteracting: true -> false）保存
+  // 3. 视口状态变化时保存（zoom, offsetX, offsetY）
   watch(
-    () => ({ version: version.value, interacting: isInteracting.value }),
+    () => ({
+      version: version.value,
+      interacting: isInteracting.value,
+      // 监听视口核心属性变化
+      zoom: viewport.zoom,
+      offsetX: viewport.offsetX,
+      offsetY: viewport.offsetY,
+    }),
     (newState, oldState) => {
       const versionChanged = newState.version !== oldState?.version;
       const interactionEnded = oldState?.interacting === true && newState.interacting === false;
+      const viewportChanged =
+        newState.zoom !== oldState?.zoom ||
+        newState.offsetX !== oldState?.offsetX ||
+        newState.offsetY !== oldState?.offsetY;
 
       // 交互结束时保存（无论 version 是否变化）
       if (interactionEnded) {
@@ -222,8 +234,8 @@ export const useCanvasStore = defineStore('canvas', () => {
         return;
       }
 
-      // version 变化且非交互状态时保存
-      if (versionChanged && !newState.interacting) {
+      // version 变化或视口变化，且非交互状态时保存
+      if ((versionChanged || viewportChanged) && !newState.interacting) {
         saveToStorage();
       }
     }
