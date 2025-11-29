@@ -17,5 +17,5 @@
   // 为Vue文件指定格式化工具
   "[vue]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
-  }
+  },
 }

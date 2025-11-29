@@ -423,7 +423,7 @@ const cornerRadius = computed({
 //Image
 
 // 选中的滤镜
-const selectedFilter = ref(null);
+const selectedFilter = ref<string | null>(null);
 
 // 预览图片（可以使用当前选中图片的缩略图）
 const previewImage = computed(() => {
@@ -435,7 +435,7 @@ const previewImage = computed(() => {
 const defaultImage = DEFAULT_IMAGE_URL;
 
 // 选择滤镜
-const selectFilter = (filterType) => {
+const selectFilter = (filterType: string) => {
   selectedFilter.value = filterType;
 
   switch (filterType) {

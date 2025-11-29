@@ -1,4 +1,9 @@
-import type { InternalResizeState, ResizeHandle } from '@/types/editor';
+import type {
+  InternalResizeState,
+  ResizeHandle,
+  InternalMultiResizeState,
+  NodeStartState,
+} from '@/types/editor';
 import { clientToWorld, isNodeInRect } from '@/core/utils/geometry';
 import { useCanvasStore } from '@/store/canvasStore';
 import { useUIStore } from '@/store/uiStore';
@@ -51,6 +56,8 @@ export class ToolManager {
   private dragState: InternalDragState & {
     // 改为TransformState类型（与节点的transform类型一致）
     startTransformMap: Record<string, TransformState>;
+    // 新增：是否为多选区域拖拽（点击空白区域拖拽选中节点）
+    isMultiAreaDrag: boolean;
   } = {
     isDragging: false,
     type: null,
@@ -60,9 +67,10 @@ export class ToolManager {
     // 同时将startTransform的类型明确为TransformState
     startTransform: { x: 0, y: 0, width: 0, height: 0, rotation: 0 } as TransformState,
     startTransformMap: {}, // 初始值为空对象，类型匹配
+    isMultiAreaDrag: false,
   };
 
-  /** 缩放状态（修正：移到类属性区，与dragState同级） */
+  /** 单选缩放状态（修正：移到类属性区，与dragState同级） */
   private resizeState: InternalResizeState = {
     isResizing: false,
     handle: null,
@@ -79,6 +87,17 @@ export class ToolManager {
   private isBoxSelecting = false;
   private boxSelectStart = { x: 0, y: 0 };
   private boxSelectEnd = { x: 0, y: 0 };
+
+  // 多选缩放状态
+  private multiResizeState: InternalMultiResizeState = {
+    isMultiResizing: false,
+    handle: null,
+    nodeIds: [],
+    startBounds: { x: 0, y: 0, width: 0, height: 0 },
+    startMouseX: 0,
+    startMouseY: 0,
+    nodeStartStates: {},
+  };
 
   constructor(stageEl: HTMLElement | null) {
     this.store = useCanvasStore();
@@ -97,6 +116,86 @@ export class ToolManager {
   }
 
   /**
+   * 新增：计算选中节点的包围盒
+   * @returns 包围盒信息 | null（无选中节点）
+   */
+  private getSelectedNodesBounds(): { x: number; y: number; width: number; height: number } | null {
+    const activeIds = Array.from(this.store.activeElementIds);
+    if (activeIds.length === 0) return null;
+
+    let minX = Infinity,
+      minY = Infinity,
+      maxX = -Infinity,
+      maxY = -Infinity;
+    activeIds.forEach((id) => {
+      const node = this.store.nodes[id] as BaseNodeState;
+      if (!node) return;
+      const { x, y, width, height } = node.transform;
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x + width);
+      maxY = Math.max(maxY, y + height);
+    });
+
+    return {
+      x: minX,
+      y: minY,
+      width: maxX - minX,
+      height: maxY - minY,
+    };
+  }
+
+  /**
+   * 新增：判断点击位置是否在选中区域内（但不在任何具体节点上）
+   * @param e 鼠标事件
+   * @returns 是否为选中区域空白处点击
+   */
+  private isClickInSelectedArea(e: MouseEvent): boolean {
+    const bounds = this.getSelectedNodesBounds();
+    if (!bounds) return false;
+
+    // 获取画布偏移
+    const stageRect = this.stageEl?.getBoundingClientRect() || { left: 0, top: 0 };
+    // 转换为世界坐标
+    const worldPos = clientToWorld(
+      this.store.viewport as ViewportState,
+      e.clientX - stageRect.left,
+      e.clientY - stageRect.top
+    );
+
+    // 1. 判断是否在选中区域包围盒内
+    if (
+      !(
+        worldPos.x >= bounds.x &&
+        worldPos.x <= bounds.x + bounds.width &&
+        worldPos.y >= bounds.y &&
+        worldPos.y <= bounds.y + bounds.height
+      )
+    ) {
+      return false;
+    }
+
+    // 2. 判断是否不在任何选中节点上
+    const activeIds = Array.from(this.store.activeElementIds);
+    for (const id of activeIds) {
+      const node = this.store.nodes[id] as BaseNodeState;
+      if (!node) continue;
+      const { x, y, width, height } = node.transform;
+      if (
+        worldPos.x >= x &&
+        worldPos.x <= x + width &&
+        worldPos.y >= y &&
+        worldPos.y <= y + height
+      ) {
+        // 点击在具体节点上，走原有节点拖拽逻辑
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  /**
    * 处理画布滚轮事件（缩放）
    * - e.preventDefault() 阻止页面滚动
    * - 这里以窗口中心为基准进行缩放，可改为以鼠标为缩放中心（更符合用户期望）
@@ -112,8 +211,9 @@ export class ToolManager {
   }
 
   /**
-   * 处理画布鼠标按下事件（平移开始 / 取消选中）
+   * 处理画布鼠标按下事件（平移开始 / 取消选中 / 多选区域拖拽启动）
    * - 点击空白区，会取消所有选中并将画布置为拖拽(pan)状态
+   * - 新增：如果有选中节点且点击在选中区域空白处，启动多选区域拖拽
    */
   handleMouseDown(e: MouseEvent) {
     // 互斥逻辑：如果正在拖拽节点，不触发画布平移
@@ -128,7 +228,40 @@ export class ToolManager {
       this.isPanDragging = true;
       this.store.setActive([]);
     } else if (e.button === 0) {
-      // 左键框选：点击空白才会触发框选（后续取消选中）
+      // 新增：判断是否点击在选中区域空白处 → 启动多选区域拖拽
+      const hasActiveNodes = this.store.activeElementIds.size > 0;
+      const isClickInArea = this.isClickInSelectedArea(e);
+
+      if (hasActiveNodes && isClickInArea) {
+        // 启动多选区域拖拽
+        this.store.isInteracting = true;
+
+        // 初始化拖拽状态
+        const activeIds = Array.from(this.store.activeElementIds).filter((id) => {
+          const node = this.store.nodes[id] as BaseNodeState;
+          return node && !node.isLocked;
+        });
+        if (activeIds.length === 0) return;
+        const startTransformMap: Record<string, TransformState> = {};
+        activeIds.forEach((id) => {
+          const node = this.store.nodes[id] as BaseNodeState;
+          startTransformMap[id] = { ...node.transform };
+        });
+
+        this.dragState = {
+          isDragging: true,
+          type: 'move',
+          nodeId: '', // 无基准节点
+          startMouseX: e.clientX,
+          startMouseY: e.clientY,
+          startTransform: { x: 0, y: 0, width: 0, height: 0, rotation: 0 },
+          startTransformMap,
+          isMultiAreaDrag: true,
+        };
+        return; // 阻止后续框选逻辑
+      }
+
+      // 原有框选逻辑
       this.isBoxSelecting = true;
       this.boxSelectStart = { x: e.clientX, y: e.clientY };
       this.boxSelectEnd = { x: e.clientX, y: e.clientY };
@@ -136,28 +269,33 @@ export class ToolManager {
   }
 
   /**
-   * 处理全局鼠标移动事件 (平移中 / 缩放中)
+   * 处理全局鼠标移动事件 (平移中 / 缩放中 / 多选区域拖拽)
    */
   handleMouseMove(e: MouseEvent) {
-    // 优先处理节点拖拽
-    if (this.dragState.isDragging) {
-      this.handleNodeMove(e); // 调用节点拖拽计算逻辑
+    // 最高优先级：多选缩放
+    if (this.multiResizeState.isMultiResizing) {
+      this.handleMultiResizeMove(e);
       return;
     }
 
+    // 其次：单选缩放
     if (this.resizeState.isResizing) {
       this.handleResizeMove(e);
       return;
     }
 
-    // 其次处理画布平移
+    // 然后：节点拖拽（包含多选区域拖拽）
+    if (this.dragState.isDragging) {
+      this.handleNodeMove(e);
+      return;
+    }
+
+    // 最后：画布平移/框选
     if (this.isPanDragging) {
       const dx = e.clientX - this.lastPos.x;
       const dy = e.clientY - this.lastPos.y;
-
       this.store.viewport.offsetX += dx;
       this.store.viewport.offsetY += dy;
-
       this.lastPos.x = e.clientX;
       this.lastPos.y = e.clientY;
       return;
@@ -172,6 +310,11 @@ export class ToolManager {
    * 处理全局鼠标松开事件 (平移结束 / 缩放结束)
    */
   handleMouseUp() {
+    // 重置多选缩放状态
+    this.multiResizeState.isMultiResizing = false;
+    this.multiResizeState.handle = null;
+    this.multiResizeState.nodeIds = [];
+
     // 重置画布平移状态
     this.isPanDragging = false;
     this.handleNodeUp();
@@ -181,13 +324,19 @@ export class ToolManager {
       this.isBoxSelecting = false;
     }
 
-    // 重置节点拖拽状态
-    this.dragState.isDragging = false;
-    this.dragState.type = null;
-    this.dragState.nodeId = '';
-    this.dragState.startTransformMap = {}; // 新增：重置多节点初始状态映射
+    // 重置节点拖拽状态（包含新增的多选区域拖拽状态）
+    this.dragState = {
+      isDragging: false,
+      type: null,
+      nodeId: '',
+      startMouseX: 0,
+      startMouseY: 0,
+      startTransform: { x: 0, y: 0, width: 0, height: 0, rotation: 0 },
+      startTransformMap: {}, // 新增：重置多节点初始状态映射
+      isMultiAreaDrag: false,
+    };
 
-    // 重置缩放状态
+    // 重置单选缩放状态
     this.resizeState.isResizing = false;
     this.resizeState.handle = null;
     this.resizeState.nodeId = null;
@@ -251,7 +400,6 @@ export class ToolManager {
   handleNodeDown(e: MouseEvent, id: string) {
     // 1.阻止事件冒泡，避免触发画布的 handleMouseDown (导致取消选中)
     e.stopPropagation();
-
     // 如果正在缩放，不处理节点拖拽
     if (this.resizeState.isResizing) return;
 
@@ -304,31 +452,34 @@ export class ToolManager {
       startMouseY: e.clientY,
       startTransform: { ...node.transform }, // 基准节点初始状态
       startTransformMap, // 新增：所有选中节点的初始状态
+      isMultiAreaDrag: false, // 非区域拖拽
     };
   }
 
   /**
    * 节点鼠标移动事件（处理拖拽位移计算）
-   * 新增：支持多选节点同步拖拽
+   * 新增：支持多选节点同步拖拽 + 多选区域空白处拖拽
    */
   handleNodeMove(e: MouseEvent) {
     // 1. 非拖拽状态，直接返回
-    if (!this.dragState.isDragging || !this.dragState.nodeId) return;
+    if (!this.dragState.isDragging) return;
     // 如果没有按住鼠标，强制结束拖拽
     if ((e.buttons & 1) === 0) {
       this.handleNodeUp();
       return;
     }
-    // 2. 获取视口状态（画布缩放/平移/网格配置）
-    const viewport = this.store.viewport as ViewportState;
-    const baseNode = this.store.nodes[this.dragState.nodeId] as BaseNodeState;
-    if (!baseNode) return;
 
-    const currentWorldPos = clientToWorld(viewport, e.clientX, e.clientY);
+    const viewport = this.store.viewport as ViewportState;
+    const stageRect = this.stageEl?.getBoundingClientRect() || { left: 0, top: 0 };
+    const currentWorldPos = clientToWorld(
+      viewport,
+      e.clientX - stageRect.left,
+      e.clientY - stageRect.top
+    );
     const startWorldPos = clientToWorld(
       viewport,
-      this.dragState.startMouseX,
-      this.dragState.startMouseY
+      this.dragState.startMouseX - stageRect.left,
+      this.dragState.startMouseY - stageRect.top
     );
 
     // 4. 计算鼠标偏移量（世界坐标下，避免缩放影响）
@@ -373,6 +524,7 @@ export class ToolManager {
       startMouseY: 0,
       startTransform: { x: 0, y: 0, width: 0, height: 0, rotation: 0 },
       startTransformMap: {}, // 新增：重置多节点初始状态映射
+      isMultiAreaDrag: false,
     };
     // 解除交互锁
     this.store.isInteracting = false;
@@ -643,22 +795,86 @@ export class ToolManager {
   }
 
   /**
+   * 处理选中多个节点时，调整大小控制点上的鼠标按下事件。
+   *
+   * 初始化多节点调整大小的状态，包括
+   * 计算每个节点相对于选中区域边界的相对位置和缩放比例。锁定的节点
+   * 会被排除在调整大小的操作之外。
+   *
+   * @param {MouseEvent} e - 按下调整大小控制点时触发的鼠标事件。
+   * @param {ResizeHandle} handle - 表示调整方向的控制点（例如：'nw'、'se'）。
+   * @param {{ x: number; y: number; width: number; height: number }} startBounds - 被选中节点在调整开始时的边界矩形。
+   * @param {string[]} nodeIds - 包含在多选区域中的节点ID列表。
+   */
+  handleMultiResizeDown(
+    e: MouseEvent,
+    handle: ResizeHandle,
+    startBounds: { x: number; y: number; width: number; height: number },
+    nodeIds: string[]
+  ) {
+    e.stopPropagation();
+    e.preventDefault();
+
+    // 互斥：重置拖拽/单选缩放状态
+    this.dragState.isDragging = false;
+    this.dragState.type = null;
+    this.dragState.nodeId = '';
+    this.dragState.startTransformMap = {};
+    this.resizeState.isResizing = false;
+
+    // 过滤锁定节点
+    const validNodeIds = nodeIds.filter((id) => {
+      const node = this.store.nodes[id];
+      return node && !node.isLocked;
+    });
+    if (validNodeIds.length === 0) return;
+
+    // 初始化每个节点的初始状态（替换any为显式类型）
+    const nodeStartStates: Record<string, NodeStartState> = {};
+    validNodeIds.forEach((id) => {
+      const node = this.store.nodes[id] as BaseNodeState;
+      // 计算节点相对于大框的偏移比例和尺寸比例
+      const offsetX =
+        startBounds.width > 0 ? (node.transform.x - startBounds.x) / startBounds.width : 0;
+      const offsetY =
+        startBounds.height > 0 ? (node.transform.y - startBounds.y) / startBounds.height : 0;
+      const scaleX = startBounds.width > 0 ? node.transform.width / startBounds.width : 0;
+      const scaleY = startBounds.height > 0 ? node.transform.height / startBounds.height : 0;
+
+      nodeStartStates[id] = {
+        x: node.transform.x,
+        y: node.transform.y,
+        width: node.transform.width,
+        height: node.transform.height,
+        offsetX,
+        offsetY,
+        scaleX,
+        scaleY,
+      };
+    });
+
+    this.multiResizeState = {
+      isMultiResizing: true,
+      handle,
+      nodeIds: validNodeIds,
+      startBounds: { ...startBounds },
+      startMouseX: e.clientX,
+      startMouseY: e.clientY,
+      nodeStartStates,
+    };
+
+    this.store.isInteracting = true;
+  }
+
+  /**
    * 处理缩放过程中的鼠标移动
    */
   private handleResizeMove(e: MouseEvent) {
     const { handle, nodeId, startX, startY, startWidth, startHeight, startNodeX, startNodeY } =
       this.resizeState;
 
-    if (!handle || !nodeId) {
-      console.log('⚠️ handleResizeMove: no handle or nodeId', { handle, nodeId });
-      return;
-    }
-
-    // 如果没有按住鼠标左键，强制结束缩放
-    if ((e.buttons & 1) === 0) {
+    if (!handle || !nodeId || (e.buttons & 1) === 0) {
       this.resizeState.isResizing = false;
-      this.resizeState.handle = null;
-      this.resizeState.nodeId = null;
       this.store.isInteracting = false;
       return;
     }
@@ -666,7 +882,6 @@ export class ToolManager {
     const node = this.store.nodes[nodeId];
     if (!node) return;
 
-    // 计算鼠标移动的距离（考虑缩放）
     const dx = (e.clientX - startX) / this.store.viewport.zoom;
     const dy = (e.clientY - startY) / this.store.viewport.zoom;
 
@@ -675,7 +890,7 @@ export class ToolManager {
     let newX = startNodeX;
     let newY = startNodeY;
 
-    // 根据节点类型选择不同的缩放策略
+    // 根据节点类型选择缩放策略
     switch (node.type) {
       case NodeType.CIRCLE:
         // 圆形：等比缩放，保持宽高相等
@@ -695,7 +910,6 @@ export class ToolManager {
           }
         );
         break;
-
       case NodeType.RECT:
         // 矩形：独立缩放宽高
         this.resizeRect(
@@ -714,7 +928,6 @@ export class ToolManager {
           }
         );
         break;
-
       case NodeType.IMAGE:
         // 图片：自由缩放（允许畸变）
         this.resizeImage(
@@ -733,7 +946,6 @@ export class ToolManager {
           }
         );
         break;
-
       case NodeType.TEXT:
         // 文本：只改变容器大小，不缩放字体
         this.resizeText(
@@ -752,7 +964,6 @@ export class ToolManager {
           }
         );
         break;
-
       case NodeType.GROUP:
         // 组合：等比缩放所有子元素
         // TODO: 实现组合缩放逻辑
@@ -772,7 +983,6 @@ export class ToolManager {
           }
         );
         break;
-
       default:
         // 默认使用矩形缩放逻辑
         this.resizeRect(
@@ -819,6 +1029,134 @@ export class ToolManager {
         x: newX,
         y: newY,
       },
+    });
+  }
+
+  /**
+   * 处理多选缩放过程中的鼠标移动计算
+   *
+   * 根据拖动的控制点和鼠标移动，计算新的选中区域边界矩形。
+   * 确定宽度和高度的缩放因子，然后对每个选中的节点应用等比缩放，
+   * 更新它们相对于新边界的位置和大小。
+   *
+   * 缩放操作会保持每个节点在选中矩形内的相对位置和大小。
+   * 计算过程考虑了当前的缩放级别、初始鼠标位置和选区的初始边界。
+   *
+   * @param {MouseEvent} e - 包含当前光标位置的鼠标事件。
+   *   使用 e.clientX 和 e.clientY 来确定相对于初始鼠标位置的移动增量。
+   *   移动量会使用当前视口的缩放比例转换为世界坐标。
+   *
+   * 算法：
+   *   1. 计算世界坐标系下的鼠标移动增量 (dx, dy)。
+   *   2. 根据拖动的控制点，调整选区边界。
+   *   3. 计算宽度和高度的缩放因子。
+   *   4. 对于每个选中的节点，根据选区边界的变化，按比例计算其新的位置和大小。
+   *   5. 更新每个节点的变换属性以反映新的位置和大小。
+   *
+   * 边界情况：
+   *   - 如果释放鼠标按钮或没有选中节点，操作将被取消。
+   *   - 可能会在其他地方强制执行最小节点尺寸限制。
+   */
+  private handleMultiResizeMove(e: MouseEvent) {
+    const {
+      isMultiResizing,
+      handle,
+      startBounds,
+      startMouseX,
+      startMouseY,
+      nodeIds,
+      nodeStartStates,
+    } = this.multiResizeState;
+
+    if (!isMultiResizing || !handle || nodeIds.length === 0 || (e.buttons & 1) === 0) {
+      this.multiResizeState.isMultiResizing = false;
+      this.store.isInteracting = false;
+      return;
+    }
+
+    // 计算鼠标偏移（世界坐标系）
+    const dx = (e.clientX - startMouseX) / this.store.viewport.zoom;
+    const dy = (e.clientY - startMouseY) / this.store.viewport.zoom;
+
+    // 计算缩放后的大框尺寸和位置
+    const newBounds = { ...startBounds };
+    switch (handle) {
+      case 'nw':
+        newBounds.x = startBounds.x + dx;
+        newBounds.y = startBounds.y + dy;
+        newBounds.width = startBounds.width - dx;
+        newBounds.height = startBounds.height - dy;
+        break;
+      case 'n':
+        newBounds.y = startBounds.y + dy;
+        newBounds.height = startBounds.height - dy;
+        break;
+      case 'ne':
+        newBounds.y = startBounds.y + dy;
+        newBounds.width = startBounds.width + dx;
+        newBounds.height = startBounds.height - dy;
+        break;
+      case 'e':
+        newBounds.width = startBounds.width + dx;
+        break;
+      case 'se':
+        newBounds.width = startBounds.width + dx;
+        newBounds.height = startBounds.height + dy;
+        break;
+      case 's':
+        newBounds.height = startBounds.height + dy;
+        break;
+      case 'sw':
+        newBounds.x = startBounds.x + dx;
+        newBounds.width = startBounds.width - dx;
+        newBounds.height = startBounds.height + dy;
+        break;
+      case 'w':
+        newBounds.x = startBounds.x + dx;
+        newBounds.width = startBounds.width - dx;
+        break;
+    }
+
+    // 限制最小尺寸
+    const clampedWidth = Math.max(MIN_NODE_SIZE, newBounds.width);
+    const clampedHeight = Math.max(MIN_NODE_SIZE, newBounds.height);
+    // 如果发生了clamp，且handle影响位置，则调整x/y
+    if (clampedWidth !== newBounds.width) {
+      switch (handle) {
+        case 'nw':
+        case 'w':
+        case 'sw':
+          newBounds.x = startBounds.x + startBounds.width - MIN_NODE_SIZE;
+          break;
+      }
+    }
+    if (clampedHeight !== newBounds.height) {
+      switch (handle) {
+        case 'nw':
+        case 'n':
+        case 'ne':
+          newBounds.y = startBounds.y + startBounds.height - MIN_NODE_SIZE;
+          break;
+      }
+    }
+    newBounds.width = clampedWidth;
+    newBounds.height = clampedHeight;
+    // 遍历所有节点同步更新
+    nodeIds.forEach((id) => {
+      const startState = nodeStartStates[id];
+      const node = this.store.nodes[id] as BaseNodeState;
+      if (!node) return;
+      if (!startState) return;
+      // 按比例计算新尺寸和位置
+      const newWidth = Math.max(MIN_NODE_SIZE, startState.scaleX * newBounds.width);
+      const newHeight = Math.max(MIN_NODE_SIZE, startState.scaleY * newBounds.height);
+      const newX = newBounds.x + startState.offsetX * newBounds.width;
+      const newY = newBounds.y + startState.offsetY * newBounds.height;
+
+      // 更新节点
+      this.store.updateNode(id, {
+        transform: { ...node.transform, x: newX, y: newY, width: newWidth, height: newHeight },
+      });
     });
   }
 

@@ -50,8 +50,8 @@
 
     <!-- Text Controls -->
     <template v-if="isText">
-      <div class="tool-item" style="width: 85px;">
-        字号: 
+      <div class="tool-item" style="width: 85px">
+        字号:
         <a-input-number
           size="mini"
           v-model="fontSize"
@@ -235,27 +235,24 @@ const activeTextNode = computed(() => {
   return null;
 });
 
-// 2. 封装通用更新函数 (核心优化)
-// key 是 TextState['props'] 的键名，value 是对应的值
-const updateTextProp = (key: keyof TextState['props'], value: any) => {
-  if (!activeTextNode.value) return;
-
-  // ✅ 关键点：使用 as Partial<TextState> 告诉 TS 这是文本节点的更新补丁
-  store.updateNode(activeTextNode.value.id, {
-    props: { [key]: value },
-  } as Partial<TextState>);
-};
-
 // --- 具体的属性绑定 ---
 
 const fontSize = computed({
   get: () => activeTextNode.value?.props.fontSize || 14,
-  set: (val) => updateTextProp('fontSize', val),
+  set: (val) =>
+    activeTextNode.value &&
+    store.updateNode(activeTextNode.value.id, {
+      props: { fontSize: val as number },
+    } as Partial<TextState>),
 });
 
 const textColor = computed({
   get: () => activeTextNode.value?.props.color || '#000000',
-  set: (val) => updateTextProp('color', val),
+  set: (val) =>
+    activeTextNode.value &&
+    store.updateNode(activeTextNode.value.id, {
+      props: { color: val as string },
+    } as Partial<TextState>),
 });
 
 // --- 样式开关 (Toggle) ---
@@ -266,22 +263,34 @@ const isBold = computed(() => {
 });
 const toggleBold = () => {
   // 如果当前是粗体，设为 400，否则设为 700
-  updateTextProp('fontWeight', isBold.value ? 400 : 700);
+  if (!activeTextNode.value) return;
+  store.updateNode(activeTextNode.value.id, {
+    props: { fontWeight: isBold.value ? 400 : 700 },
+  } as Partial<TextState>);
 };
 
 const isItalic = computed(() => activeTextNode.value?.props.fontStyle === 'italic');
 const toggleItalic = () => {
-  updateTextProp('fontStyle', isItalic.value ? 'normal' : 'italic');
+  if (!activeTextNode.value) return;
+  store.updateNode(activeTextNode.value.id, {
+    props: { fontStyle: isItalic.value ? 'normal' : 'italic' },
+  } as Partial<TextState>);
 };
 
 const isUnderline = computed(() => activeTextNode.value?.props.underline || false);
 const toggleUnderline = () => {
-  updateTextProp('underline', !isUnderline.value);
+  if (!activeTextNode.value) return;
+  store.updateNode(activeTextNode.value.id, {
+    props: { underline: !isUnderline.value },
+  } as Partial<TextState>);
 };
 
 const isStrikethrough = computed(() => activeTextNode.value?.props.strikethrough || false);
 const toggleStrikethrough = () => {
-  updateTextProp('strikethrough', !isStrikethrough.value);
+  if (!activeTextNode.value) return;
+  store.updateNode(activeTextNode.value.id, {
+    props: { strikethrough: !isStrikethrough.value },
+  } as Partial<TextState>);
 };
 
 const handleDelete = () => {

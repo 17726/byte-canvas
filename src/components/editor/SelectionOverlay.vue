@@ -1,32 +1,39 @@
 <template>
-  <!-- 遍历渲染所有选中节点的覆盖层 -->
-  <div
-    v-for="node in unlockedActiveElements"
-    :key="node.id"
-    class="selection-overlay"
-    :style="getOverlayStyle(node)"
-  >
-    <!-- 选中框边框 -->
-    <div class="selection-border"></div>
+  <div v-if="hasSelectedNodes && !allNodesLocked" class="selection-container">
+    <!-- 多选时：显示每个元素的单独选中框 -->
+    <template v-if="selectedNodes.length > 1">
+      <div
+        v-for="node in selectedNodes"
+        :key="node.id"
+        class="individual-selection"
+        :style="getIndividualStyle(node)"
+      ></div>
+    </template>
 
-    <!-- 8个控制点 -->
-    <div
-      v-for="handle in handles"
-      :key="handle"
-      class="resize-handle"
-      :class="`handle-${handle}`"
-      :style="getHandleStyle(handle)"
-      @mousedown.stop.prevent="onHandleDown($event, node, handle)"
-    ></div>
+    <!-- 主选中框（单选/多选大框） -->
+    <div class="selection-overlay" :style="overlayStyle">
+      <!-- 选中框边框 -->
+      <div class="selection-border"></div>
+
+      <!-- 8个控制点（绑定到大框上） -->
+      <div
+        v-for="handle in handles"
+        :key="handle"
+        class="resize-handle"
+        :class="`handle-${handle}`"
+        :style="getHandleStyle(handle)"
+        @mousedown.stop.prevent="onHandleDown($event, handle)"
+      ></div>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { inject, computed, type Ref } from 'vue';
+import { computed, inject, type Ref } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
 import type { ToolManager } from '@/core/tools/ToolManager';
 import type { ResizeHandle } from '@/types/editor';
-import type { NodeState } from '@/types/state';
+import type { BaseNodeState } from '@/types/state';
 
 const store = useCanvasStore();
 const toolManagerRef = inject<Ref<ToolManager | null>>('toolManager');
@@ -37,19 +44,135 @@ if (!toolManagerRef) {
 
 const handles: ResizeHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
 
-// 过滤出未锁定的选中节点
-const unlockedActiveElements = computed(() => {
-  return store.activeElements.filter((node): node is NodeState => !!node && !node.isLocked);
-});
+// 1. 多选判断：选中节点数 ≥ 1 且未全部锁定
+const hasSelectedNodes = computed(() => store.activeElements.length > 0);
+const allNodesLocked = computed(() =>
+  store.activeElements.every((node) => (node as BaseNodeState).isLocked)
+);
 
-const getOverlayStyle = (node: NodeState) => {
+// 选中的节点列表
+const selectedNodes = computed(() => store.activeElements as BaseNodeState[]);
+
+// 单个元素选中框样式
+const getIndividualStyle = (node: BaseNodeState) => {
+  const { x, y, width, height, rotation } = node.transform;
   return {
-    transform: `translate(${node.transform.x}px, ${node.transform.y}px) rotate(${node.transform.rotation}deg)`,
-    width: `${node.transform.width}px`,
-    height: `${node.transform.height}px`,
+    transform: `translate(${x}px, ${y}px) rotate(${rotation}deg)`,
+    transformOrigin: `${width / 2}px ${height / 2}px`,
+    width: `${width}px`,
+    height: `${height}px`,
   };
 };
 
+/**
+ * 计算旋转后的节点边界框（AABB）
+ * 将节点四个角点按旋转角度变换后，求最小外接矩形
+ */
+const getRotatedBounds = (node: BaseNodeState) => {
+  const { x, y, width, height, rotation } = node.transform;
+
+  // 如果没有旋转，直接返回原始边界
+  if (rotation === 0) {
+    return { minX: x, maxX: x + width, minY: y, maxY: y + height };
+  }
+
+  // 计算旋转中心（节点中心点）
+  const cx = x + width / 2;
+  const cy = y + height / 2;
+
+  // 节点四个角点（相对于左上角）
+  const corners = [
+    { x: x, y: y }, // 左上
+    { x: x + width, y: y }, // 右上
+    { x: x + width, y: y + height }, // 右下
+    { x: x, y: y + height }, // 左下
+  ];
+
+  // 旋转角度转弧度
+  const rad = (rotation * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+
+  // 旋转所有角点，找出边界
+  let minX = Infinity,
+    maxX = -Infinity,
+    minY = Infinity,
+    maxY = -Infinity;
+
+  corners.forEach((corner) => {
+    // 相对于中心点的坐标
+    const dx = corner.x - cx;
+    const dy = corner.y - cy;
+    // 旋转变换
+    const rx = cx + dx * cos - dy * sin;
+    const ry = cy + dx * sin + dy * cos;
+    // 更新边界
+    minX = Math.min(minX, rx);
+    maxX = Math.max(maxX, rx);
+    minY = Math.min(minY, ry);
+    maxY = Math.max(maxY, ry);
+  });
+
+  return { minX, maxX, minY, maxY };
+};
+
+// 2. 计算多选大框的包围盒（核心：包裹所有选中节点的最小矩形，考虑旋转）
+const selectionBounds = computed(() => {
+  const nodes = store.activeElements as BaseNodeState[];
+  if (nodes.length === 0) return null;
+  if (!nodes[0]) return null;
+
+  // 单选时：返回节点原始边界（选中框会跟着旋转）
+  if (nodes.length === 1) {
+    const node = nodes[0];
+    return {
+      x: node.transform.x,
+      y: node.transform.y,
+      width: node.transform.width,
+      height: node.transform.height,
+    };
+  }
+
+  // 多选时：计算所有节点旋转后的 AABB 并合并
+  let minX = Infinity,
+    maxX = -Infinity,
+    minY = Infinity,
+    maxY = -Infinity;
+
+  nodes.forEach((node) => {
+    const bounds = getRotatedBounds(node);
+    minX = Math.min(minX, bounds.minX);
+    maxX = Math.max(maxX, bounds.maxX);
+    minY = Math.min(minY, bounds.minY);
+    maxY = Math.max(maxY, bounds.maxY);
+  });
+
+  return {
+    x: minX,
+    y: minY,
+    width: maxX - minX,
+    height: maxY - minY,
+  };
+});
+
+// 3. 大框的样式
+const overlayStyle = computed(() => {
+  const bounds = selectionBounds.value;
+  if (!bounds) return {};
+
+  const nodes = store.activeElements as BaseNodeState[];
+  // 单选时，选中框跟随节点旋转
+  const rotation = nodes.length === 1 && nodes[0] ? nodes[0].transform.rotation : 0;
+
+  return {
+    transform: `translate(${bounds.x}px, ${bounds.y}px) rotate(${rotation}deg)`,
+    transformOrigin: `${bounds.width / 2}px ${bounds.height / 2}px`,
+    width: `${bounds.width}px`,
+    height: `${bounds.height}px`,
+  };
+});
+
+// 4. 控制点样式（适配大框）
 const getHandleStyle = (handle: ResizeHandle) => {
   const scale = 1 / store.viewport.zoom;
   let baseTransform = '';
@@ -72,27 +195,46 @@ const getHandleStyle = (handle: ResizeHandle) => {
   };
 };
 
-const onHandleDown = (e: MouseEvent, node: NodeState, handle: ResizeHandle) => {
-  console.log(
-    '🖱️ Handle mousedown:',
-    handle,
-    'toolManager:',
-    !!toolManagerRef?.value,
-    'node:',
-    node.id
-  );
-  if (node && toolManagerRef?.value) {
-    toolManagerRef.value.handleResizeHandleDown(e, node.id, handle);
+// 5. 触发多选缩放
+const onHandleDown = (e: MouseEvent, handle: ResizeHandle) => {
+  const bounds = selectionBounds.value;
+  if (!bounds || !toolManagerRef?.value || store.activeElements.length === 0) return;
+
+  // 获取选中节点ID列表
+  const nodeIds = store.activeElements.map((node) => (node as BaseNodeState).id);
+
+  // 调用多选缩放初始化方法
+  if (nodeIds.length === 1) {
+    if (!nodeIds[0]) return;
+    // 单选时，调用单节点缩放初始化方法
+    toolManagerRef.value.handleResizeHandleDown(e, nodeIds[0], handle);
   } else {
-    console.error('❌ Missing toolManager or node!', {
-      toolManager: !!toolManagerRef?.value,
-      node: !!node,
-    });
+    // 多选时，调用多选缩放初始化方法
+    toolManagerRef.value.handleMultiResizeDown(e, handle, bounds, nodeIds);
   }
 };
 </script>
 
 <style scoped>
+.selection-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+.individual-selection {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border: 1px dashed #1890ff;
+  pointer-events: none;
+  box-sizing: border-box;
+  z-index: 998;
+}
+
 .selection-overlay {
   position: absolute;
   top: 0;
