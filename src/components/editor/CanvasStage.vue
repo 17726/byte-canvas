@@ -245,8 +245,10 @@ const handleKeyDown = (e: KeyboardEvent) => {
 
   // Delete / Backspace: 删除选中元素
   if (e.key === 'Delete' || e.key === 'Backspace') {
-    e.preventDefault();
-    deleteSelected();
+    if (store.activeElementIds.size > 0) {
+      e.preventDefault();
+      deleteSelected();
+    }
     return;
   }
 };

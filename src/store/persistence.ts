@@ -57,7 +57,13 @@ export function saveToLocalStorage(
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
     console.log('[Persistence] 状态已保存到 localStorage');
   } catch (error) {
-    console.error('[Persistence] 保存状态失败:', error);
+    if (error instanceof DOMException && error.name === 'QuotaExceededError') {
+      console.error('[Persistence] localStorage 空间不足，无法保存状态');
+    } else if (error instanceof DOMException && error.name === 'SecurityError') {
+      console.error('[Persistence] 无法访问 localStorage（可能是隐私模式）');
+    } else {
+      console.error('[Persistence] 保存状态失败:', error);
+    }
   }
 }
 
@@ -131,6 +137,10 @@ export function createDebouncedSave(delay = 500) {
     lastArgs = null;
   }
 
+  /**
+   * 立即保存待处理的状态（跳过防抖延迟）
+   * 使用场景：页面卸载前强制保存，确保数据不丢失
+   */
   function flush() {
     if (timeoutId && lastArgs) {
       clearTimeout(timeoutId);
@@ -179,7 +189,18 @@ export function loadClipboard(): ClipboardData | null {
   try {
     const stored = localStorage.getItem(CLIPBOARD_KEY);
     if (!stored) return null;
-    return JSON.parse(stored) as ClipboardData;
+    const data = JSON.parse(stored);
+    // Validate structure
+    if (
+      !data ||
+      !['copy', 'cut'].includes(data.type) ||
+      !Array.isArray(data.nodes) ||
+      typeof data.timestamp !== 'number'
+    ) {
+      console.warn('[Clipboard] Invalid clipboard structure');
+      return null;
+    }
+    return data as ClipboardData;
   } catch (error) {
     console.error('[Clipboard] 加载剪贴板失败:', error);
     return null;
