@@ -13,6 +13,7 @@ import {
   type ClipboardData,
 } from './persistence';
 import { v4 as uuidv4 } from 'uuid';
+import { cloneDeep } from 'lodash-es';
 
 // 全局画布状态管理（Pinia store）
 // 说明：该 store 管理整个编辑器的核心状态，包括节点、渲染顺序、视口、交互态等。
@@ -107,6 +108,27 @@ export const useCanvasStore = defineStore('canvas', () => {
     version.value++; // 触发更新
   }
 
+  // 4. 批量删除节点（仅触发一次 version 更新）
+  function deleteNodes(ids: string[]) {
+    if (ids.length === 0) return;
+
+    const idsToDelete = ids.filter((id) => nodes.value[id]);
+    if (idsToDelete.length === 0) return;
+
+    // 批量删除节点
+    idsToDelete.forEach((id) => {
+      delete nodes.value[id];
+      activeElementIds.value.delete(id);
+    });
+
+    // 一次性过滤 nodeOrder
+    const deleteSet = new Set(idsToDelete);
+    nodeOrder.value = nodeOrder.value.filter((nId) => !deleteSet.has(nId));
+
+    // 仅触发一次版本更新
+    version.value++;
+  }
+
   function setActive(ids: string[]) {
     activeElementIds.value = new Set(ids);
   }
@@ -124,13 +146,24 @@ export const useCanvasStore = defineStore('canvas', () => {
   // 创建防抖保存函数（500ms 防抖，避免频繁写入）
   const debouncedSave = createDebouncedSave(500);
 
+  // 初始化保护标志，确保只初始化一次
+  let isInitialized = false;
+
   /**
    * 初始化：从 localStorage 恢复状态
-   * 说明：应在应用启动时调用一次
+   * 说明：应在应用启动时调用一次，重复调用会被忽略
    */
-  function initFromStorage() {
+  function initFromStorage(): boolean {
+    // 防止重复初始化
+    if (isInitialized) {
+      console.warn('[CanvasStore] initFromStorage 已被调用过，忽略重复调用');
+      return false;
+    }
+
+    isInitialized = true;
+
     const stored = loadFromLocalStorage();
-    if (!stored) return;
+    if (!stored) return false;
 
     const { data } = stored;
 
@@ -150,6 +183,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
 
     console.log('[CanvasStore] 状态已从 localStorage 恢复');
+    return true;
   }
 
   /**
@@ -172,23 +206,24 @@ export const useCanvasStore = defineStore('canvas', () => {
     console.log('[CanvasStore] 画布已重置');
   }
 
-  // 监听状态变化，自动保存（使用 version 作为脏标记）
-  // 注意：仅在非交互状态时保存，避免拖拽过程中频繁写入
+  // 统一监听持久化条件：version 变化 + 交互状态
+  // 保存时机：
+  // 1. version 变化且非交互状态时立即保存
+  // 2. 交互结束时（isInteracting: true -> false）保存
   watch(
-    () => version.value,
-    () => {
-      if (!isInteracting.value) {
-        saveToStorage();
-      }
-    }
-  );
+    () => ({ version: version.value, interacting: isInteracting.value }),
+    (newState, oldState) => {
+      const versionChanged = newState.version !== oldState?.version;
+      const interactionEnded = oldState?.interacting === true && newState.interacting === false;
 
-  // 监听交互状态结束后保存
-  watch(
-    () => isInteracting.value,
-    (newVal, oldVal) => {
-      // 交互结束时触发保存
-      if (oldVal === true && newVal === false) {
+      // 交互结束时保存（无论 version 是否变化）
+      if (interactionEnded) {
+        saveToStorage();
+        return;
+      }
+
+      // version 变化且非交互状态时保存
+      if (versionChanged && !newState.interacting) {
         saveToStorage();
       }
     }
@@ -213,10 +248,10 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
 
     // 深拷贝选中的节点
-    const nodesToCopy: NodeState[] = selectedIds
+    const nodesToCopy = selectedIds
       .map((id) => nodes.value[id])
-      .filter(Boolean)
-      .map((node) => JSON.parse(JSON.stringify(node)));
+      .filter((node): node is NodeState => Boolean(node))
+      .map((node) => cloneDeep(node));
 
     const clipboardData: ClipboardData = {
       type: 'copy',
@@ -240,10 +275,10 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
 
     // 深拷贝选中的节点
-    const nodesToCut: NodeState[] = selectedIds
+    const nodesToCut = selectedIds
       .map((id) => nodes.value[id])
-      .filter(Boolean)
-      .map((node) => JSON.parse(JSON.stringify(node)));
+      .filter((node): node is NodeState => Boolean(node))
+      .map((node) => cloneDeep(node));
 
     const clipboardData: ClipboardData = {
       type: 'cut',
@@ -253,8 +288,8 @@ export const useCanvasStore = defineStore('canvas', () => {
 
     saveClipboard(clipboardData);
 
-    // 删除原节点
-    selectedIds.forEach((id) => deleteNode(id));
+    // 批量删除原节点（仅触发一次 version 更新）
+    deleteNodes(selectedIds);
     pasteCount = 0; // 重置粘贴计数
     return true;
   }
@@ -284,7 +319,7 @@ export const useCanvasStore = defineStore('canvas', () => {
       // 生成新的 ID
       const newId = uuidv4();
       const newNode: NodeState = {
-        ...JSON.parse(JSON.stringify(node)),
+        ...cloneDeep(node),
         id: newId,
         transform: {
           ...node.transform,
@@ -321,6 +356,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     updateNode,
     addNode,
     deleteNode,
+    deleteNodes,
     setActive,
     toggleSelection,
     // 持久化相关
