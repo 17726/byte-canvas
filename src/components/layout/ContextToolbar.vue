@@ -304,7 +304,6 @@ const handleDelete = () => {
   gap: 8px;
   pointer-events: auto;
   border: 1px solid var(--color-border-2);
-  flex-wrap: nowrap
 }
 
 .tool-section {
