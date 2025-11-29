@@ -1,11 +1,10 @@
 <template>
   <!-- 遍历渲染所有选中节点的覆盖层 -->
   <div
-    v-for="node in store.activeElements"
+    v-for="node in unlockedActiveElements"
     :key="node.id"
     class="selection-overlay"
     :style="getOverlayStyle(node)"
-    v-show="!node.isLocked"
   >
     <!-- 选中框边框 -->
     <div class="selection-border"></div>
@@ -17,17 +16,17 @@
       class="resize-handle"
       :class="`handle-${handle}`"
       :style="getHandleStyle(handle)"
-      @mousedown.stop.prevent="onHandleDown($event, handle)"
+      @mousedown.stop.prevent="onHandleDown($event, node, handle)"
     ></div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, inject, type Ref } from 'vue';
+import { inject, computed, type Ref } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
 import type { ToolManager } from '@/core/tools/ToolManager';
 import type { ResizeHandle } from '@/types/editor';
-import type { BaseNodeState } from '@/types/state';
+import type { NodeState } from '@/types/state';
 
 const store = useCanvasStore();
 const toolManagerRef = inject<Ref<ToolManager | null>>('toolManager');
@@ -38,9 +37,12 @@ if (!toolManagerRef) {
 
 const handles: ResizeHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
 
-// 不再需要 selectedNode 计算属性，直接在模板中遍历 store.activeElements
+// 过滤出未锁定的选中节点
+const unlockedActiveElements = computed(() => {
+  return store.activeElements.filter((node): node is NodeState => !!node && !node.isLocked);
+});
 
-const getOverlayStyle = (node: BaseNodeState) => {
+const getOverlayStyle = (node: NodeState) => {
   return {
     transform: `translate(${node.transform.x}px, ${node.transform.y}px) rotate(${node.transform.rotation}deg)`,
     width: `${node.transform.width}px`,
@@ -70,21 +72,21 @@ const getHandleStyle = (handle: ResizeHandle) => {
   };
 };
 
-const onHandleDown = (e: MouseEvent, handle: ResizeHandle) => {
+const onHandleDown = (e: MouseEvent, node: NodeState, handle: ResizeHandle) => {
   console.log(
     '🖱️ Handle mousedown:',
     handle,
     'toolManager:',
     !!toolManagerRef?.value,
-    'selectedNode:',
-    !!selectedNode.value
+    'node:',
+    node.id
   );
-  if (selectedNode.value && toolManagerRef?.value) {
-    toolManagerRef.value.handleResizeHandleDown(e, selectedNode.value.id, handle);
+  if (node && toolManagerRef?.value) {
+    toolManagerRef.value.handleResizeHandleDown(e, node.id, handle);
   } else {
-    console.error('❌ Missing toolManager or selectedNode!', {
+    console.error('❌ Missing toolManager or node!', {
       toolManager: !!toolManagerRef?.value,
-      selectedNode: !!selectedNode.value,
+      node: !!node,
     });
   }
 };
