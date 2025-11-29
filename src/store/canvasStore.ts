@@ -190,7 +190,7 @@ export const useCanvasStore = defineStore('canvas', () => {
    * 手动保存当前状态到 localStorage
    */
   function saveToStorage() {
-    debouncedSave(nodes.value, nodeOrder.value, viewport as ViewportState);
+    debouncedSave.save(nodes.value, nodeOrder.value, viewport as ViewportState);
   }
 
   /**
@@ -319,7 +319,7 @@ export const useCanvasStore = defineStore('canvas', () => {
       // 生成新的 ID
       const newId = uuidv4();
       const newNode: NodeState = {
-        ...cloneDeep(node),
+        ...node,
         id: newId,
         transform: {
           ...node.transform,

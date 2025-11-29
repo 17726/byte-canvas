@@ -107,16 +107,43 @@ export function clearLocalStorage(): void {
  */
 export function createDebouncedSave(delay = 500) {
   let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  let lastArgs: [Record<string, NodeState>, string[], ViewportState] | null = null;
 
-  return (nodes: Record<string, NodeState>, nodeOrder: string[], viewport: ViewportState) => {
+  function save(nodes: Record<string, NodeState>, nodeOrder: string[], viewport: ViewportState) {
     if (timeoutId) {
       clearTimeout(timeoutId);
     }
-
+    lastArgs = [nodes, nodeOrder, viewport];
     timeoutId = setTimeout(() => {
-      saveToLocalStorage(nodes, nodeOrder, viewport);
+      if (lastArgs) {
+        saveToLocalStorage(...lastArgs);
+        lastArgs = null;
+      }
       timeoutId = null;
     }, delay);
+  }
+
+  function cancel() {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+      timeoutId = null;
+    }
+    lastArgs = null;
+  }
+
+  function flush() {
+    if (timeoutId && lastArgs) {
+      clearTimeout(timeoutId);
+      saveToLocalStorage(...lastArgs);
+      timeoutId = null;
+      lastArgs = null;
+    }
+  }
+
+  return {
+    save,
+    cancel,
+    flush,
   };
 }
 
