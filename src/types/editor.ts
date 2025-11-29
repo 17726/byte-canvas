@@ -35,19 +35,7 @@ export interface InternalMultiResizeState {
   startBounds: { x: number; y: number; width: number; height: number };
   startMouseX: number;
   startMouseY: number;
-  nodeStartStates: Record<
-    string,
-    {
-      x: number;
-      y: number;
-      width: number;
-      height: number;
-      offsetX: number;
-      offsetY: number;
-      scaleX: number;
-      scaleY: number;
-    }
-  >;
+  nodeStartStates: Record<string, NodeStartState>;
 }
 
 // 定义多选缩放的节点初始状态类型（替代any）

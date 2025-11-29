@@ -252,6 +252,7 @@ export class ToolManager {
           const node = this.store.nodes[id] as BaseNodeState;
           return node && !node.isLocked;
         });
+        if (activeIds.length === 0) return;
         const startTransformMap: Record<string, TransformState> = {};
         activeIds.forEach((id) => {
           const node = this.store.nodes[id] as BaseNodeState;
@@ -722,7 +723,19 @@ export class ToolManager {
     };
   }
 
-  /** 新增：处理多选缩放控制点按下事件 */
+  // 建议的新注释：
+  /**
+   * 处理选中多个节点时，调整大小控制点上的鼠标按下事件。
+   *
+   * 初始化多节点调整大小的状态，包括
+   * 计算每个节点相对于选中区域边界的相对位置和缩放比例。锁定的节点
+   * 会被排除在调整大小的操作之外。
+   *
+   * @param {MouseEvent} e - 按下调整大小控制点时触发的鼠标事件。
+   * @param {ResizeHandle} handle - 表示调整方向的控制点（例如：'nw'、'se'）。
+   * @param {{ x: number; y: number; width: number; height: number }} startBounds - 被选中节点在调整开始时的边界矩形。
+   * @param {string[]} nodes - 包含在多选区域中的节点ID列表。
+   */
   handleMultiResizeDown(
     e: MouseEvent,
     handle: ResizeHandle,
@@ -751,10 +764,12 @@ export class ToolManager {
     validNodeIds.forEach((id) => {
       const node = this.store.nodes[id] as BaseNodeState;
       // 计算节点相对于大框的偏移比例和尺寸比例
-      const offsetX = (node.transform.x - startBounds.x) / startBounds.width;
-      const offsetY = (node.transform.y - startBounds.y) / startBounds.height;
-      const scaleX = node.transform.width / startBounds.width;
-      const scaleY = node.transform.height / startBounds.height;
+      const offsetX =
+        startBounds.width > 0 ? (node.transform.x - startBounds.x) / startBounds.width : 0;
+      const offsetY =
+        startBounds.height > 0 ? (node.transform.y - startBounds.y) / startBounds.height : 0;
+      const scaleX = startBounds.width > 0 ? node.transform.width / startBounds.width : 0;
+      const scaleY = startBounds.height > 0 ? node.transform.height / startBounds.height : 0;
 
       nodeStartStates[id] = {
         x: node.transform.x,
@@ -1009,9 +1024,29 @@ export class ToolManager {
     }
 
     // 限制最小尺寸
-    newBounds.width = Math.max(MIN_NODE_SIZE, newBounds.width);
-    newBounds.height = Math.max(MIN_NODE_SIZE, newBounds.height);
-
+    const clampedWidth = Math.max(MIN_NODE_SIZE, newBounds.width);
+    const clampedHeight = Math.max(MIN_NODE_SIZE, newBounds.height);
+    // 如果发生了clamp，且handle影响位置，则调整x/y
+    if (clampedWidth !== newBounds.width) {
+      switch (handle) {
+        case 'nw':
+        case 'w':
+        case 'sw':
+          newBounds.x = startBounds.x + startBounds.width - MIN_NODE_SIZE;
+          break;
+      }
+    }
+    if (clampedHeight !== newBounds.height) {
+      switch (handle) {
+        case 'nw':
+        case 'n':
+        case 'ne':
+          newBounds.y = startBounds.y + startBounds.height - MIN_NODE_SIZE;
+          break;
+      }
+    }
+    newBounds.width = clampedWidth;
+    newBounds.height = clampedHeight;
     // 遍历所有节点同步更新
     nodeIds.forEach((id) => {
       const startState = nodeStartStates[id];
@@ -1019,8 +1054,8 @@ export class ToolManager {
       if (!node) return;
       if (!startState) return;
       // 按比例计算新尺寸和位置
-      const newWidth = startState.scaleX * newBounds.width;
-      const newHeight = startState.scaleY * newBounds.height;
+      const newWidth = Math.max(MIN_NODE_SIZE, startState.scaleX * newBounds.width);
+      const newHeight = Math.max(MIN_NODE_SIZE, startState.scaleY * newBounds.height);
       const newX = newBounds.x + startState.offsetX * newBounds.width;
       const newY = newBounds.y + startState.offsetY * newBounds.height;
 

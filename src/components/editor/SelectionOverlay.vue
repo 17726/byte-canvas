@@ -6,6 +6,7 @@
       :key="node.id"
       class="individual-selection"
       :style="getIndividualStyle(node)"
+      v-if="selectedNodes.length > 1"
     ></div>
 
     <!-- 主选中框（单选/多选大框） -->
@@ -202,8 +203,14 @@ const onHandleDown = (e: MouseEvent, handle: ResizeHandle) => {
   const nodeIds = store.activeElements.map((node) => (node as BaseNodeState).id);
 
   // 调用多选缩放初始化方法
-  toolManagerRef.value.handleMultiResizeDown(e, handle, bounds, nodeIds);
-};
+  if (nodeIds.length === 1) {
+    if (!nodeIds[0]) return;
+    // 单选时，调用单节点缩放初始化方法
+    toolManagerRef.value.handleResizeHandleDown(e, nodeIds[0], handle);
+  } else {
+    // 多选时，调用多选缩放初始化方法
+    toolManagerRef.value.handleMultiResizeDown(e, handle, bounds, nodeIds);
+  }
 </script>
 
 <style scoped>
