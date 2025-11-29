@@ -13,21 +13,7 @@ const ui = useUIStore();
 
 // 应用启动时从 localStorage 恢复画布状态
 onMounted(() => {
-  try {
-    const restored = store.initFromStorage();
-    if (!restored) {
-      // Optionally notify user that no previous state was found/loaded
-      console.info('[App] Starting with fresh canvas state');
-      // If you have a notification system, you could use it here instead
-      // e.g., ui.notify('No previous canvas state found. Starting fresh.');
-    }
-  } catch (error) {
-    console.error('[App] Failed to restore canvas state from localStorage:', error);
-    // Optionally notify user of the error
-    // e.g., ui.notify('Failed to restore canvas state. Starting fresh.');
-    // Or use a simple alert as fallback
-    // window.alert('Failed to restore canvas state. Starting fresh.');
-  }
+  store.initFromStorage();
 });
 
 // 监听选中状态，自动展开/折叠
