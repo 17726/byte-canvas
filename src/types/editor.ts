@@ -26,3 +26,35 @@ export interface InternalResizeState {
   startNodeX: number;
   startNodeY: number;
 }
+
+// 多节点缩放状态
+export interface InternalMultiResizeState {
+    isMultiResizing: boolean;
+    handle: ResizeHandle | null;
+    nodeIds: string[];
+    startBounds: { x: number; y: number; width: number; height: number };
+    startMouseX: number;
+    startMouseY: number;
+    nodeStartStates: Record<string, {
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      offsetX: number;
+      offsetY: number;
+      scaleX: number;
+      scaleY: number;
+    }>;
+  }
+
+  // 定义多选缩放的节点初始状态类型（替代any）
+ export type NodeStartState = {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    offsetX: number;
+    offsetY: number;
+    scaleX: number;
+    scaleY: number;
+  };

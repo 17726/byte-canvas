@@ -134,8 +134,8 @@ const onHandleDown = (e: MouseEvent, handle: ResizeHandle) => {
   position: absolute;
   top: 0;
   left: 0;
-  pointer-events: none;
-  z-index: 999;
+  pointer-events: none; /* 让鼠标事件穿透到下方的节点（除了控制点） */
+  z-index: 999; /* 确保在最上层 */
 }
 
 .selection-border {
@@ -146,7 +146,7 @@ const onHandleDown = (e: MouseEvent, handle: ResizeHandle) => {
   height: 100%;
   border: 1px solid #1890ff;
   pointer-events: none;
-  box-sizing: border-box;
+  box-sizing: border-box; /* 关键：让边框包含在 width/height 内，紧贴元素 */
 }
 
 .resize-handle {
@@ -155,18 +155,54 @@ const onHandleDown = (e: MouseEvent, handle: ResizeHandle) => {
   height: 8px;
   background-color: #fff;
   border: 1px solid #1890ff;
-  border-radius: 50%;
-  pointer-events: auto;
+  border-radius: 50%; /* 圆形控制点 */
+  pointer-events: auto; /* 恢复鼠标事件响应 */
   z-index: 1000;
 }
 
 /* 控制点位置 */
-.handle-nw { top: -4px; left: -4px; cursor: nw-resize; }
-.handle-n { top: -4px; left: 50%; cursor: n-resize; }
-.handle-ne { top: -4px; right: -4px; cursor: ne-resize; }
-.handle-e { top: 50%; right: -4px; cursor: e-resize; }
-.handle-se { bottom: -4px; right: -4px; cursor: se-resize; }
-.handle-s { bottom: -4px; left: 50%; cursor: s-resize; }
-.handle-sw { bottom: -4px; left: -4px; cursor: sw-resize; }
-.handle-w { top: 50%; left: -4px; cursor: w-resize; }
+.handle-nw {
+  top: -4px;
+  left: -4px;
+  cursor: nw-resize;
+}
+.handle-n {
+  top: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  cursor: n-resize;
+}
+.handle-ne {
+  top: -4px;
+  right: -4px;
+  cursor: ne-resize;
+}
+.handle-e {
+  top: 50%;
+  right: -4px;
+  transform: translateY(-50%);
+  cursor: e-resize;
+}
+.handle-se {
+  bottom: -4px;
+  right: -4px;
+  cursor: se-resize;
+}
+.handle-s {
+  bottom: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  cursor: s-resize;
+}
+.handle-sw {
+  bottom: -4px;
+  left: -4px;
+  cursor: sw-resize;
+}
+.handle-w {
+  top: 50%;
+  left: -4px;
+  transform: translateY(-50%);
+  cursor: w-resize;
+}
 </style>

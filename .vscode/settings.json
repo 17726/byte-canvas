@@ -16,6 +16,9 @@
   "typescript.tsdk": "node_modules/typescript/lib",
   // 为Vue文件指定格式化工具
   "[vue]": {
-    "editor.defaultFormatter": "esbenp.prettier-vscode"
+    "editor.defaultFormatter": "rvest.vs-code-prettier-eslint"
+  },
+  "[typescript]": {
+    "editor.defaultFormatter": "rvest.vs-code-prettier-eslint"
   }
 }
