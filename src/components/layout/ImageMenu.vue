@@ -144,8 +144,6 @@ const loadLazyImage = (index: number) => {
     return;
   }
 
-  loadedImageIndexes.value.add(index);
-
   // 分批加载，避免一次性加载太多
   const startIndex = Math.floor(index / lazyLoadCount) * lazyLoadCount;
   const endIndex = Math.min(startIndex + lazyLoadCount, imageLibrary.value.length);
