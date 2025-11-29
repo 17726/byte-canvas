@@ -76,8 +76,9 @@ export function loadFromLocalStorage(): PersistedState | null {
 
     // 版本校验（未来可用于数据迁移）
     if (state.version !== STORAGE_VERSION) {
-      console.warn('[Persistence] 状态版本不匹配，可能需要迁移');
+      console.warn('[Persistence] 状态版本不匹配，已拒绝加载旧版本数据');
       // 这里可以添加迁移逻辑
+      return null;
     }
 
     console.log('[Persistence] 从 localStorage 加载状态成功');
