@@ -46,11 +46,16 @@ const isSelected = computed(() => store.activeElementIds.has(props.node.id));
   display: flex;
   align-items: center;
   justify-content: center;
+  cursor: move; /* 显示拖拽光标 */
+  user-select: none; /* 禁止文本选择，防止出现输入光标 */
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
 }
 
 .is-selected {
   /* 选中时的视觉反馈 - 使用 outline 和阴影来突出显示 */
-  outline: 2px solid #1890ff;
-  box-shadow: 0 0 0 4px rgba(24, 144, 255, 0.2);
+  /* outline: 2px solid #1890ff; */
+  /* box-shadow: 0 0 0 4px rgba(24, 144, 255, 0.2); */
 }
 </style>

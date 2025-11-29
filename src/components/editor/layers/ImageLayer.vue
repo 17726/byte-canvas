@@ -113,7 +113,7 @@ const filterStyle = computed(() => {
 .node-image img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: fill;
   display: block;
   /** NOTE: 让鼠标事件从img穿透到父容器div
       因为我们监听的是div上的mousedown 同时禁止事件冒泡 这里不穿透的话光标在img上时无法拖拽*/
@@ -122,8 +122,8 @@ const filterStyle = computed(() => {
 
 .is-selected {
   /* 选中时的视觉反馈 */
-  outline: 2px solid #1890ff;
+  /* outline: 2px solid #1890ff;
   outline-offset: 0; /* 确保 outline 不会触发焦点 */
-  box-shadow: 0 0 0 4px rgba(24, 144, 255, 0.2);
+  /* box-shadow: 0 0 0 4px rgba(24, 144, 255, 0.2); */
 }
 </style>

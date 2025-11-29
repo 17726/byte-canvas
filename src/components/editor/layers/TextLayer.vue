@@ -37,8 +37,8 @@ const isSelected = computed(() => store.activeElementIds.has(props.node.id));
 
 .is-selected {
   /* 选中时的视觉反馈 */
-  outline: 2px solid #1890ff;
-  box-shadow: 0 0 0 4px rgba(24, 144, 255, 0.2);
+  /* outline: 2px solid #1890ff;
+  box-shadow: 0 0 0 4px rgba(24, 144, 255, 0.2); */
 }
 
 /* 文本框 为文本的父组件(容器) */

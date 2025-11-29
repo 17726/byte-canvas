@@ -1,8 +1,10 @@
 <template>
+  <!-- 遍历渲染所有选中节点的覆盖层 -->
   <div
-    v-if="selectedNode && !selectedNode.isLocked"
+    v-for="node in unlockedActiveElements"
+    :key="node.id"
     class="selection-overlay"
-    :style="overlayStyle"
+    :style="getOverlayStyle(node)"
   >
     <!-- 选中框边框 -->
     <div class="selection-border"></div>
@@ -14,16 +16,17 @@
       class="resize-handle"
       :class="`handle-${handle}`"
       :style="getHandleStyle(handle)"
-      @mousedown.stop.prevent="onHandleDown($event, handle)"
+      @mousedown.stop.prevent="onHandleDown($event, node, handle)"
     ></div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, inject, type Ref } from 'vue';
+import { inject, computed, type Ref } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
 import type { ToolManager } from '@/core/tools/ToolManager';
 import type { ResizeHandle } from '@/types/editor';
+import type { NodeState } from '@/types/state';
 
 const store = useCanvasStore();
 const toolManagerRef = inject<Ref<ToolManager | null>>('toolManager');
@@ -34,24 +37,18 @@ if (!toolManagerRef) {
 
 const handles: ResizeHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
 
-// 目前仅支持单选节点的缩放
-const selectedNode = computed(() => {
-  if (store.activeElements.length === 1) {
-    return store.activeElements[0];
-  }
-  return null;
+// 过滤出未锁定的选中节点
+const unlockedActiveElements = computed(() => {
+  return store.activeElements.filter((node): node is NodeState => !!node && !node.isLocked);
 });
 
-const overlayStyle = computed(() => {
-  const node = selectedNode.value;
-  if (!node) return {};
-
+const getOverlayStyle = (node: NodeState) => {
   return {
     transform: `translate(${node.transform.x}px, ${node.transform.y}px) rotate(${node.transform.rotation}deg)`,
     width: `${node.transform.width}px`,
     height: `${node.transform.height}px`,
   };
-});
+};
 
 const getHandleStyle = (handle: ResizeHandle) => {
   const scale = 1 / store.viewport.zoom;
@@ -75,21 +72,21 @@ const getHandleStyle = (handle: ResizeHandle) => {
   };
 };
 
-const onHandleDown = (e: MouseEvent, handle: ResizeHandle) => {
+const onHandleDown = (e: MouseEvent, node: NodeState, handle: ResizeHandle) => {
   console.log(
     '🖱️ Handle mousedown:',
     handle,
     'toolManager:',
     !!toolManagerRef?.value,
-    'selectedNode:',
-    !!selectedNode.value
+    'node:',
+    node.id
   );
-  if (selectedNode.value && toolManagerRef?.value) {
-    toolManagerRef.value.handleResizeHandleDown(e, selectedNode.value.id, handle);
+  if (node && toolManagerRef?.value) {
+    toolManagerRef.value.handleResizeHandleDown(e, node.id, handle);
   } else {
-    console.error('❌ Missing toolManager or selectedNode!', {
+    console.error('❌ Missing toolManager or node!', {
       toolManager: !!toolManagerRef?.value,
-      selectedNode: !!selectedNode.value,
+      node: !!node,
     });
   }
 };
@@ -102,8 +99,6 @@ const onHandleDown = (e: MouseEvent, handle: ResizeHandle) => {
   left: 0;
   pointer-events: none; /* 让鼠标事件穿透到下方的节点（除了控制点） */
   z-index: 999; /* 确保在最上层 */
-  /* 调试用 */
-  /* border: 1px dashed red; */
 }
 
 .selection-border {
@@ -114,6 +109,7 @@ const onHandleDown = (e: MouseEvent, handle: ResizeHandle) => {
   height: 100%;
   border: 1px solid #1890ff;
   pointer-events: none;
+  box-sizing: border-box; /* 关键：让边框包含在 width/height 内，紧贴元素 */
 }
 
 .resize-handle {
