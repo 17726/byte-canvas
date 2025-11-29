@@ -651,26 +651,116 @@ export class ToolManager {
   /**
    * 业务逻辑：创建图片
    */
-  createImage() {
+  async createImageWithUrl(imageUrl = DEFAULT_IMAGE_URL) {
     const id = uuidv4();
-    // 随机位置
-    const x = Math.random() * 800;
-    const y = Math.random() * 600;
 
+    try {
+      // 获取图片原始尺寸
+      const dimensions = await this.getImageDimensions(imageUrl);
+
+      // 尺寸限制
+      const MAX_SIZE = 400;
+      const MIN_SIZE = 50;
+
+      let { width, height } = dimensions;
+
+      // 如果图片太大，等比例缩放
+      if (width > MAX_SIZE || height > MAX_SIZE) {
+        const ratio = Math.min(MAX_SIZE / width, MAX_SIZE / height);
+        width = Math.floor(width * ratio);
+        height = Math.floor(height * ratio);
+      }
+
+      // 确保不小于最小尺寸
+      if (width < MIN_SIZE || height < MIN_SIZE) {
+        const ratio = Math.max(MIN_SIZE / width, MIN_SIZE / height);
+        width = Math.floor(width * ratio);
+        height = Math.floor(height * ratio);
+      }
+
+      const newImage: ImageState = {
+        id,
+        type: NodeType.IMAGE,
+        name: 'Image',
+        transform: {
+          x: Math.random() * 800,
+          y: Math.random() * 600,
+          width: width,
+          height: height,
+          rotation: 0,
+        },
+        style: { ...DEFAULT_IMAGE_STYLE },
+        props: {
+          imageUrl: imageUrl,
+          filters: { ...DEFAULT_IMAGE_FILTERS },
+        },
+        parentId: null,
+        isLocked: false,
+        isVisible: true,
+      };
+
+      this.store.addNode(newImage);
+      this.store.setActive([id]);
+      console.log('图片创建完成，尺寸:', width, 'x', height);
+
+    } catch (error) {
+      console.warn('获取图片尺寸失败，使用默认尺寸:', error);
+      // 降级方案：使用默认尺寸
+      this.createImageWithDefaultSize(id, imageUrl);
+    }
+  }
+
+  // 获取图片尺寸的辅助方法
+  private getImageDimensions(url: string): Promise<{width: number, height: number}> {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+
+      img.onload = () => {
+        resolve({
+          width: img.naturalWidth,
+          height: img.naturalHeight
+        });
+      };
+
+      img.onerror = () => {
+        reject(new Error(`图片加载失败: ${url}`));
+      };
+
+      // 设置超时
+      const timeoutId = setTimeout(() => {
+        img.onload = null;
+        img.onerror = null;
+        reject(new Error(`图片加载超时: ${url}`));
+      }, 5000);
+
+      img.onload = () => {
+        clearTimeout(timeoutId);
+        resolve({
+          width: img.naturalWidth,
+          height: img.naturalHeight
+        });
+      };
+
+      img.src = url;
+    });
+  }
+
+  // 降级方法：使用默认尺寸
+  private createImageWithDefaultSize(id: string, imageUrl: string) {
     const newImage: ImageState = {
       id,
       type: NodeType.IMAGE,
       name: 'Image',
       transform: {
-        x,
-        y,
+        x: Math.random() * 800,
+        y: Math.random() * 600,
         width: DEFAULT_NODE_SIZE,
         height: DEFAULT_NODE_SIZE,
         rotation: 0,
       },
       style: { ...DEFAULT_IMAGE_STYLE },
       props: {
-        imageUrl: DEFAULT_IMAGE_URL,
+        imageUrl: imageUrl,
         filters: { ...DEFAULT_IMAGE_FILTERS },
       },
       parentId: null,
@@ -680,7 +770,7 @@ export class ToolManager {
 
     this.store.addNode(newImage);
     this.store.setActive([id]);
-    console.log('图片创建完成');
+    console.log('使用默认尺寸创建图片');
   }
 
   /**

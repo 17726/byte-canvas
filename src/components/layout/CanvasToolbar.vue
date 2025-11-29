@@ -28,11 +28,10 @@
         <template #icon><icon-edit /></template>
         文本
       </a-menu-item>
-      <!-- 照片创建按钮 -->
-      <a-menu-item key="addImage">
-        <template #icon><icon-image /></template>
-        图片
-      </a-menu-item>
+
+      <!-- 图片创建按钮 -->
+      <ImageMenu />
+
       <!-- 元素删除按钮 -->
       <a-menu-item key="deleteSelected" :disabled="!hasSelection">
         <template #icon><icon-delete /></template>
@@ -55,13 +54,14 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import { IconPlus, IconEdit, IconImage, IconDelete } from '@arco-design/web-vue/es/icon';
+import { IconPlus, IconEdit,  IconDelete } from '@arco-design/web-vue/es/icon';
 //TODO：UI开发完成后优化icon-park库的导入，针对按需导入减小打包体积
 import { Square, Round } from '@icon-park/vue-next';
 import { useCanvasStore } from '@/store/canvasStore';
 import { ToolManager } from '@/core/tools/ToolManager';
 // DEFAULT_CANVAS_THEMES moved to header
 import { Notification } from '@arco-design/web-vue';
+import ImageMenu from './ImageMenu.vue';
 
 //NOTE：按钮返回值需提前在MenuKey进行注册
 enum MenuKey {
@@ -85,6 +85,7 @@ const selectedKeys = ref<string[]>([]);
 // 弹窗确认-弹窗开关
 const delModalVisible = ref(false);
 
+
 function onMenuItemClick(key: string) {
   switch (key) {
     case MenuKey.AddRect:
@@ -102,11 +103,12 @@ function onMenuItemClick(key: string) {
       toolManager.createText();
       selectedKeys.value = [key];
       break;
-    case MenuKey.AddImage:
-      console.log('图片被点击');
-      toolManager.createImage();
-      selectedKeys.value = [key];
-      break;
+    //NOTE: 菜单项不支持预览图 故创建图片独立出去处理
+    // case MenuKey.AddImage:
+    //   console.log('图片被点击');
+    //   toolManager.createImage(imageUrl);
+    //   selectedKeys.value = [key];
+    //   break;
     case MenuKey.Delete:
       if (!hasSelection.value) return;
       delModalVisible.value = true;
