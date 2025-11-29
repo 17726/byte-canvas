@@ -879,6 +879,25 @@ export class ToolManager {
           }
         );
         break;
+      case NodeType.GROUP:
+        // 组合：等比缩放所有子元素
+        // TODO: 实现组合缩放逻辑
+        this.resizeRect(
+          handle,
+          dx,
+          dy,
+          startWidth,
+          startHeight,
+          startNodeX,
+          startNodeY,
+          (result) => {
+            newWidth = result.width;
+            newHeight = result.height;
+            newX = result.x;
+            newY = result.y;
+          }
+        );
+        break;
       default:
         this.resizeRect(handle, dx, dy, startWidth, startHeight, startNodeX, startNodeY, (res) => {
           newWidth = res.width;
