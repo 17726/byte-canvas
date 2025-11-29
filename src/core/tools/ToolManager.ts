@@ -1,9 +1,9 @@
 import type { InternalResizeState, ResizeHandle } from '@/types/editor';
-import { clientToWorld } from '@/core/utils/geometry';
+import { clientToWorld, isNodeInRect } from '@/core/utils/geometry';
 import { useCanvasStore } from '@/store/canvasStore';
 import { useUIStore } from '@/store/uiStore';
 import type { InternalDragState } from '@/types/editor';
-import type { ViewportState } from '@/types/state';
+import type { ViewportState, TransformState } from '@/types/state';
 import {
   NodeType,
   type BaseNodeState,
@@ -43,26 +43,26 @@ export class ToolManager {
   private ui: ReturnType<typeof useUIStore>;
   private isPanDragging = false;
   private lastPos = { x: 0, y: 0 };
+  private stageEl: HTMLElement | null; // 画布根元素
 
   /**
    *临时拖动状态
    */
-  private dragState: InternalDragState = {
-    isDragging: false, // 是否正在拖拽节点
-    type: null, // 拖拽类型：移动/缩放/旋转
-    nodeId: '', // 被拖拽的节点ID
-    startMouseX: 0, // 拖拽起始鼠标屏幕X
-    startMouseY: 0, // 拖拽起始鼠标屏幕Y
-    startTransform: {
-      // 节点起始位置/尺寸（深拷贝，避免引用同步）
-      x: 0,
-      y: 0,
-      width: 0,
-      height: 0,
-      rotation: 0,
-    },
+  private dragState: InternalDragState & {
+    // 改为TransformState类型（与节点的transform类型一致）
+    startTransformMap: Record<string, TransformState>;
+  } = {
+    isDragging: false,
+    type: null,
+    nodeId: '',
+    startMouseX: 0,
+    startMouseY: 0,
+    // 同时将startTransform的类型明确为TransformState
+    startTransform: { x: 0, y: 0, width: 0, height: 0, rotation: 0 } as TransformState,
+    startTransformMap: {}, // 初始值为空对象，类型匹配
   };
 
+  /** 缩放状态（修正：移到类属性区，与dragState同级） */
   private resizeState: InternalResizeState = {
     isResizing: false,
     handle: null,
@@ -75,9 +75,25 @@ export class ToolManager {
     startNodeY: 0,
   };
 
-  constructor() {
+  // 框选相关状态
+  private isBoxSelecting = false;
+  private boxSelectStart = { x: 0, y: 0 };
+  private boxSelectEnd = { x: 0, y: 0 };
+
+  constructor(stageEl: HTMLElement | null) {
     this.store = useCanvasStore();
     this.ui = useUIStore();
+    this.stageEl = stageEl; // 保存画布根元素引用
+  }
+
+  /** 暴露框选状态给Vue组件 */
+  getBoxSelectState() {
+    return {
+      isDragging: this.dragState.isDragging,
+      isBoxSelecting: this.isBoxSelecting,
+      boxSelectStart: { ...this.boxSelectStart },
+      boxSelectEnd: { ...this.boxSelectEnd },
+    };
   }
 
   /**
@@ -107,11 +123,16 @@ export class ToolManager {
     this.lastPos.x = e.clientX;
     this.lastPos.y = e.clientY;
 
-    // 点击空白处，取消所有选中
-    this.store.setActive([]);
-
-    // 标记开始拖拽 (平移画布)
-    this.isPanDragging = true;
+    if (e.button === 1) {
+      // 中键平移：取消所有选中
+      this.isPanDragging = true;
+      this.store.setActive([]);
+    } else if (e.button === 0) {
+      // 左键框选：点击空白才会触发框选（后续取消选中）
+      this.isBoxSelecting = true;
+      this.boxSelectStart = { x: e.clientX, y: e.clientY };
+      this.boxSelectEnd = { x: e.clientX, y: e.clientY };
+    }
   }
 
   /**
@@ -139,6 +160,11 @@ export class ToolManager {
 
       this.lastPos.x = e.clientX;
       this.lastPos.y = e.clientY;
+      return;
+    }
+
+    if (this.isBoxSelecting) {
+      this.boxSelectEnd = { x: e.clientX, y: e.clientY };
     }
   }
 
@@ -148,11 +174,18 @@ export class ToolManager {
   handleMouseUp() {
     // 重置画布平移状态
     this.isPanDragging = false;
+    this.handleNodeUp();
+
+    if (this.isBoxSelecting) {
+      this.finishBoxSelect();
+      this.isBoxSelecting = false;
+    }
 
     // 重置节点拖拽状态
     this.dragState.isDragging = false;
     this.dragState.type = null;
     this.dragState.nodeId = '';
+    this.dragState.startTransformMap = {}; // 新增：重置多节点初始状态映射
 
     // 重置缩放状态
     this.resizeState.isResizing = false;
@@ -163,24 +196,79 @@ export class ToolManager {
     this.store.isInteracting = false;
   }
 
+  /** 结束框选，计算并选中区域内的节点 */
+  private finishBoxSelect() {
+    const stageRect = this.stageEl ? this.stageEl.getBoundingClientRect() : { left: 0, top: 0 };
+
+    const minScreenX = Math.min(
+      this.boxSelectStart.x - stageRect.left,
+      this.boxSelectEnd.x - stageRect.left
+    );
+    const maxScreenX = Math.max(
+      this.boxSelectStart.x - stageRect.left,
+      this.boxSelectEnd.x - stageRect.left
+    );
+    const minScreenY = Math.min(
+      this.boxSelectStart.y - stageRect.top,
+      this.boxSelectEnd.y - stageRect.top
+    );
+    const maxScreenY = Math.max(
+      this.boxSelectStart.y - stageRect.top,
+      this.boxSelectEnd.y - stageRect.top
+    );
+
+    const boxArea = (maxScreenX - minScreenX) * (maxScreenY - minScreenY);
+    if (boxArea < 4) {
+      // 框选面积过小 = 点击空白处：取消所有选中
+      this.store.setActive([]);
+      return;
+    }
+
+    const viewport = this.store.viewport as ViewportState;
+    const worldMin = clientToWorld(viewport, minScreenX, minScreenY);
+    const worldMax = clientToWorld(viewport, maxScreenX, maxScreenY);
+
+    const selectedIds: string[] = [];
+    Object.entries(this.store.nodes).forEach(([id, node]) => {
+      const baseNode = node as BaseNodeState;
+      if (baseNode.isLocked) return;
+
+      if (isNodeInRect(worldMax.x, worldMax.y, worldMin.x, worldMin.y, baseNode)) {
+        selectedIds.push(id);
+      }
+    });
+
+    this.store.setActive(selectedIds);
+  }
+
   /**
    * 处理节点鼠标按下事件（选中/开始拖拽）
-   * - 单击：设置单选
-   * - Ctrl/Cmd + 单击：多选切换
+   * - 单击已选中节点：保留多选状态
+   * - 单击未选中节点：设置单选
+   * - Ctrl/Shift + 单击：多选切换
    * - 选中后将右侧属性面板激活到 Node 模式（store.activePanel = 'node'）
    */
   handleNodeDown(e: MouseEvent, id: string) {
     // 1.阻止事件冒泡，避免触发画布的 handleMouseDown (导致取消选中)
     e.stopPropagation();
 
-    // 2. 多选逻辑：按住 Ctrl/Cmd 键时切换选中状态
-    if (e.ctrlKey || e.metaKey) {
-      // Ctrl/Cmd + 点击：切换选中状态（多选模式）
+    // 如果正在缩放，不处理节点拖拽
+    if (this.resizeState.isResizing) return;
+
+    // 2. 多选逻辑核心修改：框选后点击已选中节点不取消多选
+    if (e.ctrlKey || e.shiftKey) {
+      // Ctrl/Shift + 点击：切换选中状态（多选模式）
       this.store.toggleSelection(id);
-      return;
     } else {
-      // 普通点击：单选模式
-      this.store.setActive([id]);
+      // 无快捷键时：
+      // - 点击已选中的节点 → 保留现有多选
+      // - 点击未选中的节点 → 重置为单选
+      if (this.store.activeElementIds.has(id)) {
+        // 点击已选中的节点，不修改选中状态（保留多选）
+      } else {
+        // 点击未选中的节点，重置为单选
+        this.store.setActive([id]);
+      }
     }
 
     // 3. 获取节点数据，校验有效性
@@ -193,36 +281,49 @@ export class ToolManager {
     this.ui.setActivePanel('node');
     this.ui.setPanelExpanded(true);
 
+    // 5. 初始化拖拽状态（适配多选拖拽）
+    const activeIds = Array.from(this.store.activeElementIds).filter((activeId) => {
+      // 过滤锁定节点，避免拖拽锁定节点
+      const activeNode = this.store.nodes[activeId] as BaseNodeState;
+      return activeNode && !activeNode.isLocked;
+    });
+
+    // 初始化多节点初始变换状态映射
+    const startTransformMap: Record<string, typeof node.transform> = {};
+    activeIds.forEach((activeId) => {
+      const activeNode = this.store.nodes[activeId] as BaseNodeState;
+      startTransformMap[activeId] = { ...activeNode.transform };
+    });
+
     // 5. 初始化拖拽状态（深拷贝节点初始transform，避免引用同步）
     this.dragState = {
       isDragging: true,
       type: 'move',
-      nodeId: id,
+      nodeId: id, // 基准节点（鼠标点击的节点）
       startMouseX: e.clientX,
       startMouseY: e.clientY,
-      startTransform: { ...node.transform },
+      startTransform: { ...node.transform }, // 基准节点初始状态
+      startTransformMap, // 新增：所有选中节点的初始状态
     };
   }
 
   /**
    * 节点鼠标移动事件（处理拖拽位移计算）
+   * 新增：支持多选节点同步拖拽
    */
   handleNodeMove(e: MouseEvent) {
     // 1. 非拖拽状态，直接返回
     if (!this.dragState.isDragging || !this.dragState.nodeId) return;
-
     // 如果没有按住鼠标，强制结束拖拽
     if ((e.buttons & 1) === 0) {
       this.handleNodeUp();
       return;
     }
-
     // 2. 获取视口状态（画布缩放/平移/网格配置）
     const viewport = this.store.viewport as ViewportState;
-    const node = this.store.nodes[this.dragState.nodeId] as BaseNodeState;
-    if (!node) return;
+    const baseNode = this.store.nodes[this.dragState.nodeId] as BaseNodeState;
+    if (!baseNode) return;
 
-    // 3. 屏幕坐标 → 画布世界坐标（抵消画布缩放/平移）
     const currentWorldPos = clientToWorld(viewport, e.clientX, e.clientY);
     const startWorldPos = clientToWorld(
       viewport,
@@ -234,22 +335,28 @@ export class ToolManager {
     const deltaX = currentWorldPos.x - startWorldPos.x;
     const deltaY = currentWorldPos.y - startWorldPos.y;
 
-    // 5. 计算节点新位置（初始位置 + 偏移）
-    const newX = this.dragState.startTransform.x + deltaX;
-    const newY = this.dragState.startTransform.y + deltaY;
+    // 5. 多选拖拽：遍历所有选中节点，同步应用偏移量
+    Object.entries(this.dragState.startTransformMap).forEach(([nodeId, startTransform]) => {
+      const node = this.store.nodes[nodeId] as BaseNodeState;
+      if (!node || node.isLocked) return;
 
-    // TODO: Implement grid snapping逻辑（如果 viewport.isSnapToGrid 为 true）
-    // 该逻辑应该在世界坐标系中进行（已转换为 world 坐标），以保证缩放/平移下 snapping 的一致性
-    // Example:
-    // if (viewport.isSnapToGrid) {
-    //   const snapped = snapToGrid(viewport, newX, newY);
-    //   newX = snapped.x;
-    //   newY = snapped.y;
-    // }
+      // 计算节点新位置（初始位置 + 偏移）
+      const newX = startTransform.x + deltaX;
+      const newY = startTransform.y + deltaY;
 
-    // 7. 细粒度更新节点位置（触发响应式刷新）
-    this.store.updateNode(this.dragState.nodeId, {
-      transform: { ...node.transform, x: newX, y: newY },
+      // TODO: Implement grid snapping逻辑（如果 viewport.isSnapToGrid 为 true）
+      // 该逻辑应该在世界坐标系中进行（已转换为 world 坐标），以保证缩放/平移下 snapping 的一致性
+      // Example:
+      // if (viewport.isSnapToGrid) {
+      //   const snapped = snapToGrid(viewport, newX, newY);
+      //   newX = snapped.x;
+      //   newY = snapped.y;
+      // }
+
+      // 7. 细粒度更新节点位置（触发响应式刷新）
+      this.store.updateNode(nodeId, {
+        transform: { ...node.transform, x: newX, y: newY },
+      });
     });
   }
 
@@ -257,21 +364,24 @@ export class ToolManager {
    * 节点鼠标松开事件（重置拖拽状态）
    */
   handleNodeUp() {
-    // 1. 重置拖拽状态
-    this.dragState.isDragging = false;
-    this.dragState.type = null;
-    this.dragState.nodeId = '';
-
-    // 2. 解除交互锁
+    // 修正：移除重复的 dragState 重置（仅保留整体重置即可）
+    this.dragState = {
+      isDragging: false,
+      type: null,
+      nodeId: '',
+      startMouseX: 0,
+      startMouseY: 0,
+      startTransform: { x: 0, y: 0, width: 0, height: 0, rotation: 0 },
+      startTransformMap: {}, // 新增：重置多节点初始状态映射
+    };
+    // 解除交互锁
     this.store.isInteracting = false;
-
-    // 3. 可选：触发节点拖拽结束的钩子（如保存、日志）
-    // this.emit('nodeDragEnd', e, this.dragState.nodeId);
   }
 
   /**
    * 业务逻辑：创建矩形
    */
+  /** 创建矩形 */
   createRect() {
     const id = uuidv4();
     // 随机位置
@@ -302,12 +412,12 @@ export class ToolManager {
     this.store.setActive([id]);
     console.log('矩形创建完成');
   }
+
   /**
    * 业务逻辑：创建圆形
    */
   createCircle() {
     const id = uuidv4();
-    // 随机位置
     const x = Math.random() * 800;
     const y = Math.random() * 600;
 
@@ -416,12 +526,18 @@ export class ToolManager {
    */
   handleResizeHandleDown(e: MouseEvent, nodeId: string, handle: ResizeHandle) {
     e.stopPropagation();
+    e.preventDefault(); // 阻止默认行为
 
     const node = this.store.nodes[nodeId];
     if (!node || node.isLocked) return;
 
     // 标记交互中
     this.store.isInteracting = true;
+
+    // 重置拖拽状态，确保不会与缩放冲突
+    this.dragState.isDragging = false;
+    this.dragState.type = null;
+    this.dragState.nodeId = '';
 
     this.resizeState = {
       isResizing: true,
@@ -443,7 +559,10 @@ export class ToolManager {
     const { handle, nodeId, startX, startY, startWidth, startHeight, startNodeX, startNodeY } =
       this.resizeState;
 
-    if (!handle || !nodeId) return;
+    if (!handle || !nodeId) {
+      console.log('⚠️ handleResizeMove: no handle or nodeId', { handle, nodeId });
+      return;
+    }
 
     // 如果没有按住鼠标左键，强制结束缩放
     if ((e.buttons & 1) === 0) {
@@ -860,4 +979,4 @@ export class ToolManager {
   }
 }
 
-// 导出类型以便在组件中使用
+// 导出类型以便在组件中使用在此基础上实现ctr/shift按住可实现多选拖拽功能
