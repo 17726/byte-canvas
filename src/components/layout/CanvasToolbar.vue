@@ -78,7 +78,7 @@ const hasSelection = computed(() => store.activeElementIds.size > 0);
 // Settings handled by header component now
 
 // 元素控制底层组件
-const toolManagerRef = inject<Ref<ToolManager | null>>('toolManager', ref(null));
+const toolManager = new ToolManager(null, () => false);
 
 // 高亮控制
 const selectedKeys = ref<string[]>([]);
@@ -90,19 +90,25 @@ function onMenuItemClick(key: string) {
   switch (key) {
     case MenuKey.AddRect:
       console.log('矩形被点击');
-      toolManagerRef.value?.createRect(); // 改为用注入的实例调用
+      toolManager.createRect();
       selectedKeys.value = [key];
       break;
     case MenuKey.AddCircle:
       console.log('圆被点击');
-      toolManagerRef.value?.createCircle(); // 改为用注入的实例调用
+      toolManager.createCircle();
       selectedKeys.value = [key];
       break;
     case MenuKey.AddText:
       console.log('文本被点击');
-      toolManagerRef.value?.createText(); // 改为用注入的实例调用
+      toolManager.createText();
       selectedKeys.value = [key];
       break;
+    //NOTE: 菜单项不支持预览图 故创建图片独立出去处理
+    // case MenuKey.AddImage:
+    //   console.log('图片被点击');
+    //   toolManager.createImage(imageUrl);
+    //   selectedKeys.value = [key];
+    //   break;
     case MenuKey.Delete:
       if (!hasSelection.value) return;
       delModalVisible.value = true;
@@ -114,14 +120,14 @@ function onMenuItemClick(key: string) {
 }
 
 function onDeleteConfirm() {
-  toolManagerRef.value?.deleteSelected(); // 改为用注入的实例调用
+  toolManager.deleteSelected();
   Notification.success({
     content: '删除成功！',
     closable: true,
     duration: 3000,
   });
-  selectedKeys.value = [];
-  delModalVisible.value = false;
+  selectedKeys.value = []; // 清空选中状态
+  delModalVisible.value = false; // 关闭弹窗
 }
 </script>
 

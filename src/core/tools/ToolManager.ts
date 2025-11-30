@@ -106,9 +106,6 @@ export class ToolManager {
     this.ui = useUIStore();
     this.stageEl = stageEl; // 保存画布根元素引用
     this.getIsSpacePressed = getIsSpacePressed; // 接收外部状态
-
-    // 移除内部键盘监听初始化
-    // this.initKeyboardListeners();
   }
 
   /**
@@ -213,8 +210,29 @@ export class ToolManager {
    * - e.preventDefault() 阻止页面滚动
    * - 这里以窗口中心为基准进行缩放，可改为以鼠标为缩放中心（更符合用户期望）
    */
+  /**
+   * 处理画布滚轮事件（缩放）
+   * - e.preventDefault() 阻止页面滚动
+   * - 这里以窗口中心为基准进行缩放，可改为以鼠标为缩放中心（更符合用户期望）
+   */
+  /**
+   * 处理画布滚轮事件（缩放）
+   * - e.preventDefault() 阻止页面滚动
+   * - 这里以窗口中心为基准进行缩放，可改为以鼠标为缩放中心（更符合用户期望）
+   */
   handleWheel(e: WheelEvent) {
     e.preventDefault();
+    // 新增：触摸板双指平移逻辑（无Ctrl键时触发）
+    if (!(e.ctrlKey || e.shiftKey) && (e.deltaX !== 0 || e.deltaY !== 0)) {
+      // 平移偏移量适配画布缩放比例，保证平移速度一致
+      const dx = -e.deltaX / this.store.viewport.zoom;
+      const dy = -e.deltaY / this.store.viewport.zoom;
+      this.store.viewport.offsetX += dx;
+      this.store.viewport.offsetY += dy;
+      return; // 平移时跳过缩放逻辑
+    }
+
+    // 原有缩放逻辑（完全保留，注释不变）
     const zoomSensitivity = 0.001;
     const delta = -e.deltaY * zoomSensitivity;
     const newZoom = Math.max(0.1, Math.min(5, this.store.viewport.zoom + delta));
@@ -222,7 +240,6 @@ export class ToolManager {
     // TODO: 以鼠标为中心缩放
     this.store.viewport.zoom = newZoom;
   }
-
   /**
    * 处理画布鼠标按下事件（平移开始 / 取消选中 / 多选区域拖拽启动）
    * - 【核心修改】按下空格+左键：无论点击位置，强制进入平移模式
@@ -818,7 +835,7 @@ export class ToolManager {
     }
 
     // ========== 新增：Shift键等比缩放处理 ==========
-    if (e.shiftKey) {
+    if (e.shiftKey || e.ctrlKey) {
       const originalRatio = startWidth / startHeight;
       // 计算基于宽度/高度的等比值，优先以主要变化轴为准
       let ratioBasedWidth = newWidth;
@@ -869,7 +886,7 @@ export class ToolManager {
         newX = startNodeX + startWidth - minSize;
       }
       // 等比调整高度
-      if (e.shiftKey) {
+      if (e.shiftKey || e.ctrlKey) {
         newHeight = newWidth / (startWidth / startHeight);
       }
     }
@@ -879,7 +896,7 @@ export class ToolManager {
         newY = startNodeY + startHeight - minSize;
       }
       // 等比调整宽度
-      if (e.shiftKey) {
+      if (e.shiftKey || e.ctrlKey) {
         newWidth = newHeight * (startWidth / startHeight);
       }
     }
@@ -967,7 +984,7 @@ export class ToolManager {
     }
 
     // ========== 新增：Shift键等比缩放处理 ==========
-    if (e.shiftKey) {
+    if (e.shiftKey || e.ctrlKey) {
       const originalRatio = startBounds.width / startBounds.height;
       // 计算等比后的宽高
       let ratioBasedWidth = newBounds.width;
@@ -1048,7 +1065,7 @@ export class ToolManager {
       // ========== 新增：Shift键等比缩放处理 ==========
       let finalScaleX = scaleX;
       let finalScaleY = scaleY;
-      if (e.shiftKey) {
+      if (e.shiftKey || e.ctrlKey) {
         // 等比缩放时使用统一的缩放比例
         const uniformScale = Math.sqrt(scaleX * scaleY); // 几何平均保证等比
         finalScaleX = uniformScale;
