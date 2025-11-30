@@ -4,7 +4,7 @@ import type {
   InternalMultiResizeState,
   NodeStartState,
 } from '@/types/editor';
-import { clientToWorld, isNodeInRect } from '@/core/utils/geometry';
+import { clientToWorld, isNodeInRect, calculateBounds } from '@/core/utils/geometry';
 import { useCanvasStore } from '@/store/canvasStore';
 import { useUIStore } from '@/store/uiStore';
 import type { InternalDragState } from '@/types/editor';
@@ -15,6 +15,7 @@ import {
   type ImageState,
   type ShapeState,
   type TextState,
+  type GroupState,
 } from '@/types/state';
 import { v4 as uuidv4 } from 'uuid';
 import {
@@ -214,6 +215,7 @@ export class ToolManager {
    * 处理画布鼠标按下事件（平移开始 / 取消选中 / 多选区域拖拽启动）
    * - 点击空白区，会取消所有选中并将画布置为拖拽(pan)状态
    * - 新增：如果有选中节点且点击在选中区域空白处，启动多选区域拖拽
+   * - 新增：如果在组合编辑模式下点击空白区域，退出编辑模式
    */
   handleMouseDown(e: MouseEvent) {
     // 互斥逻辑：如果正在拖拽节点，不触发画布平移
@@ -227,6 +229,10 @@ export class ToolManager {
       // 中键平移：取消所有选中
       this.isPanDragging = true;
       this.store.setActive([]);
+      // 退出组合编辑模式
+      if (this.store.editingGroupId) {
+        this.exitGroupEdit();
+      }
     } else if (e.button === 0) {
       // 新增：判断是否点击在选中区域空白处 → 启动多选区域拖拽
       const hasActiveNodes = this.store.activeElementIds.size > 0;
@@ -259,6 +265,11 @@ export class ToolManager {
           isMultiAreaDrag: true,
         };
         return; // 阻止后续框选逻辑
+      }
+
+      // 点击空白区域时，如果在组合编辑模式下，退出编辑模式
+      if (this.store.editingGroupId) {
+        this.exitGroupEdit();
       }
 
       // 原有框选逻辑
@@ -531,6 +542,236 @@ export class ToolManager {
   }
 
   /**
+   * 处理节点双击事件（用于进入组合编辑模式）
+   * @param e 鼠标事件
+   * @param id 节点ID
+   */
+  handleNodeDoubleClick(e: MouseEvent, id: string) {
+    e.stopPropagation();
+
+    const node = this.store.nodes[id];
+    if (!node) return;
+
+    // 如果双击的是组合节点，进入编辑模式
+    if (node.type === NodeType.GROUP) {
+      this.enterGroupEdit(id);
+    }
+    this.store.isInteracting = false;
+  }
+
+  // ==================== 组合/解组合功能 ====================
+
+  /**
+   * 将选中的元素组合成一个组
+   * 支持嵌套组合：可以将已有的组合元素与其他元素一起组合
+   * @returns 新创建的组合ID，失败返回null
+   */
+  groupSelected(): string | null {
+    const selectedIds = Array.from(this.store.activeElementIds);
+    if (selectedIds.length < 2) {
+      console.log('[Group] 需要至少选中2个元素才能组合');
+      return null;
+    }
+
+    // 过滤掉不存在的节点
+    const validIds = selectedIds.filter((id) => this.store.nodes[id]);
+    if (validIds.length < 2) {
+      console.log('[Group] 有效元素不足2个');
+      return null;
+    }
+
+    // 计算组合的边界框
+    const bounds = calculateBounds(this.store.nodes, validIds);
+
+    // 创建新的组合节点
+    const groupId = uuidv4();
+    const groupNode: GroupState = {
+      id: groupId,
+      type: NodeType.GROUP,
+      name: 'Group',
+      transform: {
+        x: bounds.x,
+        y: bounds.y,
+        width: bounds.width,
+        height: bounds.height,
+        rotation: 0,
+      },
+      style: {
+        backgroundColor: 'transparent',
+        borderWidth: 0,
+        borderStyle: 'none',
+        borderColor: 'transparent',
+        opacity: 1,
+        zIndex: 0,
+      },
+      parentId: null,
+      isLocked: false,
+      isVisible: true,
+      children: validIds,
+    };
+
+    // 更新子节点的parentId，并将坐标转换为相对于组合的坐标
+    validIds.forEach((id) => {
+      const node = this.store.nodes[id];
+      if (node) {
+        node.parentId = groupId;
+        // 将绝对坐标转换为相对于组合的坐标
+        node.transform = {
+          ...node.transform,
+          x: node.transform.x - bounds.x,
+          y: node.transform.y - bounds.y,
+        };
+      }
+    });
+
+    // 从nodeOrder中移除子节点
+    const orderSet = new Set(validIds);
+    const insertIndex = Math.min(
+      ...validIds.map((id) => this.store.nodeOrder.indexOf(id)).filter((i) => i >= 0)
+    );
+    this.store.nodeOrder = this.store.nodeOrder.filter((id) => !orderSet.has(id));
+
+    // 添加组合节点到nodes
+    this.store.nodes[groupId] = groupNode;
+
+    // 在原来最靠前的子节点位置插入组合
+    this.store.nodeOrder.splice(insertIndex, 0, groupId);
+
+    // 选中新创建的组合
+    this.store.setActive([groupId]);
+
+    this.store.version++;
+    console.log(`[Group] 创建组合 ${groupId}，包含 ${validIds.length} 个元素`);
+    return groupId;
+  }
+
+  /**
+   * 解组合选中的组合节点
+   * 只解开最外层的组合，保留内部嵌套的组合结构
+   * @returns 解组合后的子节点ID列表
+   */
+  ungroupSelected(): string[] {
+    const selectedIds = Array.from(this.store.activeElementIds);
+    const ungroupedIds: string[] = [];
+
+    selectedIds.forEach((id) => {
+      const node = this.store.nodes[id];
+      if (!node || node.type !== NodeType.GROUP) return;
+
+      const groupNode = node as GroupState;
+      const children = groupNode.children;
+
+      // 获取组合在nodeOrder中的位置
+      const groupIndex = this.store.nodeOrder.indexOf(id);
+
+      // 恢复子节点的parentId和绝对坐标
+      children.forEach((childId) => {
+        const child = this.store.nodes[childId];
+        if (child) {
+          child.parentId = groupNode.parentId;
+          // 将相对坐标转换回绝对坐标
+          child.transform = {
+            ...child.transform,
+            x: child.transform.x + groupNode.transform.x,
+            y: child.transform.y + groupNode.transform.y,
+          };
+          ungroupedIds.push(childId);
+        }
+      });
+
+      // 从nodeOrder中移除组合，并在原位置插入子节点
+      this.store.nodeOrder.splice(groupIndex, 1, ...children);
+
+      // 删除组合节点
+      delete this.store.nodes[id];
+    });
+
+    if (ungroupedIds.length > 0) {
+      // 选中解组合后的所有子节点
+      this.store.setActive(ungroupedIds);
+      this.store.version++;
+      console.log(`[Ungroup] 解组合完成，释放 ${ungroupedIds.length} 个元素`);
+    }
+
+    return ungroupedIds;
+  }
+
+  /**
+   * 进入组合编辑模式
+   * @param groupId 要编辑的组合ID
+   */
+  enterGroupEdit(groupId: string): boolean {
+    const node = this.store.nodes[groupId];
+    if (!node || node.type !== NodeType.GROUP) {
+      console.warn('[Group] 无法进入编辑模式：节点不存在或不是组合');
+      return false;
+    }
+
+    this.store.editingGroupId = groupId;
+    this.store.setActive([]); // 清空选中状态
+    console.log(`[Group] 进入组合编辑模式: ${groupId}`);
+    return true;
+  }
+
+  /**
+   * 退出组合编辑模式
+   */
+  exitGroupEdit() {
+    if (this.store.editingGroupId) {
+      console.log(`[Group] 退出组合编辑模式: ${this.store.editingGroupId}`);
+      // 选中当前编辑的组合
+      this.store.setActive([this.store.editingGroupId]);
+      this.store.editingGroupId = null;
+    }
+  }
+
+  /**
+   * 检查选中的元素是否可以组合
+   */
+  canGroup(): boolean {
+    const ids = Array.from(this.store.activeElementIds);
+    if (ids.length < 2) return false;
+    return ids.every((id) => this.store.nodes[id]);
+  }
+
+  /**
+   * 检查选中的元素是否可以解组合
+   */
+  canUngroup(): boolean {
+    const ids = Array.from(this.store.activeElementIds);
+    return ids.some((id) => {
+      const node = this.store.nodes[id];
+      return node && node.type === NodeType.GROUP;
+    });
+  }
+
+  /**
+   * 同步更新组合的属性到所有子节点
+   * @param groupId 组合ID
+   * @param stylePatch 样式更新
+   */
+  updateGroupStyle(groupId: string, stylePatch: Partial<GroupState['style']>) {
+    const group = this.store.nodes[groupId] as GroupState;
+    if (!group || group.type !== NodeType.GROUP) return;
+
+    // 更新组合自身的样式
+    group.style = { ...group.style, ...stylePatch };
+
+    // 如果更新了opacity，同步到所有子节点
+    if ('opacity' in stylePatch && stylePatch.opacity !== undefined) {
+      const opacityValue = stylePatch.opacity;
+      group.children.forEach((childId) => {
+        const child = this.store.nodes[childId];
+        if (child) {
+          child.style = { ...child.style, opacity: opacityValue };
+        }
+      });
+    }
+
+    this.store.version++;
+  }
+
+  /**
    * 业务逻辑：创建矩形
    */
   /** 创建矩形 */
@@ -683,7 +924,6 @@ export class ToolManager {
       this.store.addNode(newImage);
       this.store.setActive([id]);
       console.log('图片创建完成，尺寸:', width, 'x', height);
-
     } catch (error) {
       console.warn('获取图片尺寸失败，使用默认尺寸:', error);
       // 降级方案：使用默认尺寸
@@ -692,14 +932,14 @@ export class ToolManager {
   }
 
   // 获取图片尺寸的辅助方法
-  private getImageDimensions(url: string): Promise<{width: number, height: number}> {
+  private getImageDimensions(url: string): Promise<{ width: number; height: number }> {
     return new Promise((resolve, reject) => {
       const img = new Image();
 
       img.onload = () => {
         resolve({
           width: img.naturalWidth,
-          height: img.naturalHeight
+          height: img.naturalHeight,
         });
       };
 
@@ -718,7 +958,7 @@ export class ToolManager {
         clearTimeout(timeoutId);
         resolve({
           width: img.naturalWidth,
-          height: img.naturalHeight
+          height: img.naturalHeight,
         });
       };
 
