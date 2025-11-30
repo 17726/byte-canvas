@@ -827,7 +827,10 @@ export class ToolManager {
 
     // ========== 新增：Shift键等比缩放处理 ==========
     if (e.shiftKey || e.ctrlKey) {
-      const originalRatio = startWidth / startHeight;
+      // 安全计算原始比例，防止除以零
+      const safeStartHeight = Math.abs(startHeight) < 1e-6 ? MIN_NODE_SIZE : startHeight;
+      const originalRatio = startWidth / safeStartHeight;
+
       // 计算基于宽度/高度的等比值，优先以主要变化轴为准
       let ratioBasedWidth = newWidth;
       let ratioBasedHeight = newHeight;
@@ -837,12 +840,13 @@ export class ToolManager {
       const isVertical = handle.includes('n') || handle.includes('s');
 
       if (isHorizontal && isVertical) {
-        // 角点缩放：取宽高变化的最大值作为基准
+        // 角点缩放：取宽高变化的绝对值最大者作为基准，并保留符号（统一策略）
         const widthRatio = newWidth / startWidth;
-        const heightRatio = newHeight / startHeight;
-        const maxRatio = Math.max(widthRatio, heightRatio);
-        ratioBasedWidth = startWidth * maxRatio;
-        ratioBasedHeight = startHeight * maxRatio;
+        const heightRatio = newHeight / safeStartHeight;
+        const dominantRatio =
+          Math.abs(widthRatio) > Math.abs(heightRatio) ? widthRatio : heightRatio;
+        ratioBasedWidth = startWidth * dominantRatio;
+        ratioBasedHeight = startHeight * dominantRatio;
       } else if (isHorizontal) {
         // 水平缩放：按宽度变化等比调整高度
         ratioBasedHeight = newWidth / originalRatio;
@@ -855,7 +859,7 @@ export class ToolManager {
       newWidth = ratioBasedWidth;
       newHeight = ratioBasedHeight;
 
-      // 调整位置以保持缩放中心（角点缩放时）
+      // 调整位置以保持缩放中心
       if (handle === 'nw') {
         newX = startNodeX + startWidth - newWidth;
         newY = startNodeY + startHeight - newHeight;
@@ -863,6 +867,24 @@ export class ToolManager {
         newY = startNodeY + startHeight - newHeight;
       } else if (handle === 'sw') {
         newX = startNodeX + startWidth - newWidth;
+      } else if (handle === 'se') {
+        // 东南角：锚点是西北角(startNodeX, startNodeY)，无需调整位置
+        newX = startNodeX;
+        newY = startNodeY;
+      } else if (handle === 'n') {
+        // 上边缘：锚点是底边中点 -> 保持底边位置，水平居中
+        newY = startNodeY + startHeight - newHeight;
+        newX = startNodeX + (startWidth - newWidth) / 2;
+      } else if (handle === 's') {
+        // 下边缘：锚点是顶边中点 -> 保持顶边位置，水平居中
+        newX = startNodeX + (startWidth - newWidth) / 2;
+      } else if (handle === 'e') {
+        // 右边缘：锚点是左边中点 -> 保持左边位置，垂直居中
+        newY = startNodeY + (startHeight - newHeight) / 2;
+      } else if (handle === 'w') {
+        // 左边缘：锚点是右边中点 -> 保持右边位置，垂直居中
+        newX = startNodeX + startWidth - newWidth;
+        newY = startNodeY + (startHeight - newHeight) / 2;
       }
     }
     // ========== End Shift键等比缩放处理 ==========
@@ -878,7 +900,9 @@ export class ToolManager {
       }
       // 等比调整高度
       if (e.shiftKey || e.ctrlKey) {
-        newHeight = newWidth / (startWidth / startHeight);
+        // 安全计算，防止除以零
+        const safeStartHeight = Math.abs(startHeight) < 1e-6 ? MIN_NODE_SIZE : startHeight;
+        newHeight = newWidth / (startWidth / safeStartHeight);
       }
     }
     if (newHeight < minSize) {
@@ -888,7 +912,9 @@ export class ToolManager {
       }
       // 等比调整宽度
       if (e.shiftKey || e.ctrlKey) {
-        newWidth = newHeight * (startWidth / startHeight);
+        // 安全计算，防止除以零
+        const safeStartHeight = Math.abs(startHeight) < 1e-6 ? MIN_NODE_SIZE : startHeight;
+        newWidth = newHeight * (startWidth / safeStartHeight);
       }
     }
 
@@ -976,7 +1002,11 @@ export class ToolManager {
 
     // ========== 新增：Shift键等比缩放处理 ==========
     if (e.shiftKey || e.ctrlKey) {
-      const originalRatio = startBounds.width / startBounds.height;
+      // 安全计算原始比例，防止除以零
+      const safeStartHeight =
+        Math.abs(startBounds.height) < 1e-6 ? MIN_NODE_SIZE : startBounds.height;
+      const originalRatio = startBounds.width / safeStartHeight;
+
       // 计算等比后的宽高
       let ratioBasedWidth = newBounds.width;
       let ratioBasedHeight = newBounds.height;
@@ -988,7 +1018,7 @@ export class ToolManager {
       if (isHorizontal && isVertical) {
         // 角点缩放：保持原始比例
         const widthRatio = newBounds.width / startBounds.width;
-        const heightRatio = newBounds.height / startBounds.height;
+        const heightRatio = newBounds.height / safeStartHeight;
         // Use the dominant axis (the one with the larger absolute ratio) and preserve its sign
         let scaleRatio: number;
         if (Math.abs(widthRatio) > Math.abs(heightRatio)) {
@@ -1014,6 +1044,24 @@ export class ToolManager {
         newBounds.y = startBounds.y + startBounds.height - ratioBasedHeight;
       } else if (handle === 'sw') {
         newBounds.x = startBounds.x + startBounds.width - ratioBasedWidth;
+      } else if (handle === 'se') {
+        // 东南角：锚点是西北角，无需调整位置
+        newBounds.x = startBounds.x;
+        newBounds.y = startBounds.y;
+      } else if (handle === 'n') {
+        // 上边缘：锚点是底边中点
+        newBounds.y = startBounds.y + startBounds.height - ratioBasedHeight;
+        newBounds.x = startBounds.x + (startBounds.width - ratioBasedWidth) / 2;
+      } else if (handle === 's') {
+        // 下边缘：锚点是顶边中点
+        newBounds.x = startBounds.x + (startBounds.width - ratioBasedWidth) / 2;
+      } else if (handle === 'e') {
+        // 右边缘：锚点是左边中点
+        newBounds.y = startBounds.y + (startBounds.height - ratioBasedHeight) / 2;
+      } else if (handle === 'w') {
+        // 左边缘：锚点是右边中点
+        newBounds.x = startBounds.x + startBounds.width - ratioBasedWidth;
+        newBounds.y = startBounds.y + (startBounds.height - ratioBasedHeight) / 2;
       }
 
       // 应用等比尺寸
