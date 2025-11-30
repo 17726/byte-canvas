@@ -24,6 +24,7 @@ import {
   DEFAULT_CIRCLE_PROPS,
   DEFAULT_TEXT_STYLE,
   DEFAULT_TEXT_PROPS,
+  DEFAULT_TEXT_SIZE,
   DEFAULT_IMAGE_STYLE,
   DEFAULT_IMAGE_URL,
   DEFAULT_IMAGE_FILTERS,
@@ -1163,8 +1164,8 @@ export class ToolManager {
       transform: {
         x,
         y,
-        width: DEFAULT_NODE_SIZE,
-        height: DEFAULT_NODE_SIZE,
+        width: DEFAULT_TEXT_SIZE.width,
+        height: DEFAULT_TEXT_SIZE.height,
         rotation: 0,
       },
       style: { ...DEFAULT_TEXT_STYLE },
