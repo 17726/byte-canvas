@@ -1021,6 +1021,26 @@ export class ToolManager {
     this.dragState.type = null;
     this.dragState.nodeId = '';
 
+    // 如果是组合节点，存储所有子节点的初始状态
+    let childStartStates:
+      | Record<string, { x: number; y: number; width: number; height: number }>
+      | undefined;
+    if (node.type === NodeType.GROUP) {
+      const groupNode = node as GroupState;
+      childStartStates = {};
+      groupNode.children.forEach((childId) => {
+        const child = this.store.nodes[childId];
+        if (child) {
+          childStartStates![childId] = {
+            x: child.transform.x,
+            y: child.transform.y,
+            width: child.transform.width,
+            height: child.transform.height,
+          };
+        }
+      });
+    }
+
     this.resizeState = {
       isResizing: true,
       handle,
@@ -1031,6 +1051,7 @@ export class ToolManager {
       startHeight: node.transform.height,
       startNodeX: node.transform.x,
       startNodeY: node.transform.y,
+      childStartStates,
     };
   }
 
@@ -1205,8 +1226,7 @@ export class ToolManager {
         );
         break;
       case NodeType.GROUP:
-        // 组合：等比缩放所有子元素
-        // TODO: 实现组合缩放逻辑
+        // 组合：等比缩放组合和所有子元素
         this.resizeRect(
           handle,
           dx,
@@ -1222,6 +1242,37 @@ export class ToolManager {
             newY = result.y;
           }
         );
+
+        // 计算缩放因子
+        const scaleX = newWidth / startWidth;
+        const scaleY = newHeight / startHeight;
+
+        // 缩放所有子节点
+        const { childStartStates } = this.resizeState;
+        if (childStartStates) {
+          const groupNode = node as GroupState;
+          groupNode.children.forEach((childId) => {
+            const childStart = childStartStates[childId];
+            const child = this.store.nodes[childId];
+            if (!childStart || !child) return;
+
+            // 按比例缩放子节点的位置和尺寸
+            const childNewX = childStart.x * scaleX;
+            const childNewY = childStart.y * scaleY;
+            const childNewWidth = Math.max(MIN_NODE_SIZE, childStart.width * scaleX);
+            const childNewHeight = Math.max(MIN_NODE_SIZE, childStart.height * scaleY);
+
+            this.store.updateNode(childId, {
+              transform: {
+                ...child.transform,
+                x: childNewX,
+                y: childNewY,
+                width: childNewWidth,
+                height: childNewHeight,
+              },
+            });
+          });
+        }
         break;
       default:
         // 默认使用矩形缩放逻辑

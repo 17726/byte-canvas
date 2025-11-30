@@ -25,6 +25,8 @@ export interface InternalResizeState {
   startHeight: number;
   startNodeX: number;
   startNodeY: number;
+  // 组合缩放时存储子节点初始状态
+  childStartStates?: Record<string, { x: number; y: number; width: number; height: number }>;
 }
 
 // 多节点缩放状态
