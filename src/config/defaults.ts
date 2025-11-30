@@ -56,7 +56,7 @@ export const DEFAULT_TEXT_STYLE = {
   zIndex: 1,
 };
 export const DEFAULT_TEXT_PROPS = {
-  content: '这里采用了vue绑定，修改这里，内容会响应式改变。但编辑功能暂时没实现，mvp版本中先写死。',
+  content: '双击编辑文本',
   fontFamily: 'Segoe UI',
   fontSize: 16,
   fontWeight: 400,
@@ -65,6 +65,11 @@ export const DEFAULT_TEXT_PROPS = {
   lineHeight: 1.6,
   underline: false,
   strikethrough: false,
+};
+
+export const DEFAULT_TEXT_SIZE = {
+  width: 160,
+  height: 40,
 };
 
 // Image Defaults
