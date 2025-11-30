@@ -24,7 +24,7 @@
       </div>
     </div>
 
-    <div class="divider"></div>
+    <div class="divider" v-if="isShape || isText"></div>
 
     <!-- Shape Controls -->
     <template v-if="isShape">
@@ -36,7 +36,7 @@
         <a-color-picker size="mini" v-model="strokeColor" trigger="hover" />
       </div>
       <div class="tool-item">
-        边框：
+        <span style="width: 50px;">边框：</span>
         <a-input-number
           size="mini"
           v-model="strokeWidth"
@@ -57,7 +57,7 @@
           v-model="fontSize"
           :min="12"
           :max="100"
-          style="width: 50px"
+          style="width: 50px;margin-left: 2px;"
           hide-button
         />
       </div>
@@ -90,10 +90,11 @@
       </div>
     </template>
 
-    <div class="divider"></div>
+ 
 
     <!-- Delete -->
     <div class="tool-item">
+      <div class="divider"></div>
       <a-button size="mini" status="danger" type="text" @click="handleDelete">
         <icon-delete />
       </a-button>
