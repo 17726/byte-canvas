@@ -10,7 +10,7 @@
       <!-- 显示模式：非编辑状态下显示文本 -->
       <div
         v-if="!isEditing"
-        class="text-content"
+        class="text-content text-base-styles text-layout text-rendering"
       >
         {{ displayContent }}
       </div>
@@ -20,7 +20,7 @@
         v-else
         ref="textInput"
         v-model="editingContent"
-        class="text-edit-input"
+        class="text-edit-input text-base-styles text-layout text-rendering"
         @blur="handleBlur"
         @keydown.esc="handleEsc"
         @keydown.enter.exact.prevent="handleEnter"
@@ -131,7 +131,8 @@ const handleShiftEnter = () => {
   -ms-user-select: auto;
 }
 
-.text-content {
+/* 基础文本样式 */
+.text-base-styles {
   font-family: var(--font-family);
   font-size: var(--text-size);
   font-weight: var(--font-weight);
@@ -139,36 +140,40 @@ const handleShiftEnter = () => {
   color: var(--text-color);
   line-height: var(--line-height);
   transform: scale(var(--text-scale));
-  text-decoration-line: var(--text-decoration-line);
   transform-origin: top left;
+  padding: 8px;
+  box-sizing: border-box;
   white-space: pre-wrap;
   word-wrap: break-word;
   overflow-wrap: break-word;
-  padding: 8px;
-  box-sizing: border-box;
   width: 100%;
   height: 100%;
 }
 
-.text-edit-input {
-  font-family: var(--font-family);
-  font-size: var(--text-size);
-  font-weight: var(--font-weight);
-  font-style: var(--font-style);
-  color: var(--text-color);
-  line-height: var(--line-height);
-  transform: scale(var(--text-scale));
-  transform-origin: top left;
+/* 布局和装饰样式 */
+.text-layout {
   width: 100%;
   height: 100%;
   padding: 8px;
   box-sizing: border-box;
+}
+
+/* 文本渲染样式 */
+.text-rendering {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+}
+
+/* 具体组件的样式 */
+.text-content {
+  text-decoration-line: var(--text-decoration-line);
+}
+
+.text-edit-input {
   resize: none;
   outline: none;
   border: none;
   background: transparent;
-  white-space: pre-wrap;
-  word-wrap: break-word;
-  overflow-wrap: break-word;
 }
 </style>
