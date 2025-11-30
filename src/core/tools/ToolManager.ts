@@ -210,16 +210,6 @@ export class ToolManager {
    * - e.preventDefault() 阻止页面滚动
    * - 这里以窗口中心为基准进行缩放，可改为以鼠标为缩放中心（更符合用户期望）
    */
-  /**
-   * 处理画布滚轮事件（缩放）
-   * - e.preventDefault() 阻止页面滚动
-   * - 这里以窗口中心为基准进行缩放，可改为以鼠标为缩放中心（更符合用户期望）
-   */
-  /**
-   * 处理画布滚轮事件（缩放）
-   * - e.preventDefault() 阻止页面滚动
-   * - 这里以窗口中心为基准进行缩放，可改为以鼠标为缩放中心（更符合用户期望）
-   */
   handleWheel(e: WheelEvent) {
     e.preventDefault();
     // 新增：触摸板双指平移逻辑（无Ctrl键时触发）
@@ -724,7 +714,7 @@ export class ToolManager {
     // 根据节点类型选择缩放策略
     switch (node.type) {
       case NodeType.CIRCLE:
-        // 圆形：等比缩放，保持圆形，锚点为对角
+        // 圆形：等比缩放，保持圆形，锚点为与当前缩放手柄相对的对角（即以对角点为固定点进行缩放）
         this.resizeCircle(
           handle,
           dx,
@@ -998,8 +988,13 @@ export class ToolManager {
         // 角点缩放：保持原始比例
         const widthRatio = newBounds.width / startBounds.width;
         const heightRatio = newBounds.height / startBounds.height;
-        const scaleRatio =
-          Math.max(Math.abs(widthRatio), Math.abs(heightRatio)) * Math.sign(widthRatio);
+        // Use the dominant axis (the one with the larger absolute ratio) and preserve its sign
+        let scaleRatio: number;
+        if (Math.abs(widthRatio) > Math.abs(heightRatio)) {
+          scaleRatio = Math.abs(widthRatio) * Math.sign(widthRatio);
+        } else {
+          scaleRatio = Math.abs(heightRatio) * Math.sign(heightRatio);
+        }
         ratioBasedWidth = startBounds.width * scaleRatio;
         ratioBasedHeight = startBounds.height * scaleRatio;
       } else if (isHorizontal) {
@@ -1067,7 +1062,7 @@ export class ToolManager {
       let finalScaleY = scaleY;
       if (e.shiftKey || e.ctrlKey) {
         // 等比缩放时使用统一的缩放比例
-        const uniformScale = Math.sqrt(scaleX * scaleY); // 几何平均保证等比
+        const uniformScale = Math.max(Math.abs(scaleX), Math.abs(scaleY)); // 使用主轴缩放比例保证等比
         finalScaleX = uniformScale;
         finalScaleY = uniformScale;
       }
