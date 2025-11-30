@@ -12,7 +12,7 @@
       :is="getComponentType(child.type)"
       :node="child"
       :isGroupChild="true"
-      @mousedown.stop="handleChildMouseDown($event, child.id)"
+      @mousedown="handleChildMouseDown($event, child.id)"
     />
 
     <!-- 组合编辑模式指示器 -->
@@ -85,10 +85,22 @@ const getComponentType = (type: NodeType) => {
   }
 };
 
+// 检查此组合是否可以被直接选中
+// 只有顶层组合或父组合正在编辑时，才能直接选中此组合
+const isSelectable = computed(() => {
+  // 顶层组合总是可选
+  if (props.node.parentId === null) return true;
+  // 嵌套组合只有在其父组合正在编辑时才可选
+  return store.editingGroupId === props.node.parentId;
+});
+
 // 处理组合的鼠标按下事件
 const handleMouseDown = (e: MouseEvent) => {
   // 如果正在编辑此组合，不拦截事件，让子元素处理
   if (isEditing.value) return;
+
+  // 如果此组合不可直接选中（嵌套组合且父组合未在编辑），不处理，让事件冒泡
+  if (!isSelectable.value) return;
 
   // 否则，选中整个组合
   if (toolManagerRef?.value) {
@@ -98,12 +110,18 @@ const handleMouseDown = (e: MouseEvent) => {
 
 // 双击进入组合编辑模式
 const handleDoubleClick = (e: MouseEvent) => {
+  // 如果此组合不可选中，不处理
+  if (!isSelectable.value) return;
+
   e.stopPropagation();
   toolManagerRef?.value?.enterGroupEdit(props.node.id);
 };
 
 // 编辑模式下，处理子元素的点击
 const handleChildMouseDown = (e: MouseEvent, childId: string) => {
+  // 如果此组合不可选中（嵌套组合且父组合未在编辑），不处理，让事件冒泡到上层
+  if (!isSelectable.value) return;
+
   if (!isEditing.value) {
     // 非编辑模式，选中整个组合
     e.stopPropagation();
@@ -114,6 +132,7 @@ const handleChildMouseDown = (e: MouseEvent, childId: string) => {
   }
 
   // 编辑模式下，选中具体的子元素
+  e.stopPropagation();
   if (toolManagerRef?.value) {
     toolManagerRef.value.handleNodeDown(e, childId);
   }
