@@ -2,16 +2,36 @@
   <!-- 外层容器：用于放置缩放控制点 -->
   <div class="text-layer-wrapper" :style="style">
     <!-- 透明矩形内部写文字，即文本框 -->
-    <div class="textBox" :class="{ 'is-selected': isSelected }">
-      <div class="text-content">
-        {{ node.props.content }}
+    <div
+      class="textBox"
+      :class="{ 'is-selected': isSelected, 'is-editing': isEditing }"
+      @dblclick="handleDoubleClick"
+    >
+      <!-- 显示模式：非编辑状态下显示文本 -->
+      <div
+        v-if="!isEditing"
+        class="text-content"
+      >
+        {{ displayContent }}
       </div>
+
+      <!-- 编辑模式：编辑状态下显示输入框 -->
+      <textarea
+        v-else
+        ref="textInput"
+        v-model="editingContent"
+        class="text-edit-input"
+        @blur="handleBlur"
+        @keydown.esc="handleEsc"
+        @keydown.enter.exact.prevent="handleEnter"
+        @keydown.shift.enter="handleShiftEnter"
+      />
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, nextTick } from 'vue';
 import type { TextState } from '@/types/state';
 import { useCanvasStore } from '@/store/canvasStore';
 import { getDomStyle } from '@/core/renderers/dom';
@@ -22,44 +42,96 @@ const props = defineProps<{
 
 const store = useCanvasStore();
 
-// 获取文本框+文本样式 (使用策略模式分离的渲染器)
+// 编辑状态相关
+const isEditing = ref(false);
+const editingContent = ref('');
+const textInput = ref<HTMLTextAreaElement | null>(null);
+
+// 获取样式
 const style = computed(() => getDomStyle(props.node));
+
+// 显示内容
+const displayContent = computed(() => {
+  return props.node.props.content || '双击此处编辑文本';
+});
 
 // 选中状态
 const isSelected = computed(() => store.activeElementIds.has(props.node.id));
+
+// 双击进入编辑
+const handleDoubleClick = (event: MouseEvent) => {
+  event.stopPropagation();
+  if (!isSelected.value) return;
+
+  isEditing.value = true;
+  editingContent.value = props.node.props.content || '';
+
+  nextTick(() => {
+    if (textInput.value) {
+      textInput.value.focus();
+      textInput.value.select();
+    }
+  });
+};
+
+// 保存内容
+const saveContent = () => {
+  if (isEditing.value) {
+    store.updateNode(props.node.id, {
+      props: {
+        ...props.node.props,
+        content: editingContent.value
+      }
+    });
+    isEditing.value = false;
+  }
+};
+
+// 取消编辑
+const cancelEditing = () => {
+  isEditing.value = false;
+  editingContent.value = props.node.props.content || '';
+};
+
+// 事件处理
+const handleBlur = () => saveContent();
+const handleEsc = () => cancelEditing();
+const handleEnter = () => saveContent();
+// .prevent，所以会执行默认行为（插入换行）
+const handleShiftEnter = () => {
+  console.log('Shift+Enter，插入换行');
+  // 不需要额外代码，浏览器会自动插入换行
+};
+
+
 </script>
 
 <style scoped>
-/* 外层容器：继承所有位置和尺寸样式 */
 .text-layer-wrapper {
   position: relative;
 }
 
-.is-selected {
-  /* 选中时的视觉反馈 */
-  /* outline: 2px solid #1890ff;
-  box-shadow: 0 0 0 4px rgba(24, 144, 255, 0.2); */
-}
-
-/* 文本框 为文本的父组件(容器) */
 .textBox {
-  /* 容器样式 */
   width: 100%;
   height: 100%;
-  overflow: auto;
   margin: 0;
   background: transparent;
-  /* 移除 min-width 和 min-height，避免与数据层缩放不一致 */
-  /* 最小尺寸限制已在 ToolManager.resizeText 中处理 */
   cursor: move;
-  user-select: none; /* 禁止文本选择 */
-  -webkit-user-select: none; /* Safari */
-  -moz-user-select: none; /* Firefox */
-  -ms-user-select: none; /* IE/Edge */
+  user-select: none;
+  -webkit-user-select: none;
+  -moz-user-select: none;
+  -ms-user-select: none;
+}
+
+.textBox.is-editing {
+  cursor: text;
+  user-select: auto;
+  -webkit-user-select: auto;
+  -moz-user-select: auto;
+  -ms-user-select: auto;
 }
 
 .text-content {
-  /* 使用 CSS 变量 */
   font-family: var(--font-family);
   font-size: var(--text-size);
   font-weight: var(--font-weight);
@@ -69,7 +141,32 @@ const isSelected = computed(() => store.activeElementIds.has(props.node.id));
   transform: scale(var(--text-scale));
   text-decoration-line: var(--text-decoration-line);
   transform-origin: top left;
-  /* 确保文本正确显示 */
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  padding: 8px;
+  box-sizing: border-box;
+  width: 100%;
+  height: 100%;
+}
+
+.text-edit-input {
+  font-family: var(--font-family);
+  font-size: var(--text-size);
+  font-weight: var(--font-weight);
+  font-style: var(--font-style);
+  color: var(--text-color);
+  line-height: var(--line-height);
+  transform: scale(var(--text-scale));
+  transform-origin: top left;
+  width: 100%;
+  height: 100%;
+  padding: 8px;
+  box-sizing: border-box;
+  resize: none;
+  outline: none;
+  border: none;
+  background: transparent;
   white-space: pre-wrap;
   word-wrap: break-word;
   overflow-wrap: break-word;
