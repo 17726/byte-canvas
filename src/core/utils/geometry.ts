@@ -134,7 +134,8 @@ export function isNodeInRect(
     case 'rect':
     case 'image':
     case 'text':
-      // 矩形类节点：包围盒交集即判定为命中
+    case 'group':
+      // 矩形类节点（包括组合）：包围盒交集即判定为命中
       return true;
 
     case 'circle':

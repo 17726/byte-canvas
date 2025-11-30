@@ -4,7 +4,7 @@ import type {
   InternalMultiResizeState,
   NodeStartState,
 } from '@/types/editor';
-import { clientToWorld, isNodeInRect, calculateBounds } from '@/core/utils/geometry';
+import { clientToWorld, isNodeInRect } from '@/core/utils/geometry';
 import { useCanvasStore } from '@/store/canvasStore';
 import { useUIStore } from '@/store/uiStore';
 import type { InternalDragState } from '@/types/editor';
@@ -389,11 +389,34 @@ export class ToolManager {
     const worldMax = clientToWorld(viewport, maxScreenX, maxScreenY);
 
     const selectedIds: string[] = [];
+    const editingGroupId = this.store.editingGroupId;
+
     Object.entries(this.store.nodes).forEach(([id, node]) => {
       const baseNode = node as BaseNodeState;
       if (baseNode.isLocked) return;
 
-      if (isNodeInRect(worldMax.x, worldMax.y, worldMin.x, worldMin.y, baseNode)) {
+      // 只选择当前层级的节点：
+      // - 正常模式：只选择顶层节点 (parentId === null)
+      // - 编辑模式：只选择当前编辑组合的直接子节点
+      if (editingGroupId) {
+        // 编辑模式：只选择编辑组合的子节点
+        if (baseNode.parentId !== editingGroupId) return;
+      } else {
+        // 正常模式：只选择顶层节点
+        if (baseNode.parentId !== null) return;
+      }
+
+      // 使用绝对坐标进行碰撞检测
+      const absTransform = this.store.getAbsoluteTransform(id);
+      if (!absTransform) return;
+
+      // 创建一个使用绝对坐标的虚拟节点进行检测
+      const nodeForHitTest = {
+        ...baseNode,
+        transform: absTransform,
+      };
+
+      if (isNodeInRect(worldMax.x, worldMax.y, worldMin.x, worldMin.y, nodeForHitTest)) {
         selectedIds.push(id);
       }
     });
@@ -580,8 +603,8 @@ export class ToolManager {
       return null;
     }
 
-    // 计算组合的边界框
-    const bounds = calculateBounds(this.store.nodes, validIds);
+    // 计算组合的边界框（使用绝对坐标）
+    const bounds = this.store.getSelectionBounds(validIds);
 
     // 创建新的组合节点
     const groupId = uuidv4();
@@ -610,38 +633,65 @@ export class ToolManager {
       children: validIds,
     };
 
-    // 更新子节点的parentId，并将坐标转换为相对于组合的坐标
+    // 检查是否在组合编辑模式下
+    const editingGroupId = this.store.editingGroupId;
+    const isInEditMode = !!editingGroupId;
+
+    // 如果在编辑模式下，新组合应该继承父组合
+    if (isInEditMode) {
+      groupNode.parentId = editingGroupId;
+    }
+
+    // 更新子节点的parentId，并将坐标转换为相对于新组合的坐标
     validIds.forEach((id) => {
       const node = this.store.nodes[id];
       if (node) {
-        node.parentId = groupId;
-        // 将绝对坐标转换为相对于组合的坐标
-        node.transform = {
-          ...node.transform,
-          x: node.transform.x - bounds.x,
-          y: node.transform.y - bounds.y,
-        };
+        // 获取节点的绝对坐标
+        const absTransform = this.store.getAbsoluteTransform(id);
+        const absX = absTransform ? absTransform.x : node.transform.x;
+        const absY = absTransform ? absTransform.y : node.transform.y;
+
+        // 使用 updateNode 确保响应式更新
+        this.store.updateNode(id, {
+          parentId: groupId,
+          transform: {
+            ...node.transform,
+            x: absX - bounds.x,
+            y: absY - bounds.y,
+          },
+        });
       }
     });
-
-    // 从nodeOrder中移除子节点
-    const orderSet = new Set(validIds);
-    const insertIndex = Math.min(
-      ...validIds.map((id) => this.store.nodeOrder.indexOf(id)).filter((i) => i >= 0)
-    );
-    this.store.nodeOrder = this.store.nodeOrder.filter((id) => !orderSet.has(id));
 
     // 添加组合节点到nodes
     this.store.nodes[groupId] = groupNode;
 
-    // 在原来最靠前的子节点位置插入组合
-    this.store.nodeOrder.splice(insertIndex, 0, groupId);
+    if (isInEditMode) {
+      // 在编辑模式下：更新父组合的children数组
+      const parentGroup = this.store.nodes[editingGroupId] as GroupState;
+      if (parentGroup && parentGroup.type === NodeType.GROUP) {
+        // 从父组合的children中移除被组合的节点，添加新组合
+        const newChildren = parentGroup.children.filter((id) => !validIds.includes(id));
+        newChildren.push(groupId);
+        parentGroup.children = newChildren;
+      }
+    } else {
+      // 正常模式：更新nodeOrder
+      const orderSet = new Set(validIds);
+      const insertIndex = Math.min(
+        ...validIds.map((id) => this.store.nodeOrder.indexOf(id)).filter((i) => i >= 0)
+      );
+      this.store.nodeOrder = this.store.nodeOrder.filter((id) => !orderSet.has(id));
+      this.store.nodeOrder.splice(insertIndex, 0, groupId);
+    }
 
     // 选中新创建的组合
     this.store.setActive([groupId]);
 
     this.store.version++;
-    console.log(`[Group] 创建组合 ${groupId}，包含 ${validIds.length} 个元素`);
+    console.log(
+      `[Group] 创建组合 ${groupId}，包含 ${validIds.length} 个元素，编辑模式: ${isInEditMode}`
+    );
     return groupId;
   }
 
@@ -659,28 +709,43 @@ export class ToolManager {
       if (!node || node.type !== NodeType.GROUP) return;
 
       const groupNode = node as GroupState;
-      const children = groupNode.children;
+      const children = [...groupNode.children]; // 复制一份，避免修改原数组时出问题
+      const isNested = groupNode.parentId !== null;
 
-      // 获取组合在nodeOrder中的位置
-      const groupIndex = this.store.nodeOrder.indexOf(id);
-
-      // 恢复子节点的parentId和绝对坐标
+      // 恢复子节点的parentId和坐标
       children.forEach((childId) => {
         const child = this.store.nodes[childId];
         if (child) {
-          child.parentId = groupNode.parentId;
-          // 将相对坐标转换回绝对坐标
-          child.transform = {
-            ...child.transform,
-            x: child.transform.x + groupNode.transform.x,
-            y: child.transform.y + groupNode.transform.y,
-          };
+          // 使用 updateNode 确保响应式更新
+          this.store.updateNode(childId, {
+            parentId: groupNode.parentId,
+            transform: {
+              ...child.transform,
+              // 将相对坐标转换：加上组合的偏移
+              x: child.transform.x + groupNode.transform.x,
+              y: child.transform.y + groupNode.transform.y,
+            },
+          });
           ungroupedIds.push(childId);
         }
       });
 
-      // 从nodeOrder中移除组合，并在原位置插入子节点
-      this.store.nodeOrder.splice(groupIndex, 1, ...children);
+      if (isNested && groupNode.parentId) {
+        // 如果组合是嵌套的，更新父组合的children数组
+        const parentGroup = this.store.nodes[groupNode.parentId] as GroupState;
+        if (parentGroup && parentGroup.type === NodeType.GROUP) {
+          // 从父组合的children中移除当前组合，添加其子节点
+          const newChildren = parentGroup.children.filter((cid) => cid !== id);
+          newChildren.push(...children);
+          parentGroup.children = newChildren;
+        }
+      } else {
+        // 顶层组合：更新nodeOrder
+        const groupIndex = this.store.nodeOrder.indexOf(id);
+        if (groupIndex >= 0) {
+          this.store.nodeOrder.splice(groupIndex, 1, ...children);
+        }
+      }
 
       // 删除组合节点
       delete this.store.nodes[id];
@@ -1021,24 +1086,35 @@ export class ToolManager {
     this.dragState.type = null;
     this.dragState.nodeId = '';
 
-    // 如果是组合节点，存储所有子节点的初始状态
+    // 如果是组合节点，递归存储所有后代节点的初始状态（包括嵌套组合的子节点）
     let childStartStates:
       | Record<string, { x: number; y: number; width: number; height: number }>
       | undefined;
     if (node.type === NodeType.GROUP) {
-      const groupNode = node as GroupState;
       childStartStates = {};
-      groupNode.children.forEach((childId) => {
-        const child = this.store.nodes[childId];
-        if (child) {
+
+      // 递归收集所有后代节点的初始状态（每个节点存储相对于其父节点的坐标）
+      const collectDescendants = (groupNode: GroupState) => {
+        groupNode.children.forEach((childId) => {
+          const child = this.store.nodes[childId];
+          if (!child) return;
+
+          // 存储节点相对于其父节点的原始坐标
           childStartStates![childId] = {
             x: child.transform.x,
             y: child.transform.y,
             width: child.transform.width,
             height: child.transform.height,
           };
-        }
-      });
+
+          // 如果子节点也是组合，递归收集其子节点
+          if (child.type === NodeType.GROUP) {
+            collectDescendants(child as GroupState);
+          }
+        });
+      };
+
+      collectDescendants(node as GroupState);
     }
 
     this.resizeState = {
@@ -1247,14 +1323,13 @@ export class ToolManager {
         const scaleX = newWidth / startWidth;
         const scaleY = newHeight / startHeight;
 
-        // 缩放所有子节点
+        // 缩放所有后代节点（包括嵌套组合的子节点）
         const { childStartStates } = this.resizeState;
         if (childStartStates) {
-          const groupNode = node as GroupState;
-          groupNode.children.forEach((childId) => {
-            const childStart = childStartStates[childId];
+          // 遍历所有后代节点，不只是直接子节点
+          Object.entries(childStartStates).forEach(([childId, childStart]) => {
             const child = this.store.nodes[childId];
-            if (!childStart || !child) return;
+            if (!child) return;
 
             // 按比例缩放子节点的位置和尺寸
             const childNewX = childStart.x * scaleX;
