@@ -91,6 +91,7 @@ const saveContent = () => {
 const cancelEditing = () => {
   isEditing.value = false;
   editingContent.value = props.node.props.content || '';
+  store.setActive([]);
 };
 
 // 事件处理
