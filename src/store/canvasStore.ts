@@ -70,6 +70,120 @@ export const useCanvasStore = defineStore('canvas', () => {
     const node = nodes.value[id];
     if (!node) return;
 
+    // ==================== 组合节点特殊处理 ====================
+    if (node.type === NodeType.GROUP) {
+      const groupNode = node as import('@/types/state').GroupState;
+
+      // 处理组合的 transform 变更：同步更新子节点
+      if ('transform' in patch && patch.transform) {
+        const oldTransform = node.transform;
+        const newTransform = { ...oldTransform, ...patch.transform };
+
+        // 计算位置偏移量
+        const deltaX = newTransform.x - oldTransform.x;
+        const deltaY = newTransform.y - oldTransform.y;
+
+        // 计算缩放比例
+        const scaleX = oldTransform.width > 0 ? newTransform.width / oldTransform.width : 1;
+        const scaleY = oldTransform.height > 0 ? newTransform.height / oldTransform.height : 1;
+
+        // 递归更新所有后代节点
+        const updateDescendants = (
+          childIds: string[],
+          parentScaleX: number,
+          parentScaleY: number
+        ) => {
+          childIds.forEach((childId) => {
+            const child = nodes.value[childId];
+            if (!child) return;
+
+            // 应用位置偏移（仅对直接子节点）和缩放
+            const childNewX =
+              child.transform.x * parentScaleX + (childIds === groupNode.children ? deltaX : 0);
+            const childNewY =
+              child.transform.y * parentScaleY + (childIds === groupNode.children ? deltaY : 0);
+            const childNewWidth = Math.max(1, child.transform.width * parentScaleX);
+            const childNewHeight = Math.max(1, child.transform.height * parentScaleY);
+
+            child.transform = {
+              ...child.transform,
+              x: childNewX,
+              y: childNewY,
+              width: childNewWidth,
+              height: childNewHeight,
+            };
+
+            // 如果子节点也是组合，递归处理其子节点（只传递缩放，不传递位移）
+            if (child.type === NodeType.GROUP) {
+              const childGroup = child as import('@/types/state').GroupState;
+              updateDescendants(childGroup.children, parentScaleX, parentScaleY);
+            }
+          });
+        };
+
+        // 只有当有实际变化时才更新子节点
+        if (deltaX !== 0 || deltaY !== 0 || scaleX !== 1 || scaleY !== 1) {
+          updateDescendants(groupNode.children, scaleX, scaleY);
+        }
+      }
+
+      // 处理组合的 style 变更：同步更新子节点的相应样式
+      if ('style' in patch && patch.style) {
+        const stylePatch = patch.style;
+
+        // 递归更新所有后代节点的样式
+        const updateChildrenStyle = (childIds: string[]) => {
+          childIds.forEach((childId) => {
+            const child = nodes.value[childId];
+            if (!child) return;
+
+            // 构建子节点的样式更新
+            const childStylePatch: Record<string, unknown> = {};
+
+            // 透明度同步
+            if ('opacity' in stylePatch && stylePatch.opacity !== undefined) {
+              childStylePatch.opacity = stylePatch.opacity;
+            }
+
+            // 填充色同步（仅对形状节点）
+            if ('backgroundColor' in stylePatch && stylePatch.backgroundColor !== undefined) {
+              if (child.type === NodeType.RECT || child.type === NodeType.CIRCLE) {
+                childStylePatch.backgroundColor = stylePatch.backgroundColor;
+              }
+            }
+
+            // 描边色同步（仅对形状节点）
+            if ('borderColor' in stylePatch && stylePatch.borderColor !== undefined) {
+              if (child.type === NodeType.RECT || child.type === NodeType.CIRCLE) {
+                childStylePatch.borderColor = stylePatch.borderColor;
+              }
+            }
+
+            // 描边宽度同步（仅对形状节点）
+            if ('borderWidth' in stylePatch && stylePatch.borderWidth !== undefined) {
+              if (child.type === NodeType.RECT || child.type === NodeType.CIRCLE) {
+                childStylePatch.borderWidth = stylePatch.borderWidth;
+              }
+            }
+
+            // 应用样式更新
+            if (Object.keys(childStylePatch).length > 0) {
+              child.style = { ...child.style, ...childStylePatch };
+            }
+
+            // 如果子节点也是组合，递归处理
+            if (child.type === NodeType.GROUP) {
+              const childGroup = child as import('@/types/state').GroupState;
+              updateChildrenStyle(childGroup.children);
+            }
+          });
+        };
+
+        updateChildrenStyle(groupNode.children);
+      }
+    }
+    // ==================== 组合节点特殊处理结束 ====================
+
     // 核心优化：处理 props 的深度合并 (Deep Merge for props)
     // 防止 updateNode(id, { props: { fontSize: 20 } }) 导致 content 等其他属性丢失
     // 使用类型守卫或 'in' 操作符检查 props 是否存在于 patch 中
