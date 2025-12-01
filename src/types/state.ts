@@ -102,6 +102,20 @@ export interface TextState extends BaseNodeState {
     lineHeight: number;
     underline: boolean;
     strikethrough: boolean;
+    // 添加部分文本样式支持
+    inlineStyles?: Array<{
+      start: number;      // 样式起始位置
+      end: number;        // 样式结束位置
+      styles: {          // 应用的样式
+        fontFamily: string;
+        fontSize: number;
+        fontWeight: number; // B (加粗)
+        fontStyle: 'normal' | 'italic'; // I (斜体)
+        color: string;
+        underline: boolean;
+        strikethrough: boolean;
+      };
+    }>;
   };
 }
 
