@@ -75,55 +75,48 @@ export const useCanvasStore = defineStore('canvas', () => {
       const groupNode = node as import('@/types/state').GroupState;
 
       // 处理组合的 transform 变更：同步更新子节点
+      // 注意：子节点坐标是相对于组合的，所以：
+      // - 组合移动时：子节点不需要更新（相对位置不变）
+      // - 组合缩放时：子节点的位置和尺寸需要等比例缩放
       if ('transform' in patch && patch.transform) {
         const oldTransform = node.transform;
         const newTransform = { ...oldTransform, ...patch.transform };
-
-        // 计算位置偏移量
-        const deltaX = newTransform.x - oldTransform.x;
-        const deltaY = newTransform.y - oldTransform.y;
 
         // 计算缩放比例
         const scaleX = oldTransform.width > 0 ? newTransform.width / oldTransform.width : 1;
         const scaleY = oldTransform.height > 0 ? newTransform.height / oldTransform.height : 1;
 
-        // 递归更新所有后代节点
-        const updateDescendants = (
-          childIds: string[],
-          parentScaleX: number,
-          parentScaleY: number
-        ) => {
-          childIds.forEach((childId) => {
-            const child = nodes.value[childId];
-            if (!child) return;
+        // 只有当尺寸发生变化时才需要更新子节点
+        if (scaleX !== 1 || scaleY !== 1) {
+          // 递归更新所有后代节点
+          const updateDescendants = (childIds: string[]) => {
+            childIds.forEach((childId) => {
+              const child = nodes.value[childId];
+              if (!child) return;
 
-            // 应用位置偏移（仅对直接子节点）和缩放
-            const childNewX =
-              child.transform.x * parentScaleX + (childIds === groupNode.children ? deltaX : 0);
-            const childNewY =
-              child.transform.y * parentScaleY + (childIds === groupNode.children ? deltaY : 0);
-            const childNewWidth = Math.max(1, child.transform.width * parentScaleX);
-            const childNewHeight = Math.max(1, child.transform.height * parentScaleY);
+              // 等比例缩放子节点的位置和尺寸
+              const childNewX = child.transform.x * scaleX;
+              const childNewY = child.transform.y * scaleY;
+              const childNewWidth = Math.max(1, child.transform.width * scaleX);
+              const childNewHeight = Math.max(1, child.transform.height * scaleY);
 
-            child.transform = {
-              ...child.transform,
-              x: childNewX,
-              y: childNewY,
-              width: childNewWidth,
-              height: childNewHeight,
-            };
+              child.transform = {
+                ...child.transform,
+                x: childNewX,
+                y: childNewY,
+                width: childNewWidth,
+                height: childNewHeight,
+              };
 
-            // 如果子节点也是组合，递归处理其子节点（只传递缩放，不传递位移）
-            if (child.type === NodeType.GROUP) {
-              const childGroup = child as import('@/types/state').GroupState;
-              updateDescendants(childGroup.children, parentScaleX, parentScaleY);
-            }
-          });
-        };
+              // 如果子节点也是组合，递归处理其子节点
+              if (child.type === NodeType.GROUP) {
+                const childGroup = child as import('@/types/state').GroupState;
+                updateDescendants(childGroup.children);
+              }
+            });
+          };
 
-        // 只有当有实际变化时才更新子节点
-        if (deltaX !== 0 || deltaY !== 0 || scaleX !== 1 || scaleY !== 1) {
-          updateDescendants(groupNode.children, scaleX, scaleY);
+          updateDescendants(groupNode.children);
         }
       }
 
