@@ -16,6 +16,7 @@ import {
   type ShapeState,
   type TextState,
   type GroupState,
+  type NodeState,
 } from '@/types/state';
 import { v4 as uuidv4 } from 'uuid';
 import {
@@ -321,6 +322,13 @@ export class ToolManager {
    * 处理全局鼠标松开事件 (平移结束 / 缩放结束)
    */
   handleMouseUp() {
+    // 在重置状态之前，检查是否需要扩展组合边界
+    // 只有在有实际拖拽或缩放操作时才检查
+    const hadDragOrResize =
+      this.dragState.isDragging ||
+      this.resizeState.isResizing ||
+      this.multiResizeState.isMultiResizing;
+
     // 重置多选缩放状态
     this.multiResizeState.isMultiResizing = false;
     this.multiResizeState.handle = null;
@@ -351,6 +359,11 @@ export class ToolManager {
     this.resizeState.isResizing = false;
     this.resizeState.handle = null;
     this.resizeState.nodeId = null;
+
+    // 如果在组合编辑模式下有拖拽或缩放操作，检查并扩展组合边界
+    if (hadDragOrResize && this.store.editingGroupId) {
+      this.expandGroupToFitChildren();
+    }
 
     // 统一解除交互锁
     this.store.isInteracting = false;
@@ -788,6 +801,110 @@ export class ToolManager {
       this.store.setActive([this.store.editingGroupId]);
       this.store.editingGroupId = null;
     }
+  }
+
+  /**
+   * 调整组合边界以精确适应所有子元素
+   * 支持扩展和收缩边界，考虑子元素旋转
+   */
+  expandGroupToFitChildren() {
+    const editingGroupId = this.store.editingGroupId;
+    if (!editingGroupId) return;
+
+    const groupNode = this.store.nodes[editingGroupId] as GroupState;
+    if (!groupNode || groupNode.type !== NodeType.GROUP) return;
+
+    const children = groupNode.children
+      .map((id) => this.store.nodes[id])
+      .filter((node): node is NodeState => Boolean(node));
+
+    if (children.length === 0) return;
+
+    // 计算所有子元素的边界（考虑旋转）
+    let minX = Infinity;
+    let minY = Infinity;
+    let maxX = -Infinity;
+    let maxY = -Infinity;
+
+    children.forEach((child) => {
+      const { x, y, width, height, rotation } = child.transform;
+
+      if (rotation === 0) {
+        // 无旋转：直接使用矩形边界
+        minX = Math.min(minX, x);
+        minY = Math.min(minY, y);
+        maxX = Math.max(maxX, x + width);
+        maxY = Math.max(maxY, y + height);
+      } else {
+        // 有旋转：计算旋转后四角的位置
+        const cx = x + width / 2;
+        const cy = y + height / 2;
+        const rad = (rotation * Math.PI) / 180;
+        const cos = Math.cos(rad);
+        const sin = Math.sin(rad);
+
+        const corners = [
+          { x: x, y: y },
+          { x: x + width, y: y },
+          { x: x + width, y: y + height },
+          { x: x, y: y + height },
+        ];
+
+        corners.forEach((corner) => {
+          const dx = corner.x - cx;
+          const dy = corner.y - cy;
+          const rx = cx + dx * cos - dy * sin;
+          const ry = cy + dx * sin + dy * cos;
+          minX = Math.min(minX, rx);
+          maxX = Math.max(maxX, rx);
+          minY = Math.min(minY, ry);
+          maxY = Math.max(maxY, ry);
+        });
+      }
+    });
+
+    // 计算新的组合边界
+    const newBoundsWidth = maxX - minX;
+    const newBoundsHeight = maxY - minY;
+    const newGroupX = groupNode.transform.x + minX;
+    const newGroupY = groupNode.transform.y + minY;
+
+    // 检查是否需要调整（边界有变化）
+    const eps = 0.01; // 浮点数容差
+    const needsAdjust =
+      Math.abs(minX) > eps ||
+      Math.abs(minY) > eps ||
+      Math.abs(newBoundsWidth - groupNode.transform.width) > eps ||
+      Math.abs(newBoundsHeight - groupNode.transform.height) > eps;
+
+    if (!needsAdjust) return;
+
+    // 调整所有子元素的相对坐标（相对于新的组合原点）
+    const offsetX = -minX;
+    const offsetY = -minY;
+
+    children.forEach((child) => {
+      this.store.updateNode(child.id, {
+        transform: {
+          ...child.transform,
+          x: child.transform.x + offsetX,
+          y: child.transform.y + offsetY,
+        },
+      });
+    });
+
+    // 更新组合的位置和尺寸
+    this.store.updateNode(editingGroupId, {
+      transform: {
+        ...groupNode.transform,
+        x: newGroupX,
+        y: newGroupY,
+        width: newBoundsWidth,
+        height: newBoundsHeight,
+      },
+    });
+
+    console.log(`[Group] 调整组合边界: ${editingGroupId}`);
   }
 
   /**
