@@ -116,7 +116,6 @@
             <span class="label">填充</span>
             <div class="flex-row">
               <a-color-picker v-model="fillColorTemp" size="small" @change="applyFillColor" />
-              <a-button size="mini" type="outline" @click="applyFillColor">应用</a-button>
             </div>
           </div>
 
@@ -138,7 +137,6 @@
               >
                 <template #suffix>px</template>
               </a-input-number>
-              <a-button size="mini" type="outline" @click="applyStrokeStyle()">应用</a-button>
             </div>
           </div>
 
