@@ -51,7 +51,7 @@ import { IconImage } from '@arco-design/web-vue/es/icon';
 import { ToolManager } from '@/core/tools/ToolManager';
 import { DEFAULT_IMAGE_URL } from '@/config/defaults';
 
-const toolManager = new ToolManager(null);
+const toolManager = new ToolManager(null, () => false);
 
 interface ImageItem {
   id?: string;
