@@ -111,14 +111,14 @@
         <div class="panel-section">
           <div class="section-title">外观</div>
 
-          <!-- Fill -->
-          <div class="prop-item" v-if="!isImage">
+          <!-- Fill: 仅对形状节点显示 -->
+          <div class="prop-item" v-if="isShape">
             <span class="label">填充</span>
             <a-color-picker v-model="fillColor" size="small" />
           </div>
 
-          <!-- Stroke -->
-          <div class="prop-item">
+          <!-- Stroke: 仅对形状节点显示 -->
+          <div class="prop-item" v-if="isShape">
             <span class="label">描边</span>
             <div class="flex-row">
               <a-color-picker v-model="strokeColor" size="small" />
@@ -128,11 +128,13 @@
             </div>
           </div>
 
-          <!-- Opacity -->
+          <!-- Opacity: 对所有节点显示 -->
           <div class="prop-item">
             <span class="label">不透明度</span>
             <a-slider v-model="opacity" :min="0" :max="1" :step="0.01" show-input size="small" />
           </div>
+
+          <!-- 圆角: 仅对形状节点显示 -->
           <template v-if="isShape">
             <div class="prop-item">
               <span class="label">圆角 (%)</span>
@@ -153,11 +155,11 @@
         <!-- Section 3: 特有属性 (Specific) -->
         <div class="panel-section" v-if="isText || isShape || isImage">
           <div class="section-title">属性</div>
-            <div class="common">
-              <span class="label">z-Index</span>
-              <a-input-number v-model="zIndex" size="small" :min="1" mode="button" />
-            </div>
-            <br/>
+          <div class="common">
+            <span class="label">z-Index</span>
+            <a-input-number v-model="zIndex" size="small" :min="1" mode="button" />
+          </div>
+          <br />
           <!-- Text Specific -->
           <template v-if="isText">
             <div class="prop-item">
@@ -293,12 +295,9 @@ const isShape = computed(
   () => activeNode.value?.type === NodeType.RECT || activeNode.value?.type === NodeType.CIRCLE
 );
 const isText = computed(() => activeNode.value?.type === NodeType.TEXT);
-// const isRect = computed(
-//   () => isShape.value && (activeNode.value as ShapeState)?.shapeType === 'rect'
-// );
 const isImage = computed(() => activeNode.value?.type === NodeType.IMAGE);
-// const hasFill = computed(() => isShape.value);
-// const hasStroke = computed(() => isShape.value);
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+const isGroup = computed(() => activeNode.value?.type === NodeType.GROUP);
 
 // --- Transform Bindings ---
 const transformX = computed({
@@ -377,13 +376,13 @@ const opacity = computed({
 });
 
 const zIndex = computed({
-  get:() => activeNode.value?.style.zIndex ?? 1,
-  set:(val) =>
-    activeNode.value&&
-    store.updateNode(activeNode.value.id,{
-      style:{ ...activeNode.value.style,zIndex:val as number}
-    })
-})
+  get: () => activeNode.value?.style.zIndex ?? 1,
+  set: (val) =>
+    activeNode.value &&
+    store.updateNode(activeNode.value.id, {
+      style: { ...activeNode.value.style, zIndex: val as number },
+    }),
+});
 
 // --- Specific Bindings ---
 // Text

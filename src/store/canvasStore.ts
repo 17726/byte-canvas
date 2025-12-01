@@ -71,7 +71,9 @@ export const useCanvasStore = defineStore('canvas', () => {
     if (!node) return;
 
     // ==================== 组合节点特殊处理 ====================
-    if (node.type === NodeType.GROUP) {
+    // 注意：只有在非编辑模式下才触发子节点同步更新
+    // 编辑模式下，用户直接操作子节点，组合边框由 expandGroupToFitChildren 单独处理
+    if (node.type === NodeType.GROUP && editingGroupId.value !== id) {
       const groupNode = node as import('@/types/state').GroupState;
 
       // 处理组合的 transform 变更：同步更新子节点
