@@ -73,31 +73,31 @@
           <div class="section-title">变换</div>
           <a-row :gutter="8" class="prop-row">
             <a-col :span="12">
-              <a-input-number v-model="transformX" size="small" mode="button">
+              <a-input-number v-model="transformX" size="small" precision="2">
                 <template #prefix>X</template>
               </a-input-number>
             </a-col>
             <a-col :span="12">
-              <a-input-number v-model="transformY" size="small" mode="button">
+              <a-input-number v-model="transformY" size="small" precision="2">
                 <template #prefix>Y</template>
               </a-input-number>
             </a-col>
           </a-row>
           <a-row :gutter="8" class="prop-row">
             <a-col :span="12">
-              <a-input-number v-model="transformW" size="small" :min="1" mode="button">
+              <a-input-number v-model="transformW" size="small" :min="1">
                 <template #prefix>W</template>
               </a-input-number>
             </a-col>
             <a-col :span="12">
-              <a-input-number v-model="transformH" size="small" :min="1" mode="button">
+              <a-input-number v-model="transformH" size="small" :min="1">
                 <template #prefix>H</template>
               </a-input-number>
             </a-col>
           </a-row>
           <a-row :gutter="8" class="prop-row">
             <a-col :span="24">
-              <a-input-number v-model="transformRotation" size="small" mode="button">
+              <a-input-number v-model="transformRotation" size="small">
                 <template #prefix>∠</template>
                 <template #suffix>°</template>
               </a-input-number>
@@ -133,6 +133,19 @@
             <span class="label">不透明度</span>
             <a-slider v-model="opacity" :min="0" :max="1" :step="0.01" show-input size="small" />
           </div>
+          <template v-if="isShape">
+            <div class="prop-item">
+              <span class="label">圆角 (%)</span>
+              <a-slider
+                v-model="cornerRadius"
+                :min="0"
+                :max="50"
+                :step="1"
+                show-input
+                size="small"
+              />
+            </div>
+          </template>
         </div>
 
         <a-divider style="margin: 12px 0" />
@@ -140,7 +153,11 @@
         <!-- Section 3: 特有属性 (Specific) -->
         <div class="panel-section" v-if="isText || isShape || isImage">
           <div class="section-title">属性</div>
-
+            <div class="common">
+              <span class="label">z-Index</span>
+              <a-input-number v-model="zIndex" size="small" :min="1" mode="button" />
+            </div>
+            <br/>
           <!-- Text Specific -->
           <template v-if="isText">
             <div class="prop-item">
@@ -161,21 +178,6 @@
             <div class="prop-item">
               <span class="label">颜色</span>
               <a-color-picker v-model="textColor" show-text size="small" />
-            </div>
-          </template>
-
-          <!-- Shape Specific -->
-          <template v-if="isRect">
-            <div class="prop-item">
-              <span class="label">圆角 (%)</span>
-              <a-slider
-                v-model="cornerRadius"
-                :min="0"
-                :max="50"
-                :step="1"
-                show-input
-                size="small"
-              />
             </div>
           </template>
 
@@ -291,9 +293,9 @@ const isShape = computed(
   () => activeNode.value?.type === NodeType.RECT || activeNode.value?.type === NodeType.CIRCLE
 );
 const isText = computed(() => activeNode.value?.type === NodeType.TEXT);
-const isRect = computed(
-  () => isShape.value && (activeNode.value as ShapeState)?.shapeType === 'rect'
-);
+// const isRect = computed(
+//   () => isShape.value && (activeNode.value as ShapeState)?.shapeType === 'rect'
+// );
 const isImage = computed(() => activeNode.value?.type === NodeType.IMAGE);
 // const hasFill = computed(() => isShape.value);
 // const hasStroke = computed(() => isShape.value);
@@ -373,6 +375,15 @@ const opacity = computed({
       style: { ...activeNode.value.style, opacity: val as number },
     }),
 });
+
+const zIndex = computed({
+  get:() => activeNode.value?.style.zIndex ?? 1,
+  set:(val) =>
+    activeNode.value&&
+    store.updateNode(activeNode.value.id,{
+      style:{ ...activeNode.value.style,zIndex:val as number}
+    })
+})
 
 // --- Specific Bindings ---
 // Text
