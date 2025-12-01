@@ -69,7 +69,7 @@ let loadTimeout: number | null = null;
 
 
 // 可见图片数量控制
-const initialLoadCount = 9; // 首次加载9张
+const initialLoadCount = 22; // 首次加载22张
 const lazyLoadCount = 6;    // 每次懒加载6张
 
 //NOTE: 懒加载占位符数量计算

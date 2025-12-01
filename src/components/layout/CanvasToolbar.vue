@@ -54,7 +54,7 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue';
-import { IconPlus, IconEdit,  IconDelete } from '@arco-design/web-vue/es/icon';
+import { IconPlus, IconEdit, IconDelete } from '@arco-design/web-vue/es/icon';
 //TODO：UI开发完成后优化icon-park库的导入，针对按需导入减小打包体积
 import { Square, Round } from '@icon-park/vue-next';
 import { useCanvasStore } from '@/store/canvasStore';
@@ -77,14 +77,13 @@ const hasSelection = computed(() => store.activeElementIds.size > 0);
 // Settings handled by header component now
 
 // 元素控制底层组件
-const toolManager = new ToolManager(null);
+const toolManager = new ToolManager(null, () => false);
 
 // 高亮控制
 const selectedKeys = ref<string[]>([]);
 
 // 弹窗确认-弹窗开关
 const delModalVisible = ref(false);
-
 
 function onMenuItemClick(key: string) {
   switch (key) {
