@@ -208,6 +208,8 @@ export class ToolManager {
     return true;
   }
 
+  // ==================== 画布事件处理 ====================
+
   /**
    * 处理画布滚轮事件（缩放）
    * - e.preventDefault() 阻止页面滚动
@@ -474,6 +476,8 @@ export class ToolManager {
     this.store.setActive(selectedIds);
   }
 
+  // ==================== 节点事件处理 ====================
+
   /**
    * 处理节点鼠标按下事件（选中/开始拖拽）
    * 【核心修改】按下空格时，不阻止冒泡、不处理节点交互，直接触发画布平移
@@ -540,77 +544,6 @@ export class ToolManager {
       startTransformMap, // 新增：所有选中节点的初始状态
       isMultiAreaDrag: false, // 非区域拖拽
     };
-  }
-
-  /**
-   * 处理缩放控制点鼠标按下事件
-   * 【核心修改】按下空格时，禁用缩放操作
-   */
-  handleResizeHandleDown(e: MouseEvent, nodeId: string, handle: ResizeHandle) {
-    // 核心修改3：按下空格时，不处理缩放逻辑
-    if (this.getIsSpacePressed()) {
-      return;
-    }
-
-    const viewport = this.store.viewport as ViewportState;
-    const stageRect = this.stageEl?.getBoundingClientRect() || { left: 0, top: 0 };
-    const currentWorldPos = clientToWorld(
-      viewport,
-      e.clientX - stageRect.left,
-      e.clientY - stageRect.top
-    );
-    const startWorldPos = clientToWorld(
-      viewport,
-      this.dragState.startMouseX - stageRect.left,
-      this.dragState.startMouseY - stageRect.top
-    );
-
-    // 4. 计算鼠标偏移量（世界坐标下，避免缩放影响）
-    const deltaX = currentWorldPos.x - startWorldPos.x;
-    const deltaY = currentWorldPos.y - startWorldPos.y;
-
-    // 5. 多选拖拽：遍历所有选中节点，同步应用偏移量
-    Object.entries(this.dragState.startTransformMap).forEach(([nodeId, startTransform]) => {
-      const node = this.store.nodes[nodeId] as BaseNodeState;
-      if (!node || node.isLocked) return;
-
-      // 计算节点新位置（初始位置 + 偏移）
-      const newX = startTransform.x + deltaX;
-      const newY = startTransform.y + deltaY;
-
-      // TODO: Implement grid snapping逻辑（如果 viewport.isSnapToGrid 为 true）
-      // 该逻辑应该在世界坐标系中进行（已转换为 world 坐标），以保证缩放/平移下 snapping 的一致性
-      // Example:
-      // if (viewport.isSnapToGrid) {
-      //   const snapped = snapToGrid(viewport, newX, newY);
-      //   newX = snapped.x;
-      //   newY = snapped.y;
-      // }
-
-      // 7. 细粒度更新节点位置（触发响应式刷新）
-      this.store.updateNode(nodeId, {
-        transform: { ...node.transform, x: newX, y: newY },
-      });
-    });
-  }
-
-  /**
-   * 节点鼠标松开事件（重置拖拽状态）
-   */
-  handleNodeUp() {
-    // 修正：移除重复的 dragState 重置（仅保留整体重置即可）
-    this.dragState = {
-      isDragging: false,
-      type: null,
-      nodeId: '',
-      startMouseX: 0,
-      startMouseY: 0,
-      startTransform: { x: 0, y: 0, width: 0, height: 0, rotation: 0 },
-      startTransformMap: {}, // 新增：重置多节点初始状态映射
-      isMultiAreaDrag: false,
-    };
-    // 解除交互锁
-    this.store.isInteracting = false;
   }
 
   /**
@@ -989,237 +922,7 @@ export class ToolManager {
     this.store.version++;
   }
 
-  /**
-   * 业务逻辑：创建矩形
-   */
-  /** 创建矩形 */
-  createRect() {
-    const id = uuidv4();
-    // 随机位置
-    // NOTE：不应该在这里限制精度，应该在UI层处理 --- IGNORE ---
-    const x = Math.random() * 800;
-    const y = Math.random() * 600;
-
-    const newRect: ShapeState = {
-      id,
-      type: NodeType.RECT,
-      name: 'Rectangle',
-      transform: {
-        x,
-        y,
-        width: DEFAULT_NODE_SIZE,
-        height: DEFAULT_NODE_SIZE,
-        rotation: 0,
-      },
-      style: { ...DEFAULT_RECT_STYLE },
-      props: { ...DEFAULT_RECT_PROPS },
-      parentId: null,
-      isLocked: false,
-      isVisible: true,
-      shapeType: 'rect',
-    };
-
-    this.store.addNode(newRect);
-    this.store.setActive([id]);
-    console.log('矩形创建完成');
-  }
-
-  /**
-   * 业务逻辑：创建圆形
-   */
-  createCircle() {
-    const id = uuidv4();
-    const x = Math.random() * 800;
-    const y = Math.random() * 600;
-
-    const newCircle: ShapeState = {
-      id,
-      type: NodeType.CIRCLE,
-      name: 'Circle',
-      transform: {
-        x,
-        y,
-        width: DEFAULT_NODE_SIZE,
-        height: DEFAULT_NODE_SIZE,
-        rotation: 0,
-      },
-      style: { ...DEFAULT_CIRCLE_STYLE },
-      props: { ...DEFAULT_CIRCLE_PROPS },
-      parentId: null,
-      isLocked: false,
-      isVisible: true,
-      shapeType: 'circle',
-    };
-
-    this.store.addNode(newCircle);
-    this.store.setActive([id]);
-    console.log('圆形创建完成');
-  }
-
-  /**
-   * 业务逻辑：创建文本
-   */
-  createText() {
-    const id = uuidv4();
-    // 随机位置
-    const x = Math.random() * 800;
-    const y = Math.random() * 600;
-
-    const newText: TextState = {
-      id,
-      type: NodeType.TEXT,
-      name: 'Text',
-      transform: {
-        x,
-        y,
-        width: DEFAULT_NODE_SIZE,
-        height: DEFAULT_NODE_SIZE,
-        rotation: 0,
-      },
-      style: { ...DEFAULT_TEXT_STYLE },
-      props: { ...DEFAULT_TEXT_PROPS },
-      parentId: null,
-      isLocked: false,
-      isVisible: true,
-    };
-
-    this.store.addNode(newText);
-    this.store.setActive([id]);
-    console.log('文本创建完成');
-  }
-
-  /**
-   * 业务逻辑：创建图片
-   */
-  async createImageWithUrl(imageUrl = DEFAULT_IMAGE_URL) {
-    const id = uuidv4();
-
-    try {
-      // 获取图片原始尺寸
-      const dimensions = await this.getImageDimensions(imageUrl);
-
-      // 尺寸限制
-      const MAX_SIZE = 400;
-      const MIN_SIZE = 50;
-
-      let { width, height } = dimensions;
-
-      // 如果图片太大，等比例缩放
-      if (width > MAX_SIZE || height > MAX_SIZE) {
-        const ratio = Math.min(MAX_SIZE / width, MAX_SIZE / height);
-        width = Math.floor(width * ratio);
-        height = Math.floor(height * ratio);
-      }
-
-      // 确保不小于最小尺寸
-      if (width < MIN_SIZE || height < MIN_SIZE) {
-        const ratio = Math.max(MIN_SIZE / width, MIN_SIZE / height);
-        width = Math.floor(width * ratio);
-        height = Math.floor(height * ratio);
-      }
-
-      const newImage: ImageState = {
-        id,
-        type: NodeType.IMAGE,
-        name: 'Image',
-        transform: {
-          x: Math.random() * 800,
-          y: Math.random() * 600,
-          width: width,
-          height: height,
-          rotation: 0,
-        },
-        style: { ...DEFAULT_IMAGE_STYLE },
-        props: {
-          imageUrl: imageUrl,
-          filters: { ...DEFAULT_IMAGE_FILTERS },
-        },
-        parentId: null,
-        isLocked: false,
-        isVisible: true,
-      };
-
-      this.store.addNode(newImage);
-      this.store.setActive([id]);
-      console.log('图片创建完成，尺寸:', width, 'x', height);
-    } catch (error) {
-      console.warn('获取图片尺寸失败，使用默认尺寸:', error);
-      // 降级方案：使用默认尺寸
-      this.createImageWithDefaultSize(id, imageUrl);
-    }
-  }
-
-  // 获取图片尺寸的辅助方法
-  private getImageDimensions(url: string): Promise<{ width: number; height: number }> {
-    return new Promise((resolve, reject) => {
-      const img = new Image();
-
-      img.onload = () => {
-        resolve({
-          width: img.naturalWidth,
-          height: img.naturalHeight,
-        });
-      };
-
-      img.onerror = () => {
-        reject(new Error(`图片加载失败: ${url}`));
-      };
-
-      // 设置超时
-      const timeoutId = setTimeout(() => {
-        img.onload = null;
-        img.onerror = null;
-        reject(new Error(`图片加载超时: ${url}`));
-      }, 5000);
-
-      img.onload = () => {
-        clearTimeout(timeoutId);
-        resolve({
-          width: img.naturalWidth,
-          height: img.naturalHeight,
-        });
-      };
-
-      img.src = url;
-    });
-  }
-
-  // 降级方法：使用默认尺寸
-  private createImageWithDefaultSize(id: string, imageUrl: string) {
-    const newImage: ImageState = {
-      id,
-      type: NodeType.IMAGE,
-      name: 'Image',
-      transform: {
-        x: Math.random() * 800,
-        y: Math.random() * 600,
-        width: DEFAULT_NODE_SIZE,
-        height: DEFAULT_NODE_SIZE,
-        rotation: 0,
-      },
-      style: { ...DEFAULT_IMAGE_STYLE },
-      props: {
-        imageUrl: imageUrl,
-        filters: { ...DEFAULT_IMAGE_FILTERS },
-      },
-      parentId: null,
-      isLocked: false,
-      isVisible: true,
-    };
-
-    this.store.addNode(newImage);
-    this.store.setActive([id]);
-    console.log('使用默认尺寸创建图片');
-  }
-
-  /**
-   * 业务逻辑：删除选中元素
-   */
-  deleteSelected() {
-    this.store.activeElementIds.forEach((id) => {
-      this.store.deleteNode(id);
-    });
-  }
+  // ==================== 单选缩放处理 ====================
 
   /**
    * 处理缩放控制点鼠标按下事件
@@ -1910,9 +1613,10 @@ export class ToolManager {
     });
   }
 
-  // ========== 以下为原有工具方法，无修改 ==========
+  // ==================== 节点创建功能 ====================
+
   /**
-   * 业务逻辑：创建矩形
+   * 创建矩形节点
    */
   createRect() {
     const id = uuidv4();
@@ -2141,6 +1845,8 @@ export class ToolManager {
       this.store.deleteNode(id);
     });
   }
+
+  // ==================== 缩放计算辅助方法 ====================
 
   /**
    * 圆形缩放计算
