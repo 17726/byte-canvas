@@ -263,11 +263,11 @@ export class ToolManager {
     if (e.button === 1) {
       this.isPanDragging = true;
       this.store.setActive([]); // 中键平移取消选中
-      return;
       // 退出组合编辑模式
       if (this.store.editingGroupId) {
         this.exitGroupEdit();
       }
+      return;
     }
 
     // 仅当未按空格时，才执行原有框选/多选区域拖拽逻辑
