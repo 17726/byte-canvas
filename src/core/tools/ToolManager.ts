@@ -1210,8 +1210,8 @@ export class ToolManager {
       type: NodeType.TEXT,
       name: 'Text',
       transform: {
-        x,
-        y,
+        x:x,
+        y:y,
         width: DEFAULT_TEXT_SIZE.width,
         height: DEFAULT_TEXT_SIZE.height,
         rotation: 0,

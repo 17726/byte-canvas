@@ -356,6 +356,20 @@ export const useCanvasStore = defineStore('canvas', () => {
     return true;
   }
 
+  // ==================== 选中部分文本编辑属性功能 ====================
+
+  // 新增：全局文本选区（与 activeTextNode 一一对应）
+  const globalTextSelection=null as { start: number; end: number } | null;
+
+  // 新增：更新全局选区（供文本组件调用）
+  function updateGlobalTextSelection(
+    this: ReturnType<typeof useCanvasStore>, // 关键：告诉 TS this 是 Store 实例
+    selection: { start: number; end: number } | null
+  ) {
+    // 赋值操作会被 ESLint 正确识别为“有副作用的操作”，无报错
+    this.globalTextSelection = selection;
+  }
+
   return {
     nodes,
     nodeOrder,
@@ -365,6 +379,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     isInteracting,
     renderList,
     activeElements,
+    globalTextSelection,
     updateNode,
     addNode,
     deleteNode,
@@ -380,5 +395,6 @@ export const useCanvasStore = defineStore('canvas', () => {
     cutSelected,
     paste,
     // UI 状态请使用 uiStore 中的 activePanel 和 isPanelExpanded
+    updateGlobalTextSelection
   };
 });

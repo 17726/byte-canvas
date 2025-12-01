@@ -70,38 +70,39 @@
           :max="100"
           style="width: 50px;margin-left: 2px;"
           hide-button
+          @change="handleFontSizeChange"
         />
       </div>
       <div class="tool-item">
         <a-tooltip placement="top" content="加粗">
-          <a-button size="mini" :type="isBold ? 'primary' : 'text'" @click="toggleBold">
+          <a-button size="mini" :type="isBold ? 'primary' : 'text'" @click="handleToggleBold">
             <icon-text-bold />
           </a-button>
         </a-tooltip>
       </div>
       <div class="tool-item">
         <a-tooltip placement="top" content="倾斜">
-          <a-button size="mini" :type="isItalic ? 'primary' : 'text'" @click="toggleItalic">
+          <a-button size="mini" :type="isItalic ? 'primary' : 'text'" @click="handleToggleItalic">
             <icon-text-italic />
           </a-button>
         </a-tooltip>
       </div>
       <div class="tool-item">
         <a-tooltip placement="top" content="下划线">
-            <a-button size="mini" :type="isUnderline ? 'primary' : 'text'" @click="toggleUnderline">
+            <a-button size="mini" :type="isUnderline ? 'primary' : 'text'" @click="handleToggleUnderline">
               <icon-text-underline />
             </a-button>
         </a-tooltip>
       </div>
       <div class="tool-item">
         <a-tooltip placement="top" content="删除线">
-          <a-button size="mini" :type="isStrikethrough ? 'primary' : 'text'" @click="toggleStrikethrough">
+          <a-button size="mini" :type="isStrikethrough ? 'primary' : 'text'" @click="handleToggleStrikeThrough">
             <icon-strikethrough />
           </a-button>
         </a-tooltip>
       </div>
       <div class="tool-item">
-        <a-color-picker size="mini" v-model="textColor" trigger="hover" />
+        <a-color-picker size="mini" v-model="textColor" trigger="hover" @input="handleColorChange" />
       </div>
     </template>
 
@@ -318,6 +319,12 @@ const activeTextNode = computed(() => {
   return null;
 });
 
+// 2. 从 Pinia 获取全局选区（与激活节点对应）
+const globalTextSelection = computed(() => {
+  return store.globalTextSelection;
+});
+
+
 // --- 具体的属性绑定 ---
 
 const fontSize = computed({
@@ -344,36 +351,117 @@ const isBold = computed(() => {
   const fw = activeTextNode.value?.props.fontWeight || 400;
   return fw >= 700;
 });
-const toggleBold = () => {
-  // 如果当前是粗体，设为 400，否则设为 700
-  if (!activeTextNode.value) return;
-  store.updateNode(activeTextNode.value.id, {
-    props: { fontWeight: isBold.value ? 400 : 700 },
-  } as Partial<TextState>);
-};
-
 const isItalic = computed(() => activeTextNode.value?.props.fontStyle === 'italic');
-const toggleItalic = () => {
-  if (!activeTextNode.value) return;
-  store.updateNode(activeTextNode.value.id, {
-    props: { fontStyle: isItalic.value ? 'normal' : 'italic' },
-  } as Partial<TextState>);
-};
-
 const isUnderline = computed(() => activeTextNode.value?.props.underline || false);
-const toggleUnderline = () => {
-  if (!activeTextNode.value) return;
+const isStrikethrough = computed(() => activeTextNode.value?.props.strikethrough || false);
+
+// 工具函数：添加/移除部分文本样式（修改依赖为全局状态）
+const toggleInlineStyle = (
+  styleKey: keyof Partial<Omit<TextState['props'], 'content' | 'inlineStyles'>>,
+  value: any
+) => {
+  if (!activeTextNode.value || !globalTextSelection.value) {
+    console.warn('请先选中需要格式化的文本');
+    return;
+  }
+
+  const { start, end } = globalTextSelection.value;
+  const newInlineStyles = [...activeTextNode.value.props.inlineStyles || []];
+  const existingIndex = newInlineStyles.findIndex(
+    s => s.start === start && s.end === end && s.styles[styleKey] === value
+  );
+
+  if (existingIndex !== -1) {
+    newInlineStyles.splice(existingIndex, 1);
+  } else {
+    newInlineStyles.push({ start, end, styles: { [styleKey]: value } });
+  }
+
+  // 调用 Pinia 更新节点状态
   store.updateNode(activeTextNode.value.id, {
-    props: { underline: !isUnderline.value },
-  } as Partial<TextState>);
+    props: { ...activeTextNode.value.props, inlineStyles: newInlineStyles }
+  });
 };
 
-const isStrikethrough = computed(() => activeTextNode.value?.props.strikethrough || false);
-const toggleStrikethrough = () => {
+// 加粗切换
+const handleToggleBold = () => {
   if (!activeTextNode.value) return;
-  store.updateNode(activeTextNode.value.id, {
-    props: { strikethrough: !isStrikethrough.value },
-  } as Partial<TextState>);
+  const currentWeight = activeTextNode.value.props.fontWeight;
+  toggleInlineStyle('fontWeight', currentWeight === 700 ? 400 : 700);
+};
+
+// 斜体切换
+const handleToggleItalic = () => {
+  if (!activeTextNode.value) return;
+  const currentStyle = activeTextNode.value.props.fontStyle;
+  toggleInlineStyle('fontStyle', currentStyle === 'italic' ? 'normal' : 'italic');
+};
+
+// 下划线切换
+const handleToggleUnderline = () => {
+  if (!activeTextNode.value) return;
+  const currentUnderline = activeTextNode.value.props.underline;
+  toggleInlineStyle('underline', !currentUnderline);
+};
+
+// 删除线切换
+const handleToggleStrikeThrough = () => {
+  if (!activeTextNode.value) return;
+  const currentStrike = activeTextNode.value.props.strikethrough;
+  toggleInlineStyle('strikethrough', !currentStrike);
+};
+
+
+// 字体选择(稍后实现)
+// const handleFontFamilyChange = (e: Event) => {
+//   const target = e.target as HTMLSelectElement;
+//   const fontFamily = target.value.trim(); // 去除空格，避免空字符串
+
+//   // 校验：有激活节点 + 有选区 + 字体值有效
+//   if (!activeTextNode.value || !globalTextSelection.value || !fontFamily) {
+//     target.value = ''; // 重置下拉框
+//     return;
+//   }
+
+//   // 调用工具函数添加/移除字体样式
+//   toggleInlineStyle('fontFamily', fontFamily);
+//   target.value = ''; // 重置下拉框，提升用户体验
+// };
+
+// 字号选择
+const handleFontSizeChange = (e: Event) => {
+  const target = e.target as HTMLSelectElement;
+  const fontSize = Number(target.value);
+
+  // 校验：有激活节点 + 有选区 + 字号是有效数字（8-48px 范围）
+  if (
+    !activeTextNode.value ||
+    !globalTextSelection.value ||
+    isNaN(fontSize) ||
+    fontSize < 8 ||
+    fontSize > 48
+  ) {
+    target.value = ''; // 重置下拉框
+    return;
+  }
+
+  // 调用工具函数添加/移除字号样式
+  toggleInlineStyle('fontSize', fontSize);
+  target.value = ''; // 重置下拉框
+};
+
+// 颜色选择
+const handleColorChange = (e: Event) => {
+  const target = e.target as HTMLInputElement;
+  const color = target.value.trim();
+
+  // 校验：有激活节点 + 有选区 + 颜色值有效（非空）
+  if (!activeTextNode.value || !globalTextSelection.value || !color) {
+    return;
+  }
+
+  // 调用工具函数添加颜色样式（颜色选择无需重置，保持选中的颜色显示）
+  toggleInlineStyle('color', color);
 };
 
 const handleDelete = () => {
