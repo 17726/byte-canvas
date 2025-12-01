@@ -76,6 +76,9 @@ import {
 const store = useCanvasStore();
 const stageRef = ref<HTMLElement | null>(null);
 
+// 空格键状态（迁移自ToolManager，统一在组件内维护）
+const isSpacePressed = ref(false);
+
 // 创建 toolManager ref 并立即 provide（解决依赖注入时序问题）
 const toolManagerRef = ref<ToolManager | null>(null);
 provide('toolManager', toolManagerRef);
@@ -90,10 +93,22 @@ const viewportStyle = computed(() => ({
 const stageStyle = computed(() => {
   const bg = store.viewport.backgroundColor || DEFAULT_CANVAS_BG; // use store setting
 
+  // 基础样式：先初始化背景色 + 光标样式
+  const style: CSSProperties = {
+    backgroundColor: bg,
+    // 空格按下时切换为手型光标：
+    // - 未交互时：grab（可拖拽手型）
+    // - 交互中（如拖拽画布）：grabbing（拖拽中手型）
+    // - 未按空格：默认光标（可根据需求调整为 'default'/'auto'）
+    cursor: isSpacePressed.value ? (store.isInteracting ? 'grabbing' : 'grab') : 'default',
+  };
+
+  // 网格不可见时，直接返回基础样式（含光标）
   if (!store.viewport.isGridVisible) {
-    return { backgroundColor: bg };
+    return style;
   }
 
+  // 原有网格样式计算逻辑（不变）
   const gridSize = Math.max(8, store.viewport.gridSize) * store.viewport.zoom; // 防止 zoom=0 或 gridSize 太小影响显示
   const offsetX = store.viewport.offsetX;
   const offsetY = store.viewport.offsetY;
@@ -101,7 +116,6 @@ const stageStyle = computed(() => {
   const dotSize = store.viewport.gridDotSize || DEFAULT_GRID_DOT_SIZE; // px
   const gridStyle = store.viewport.gridStyle || 'dot';
 
-  const style: CSSProperties = { backgroundColor: bg };
   if (gridStyle === 'dot') {
     style.backgroundImage = `radial-gradient(${dotColor} ${dotSize}px, transparent ${dotSize}px)`;
     style.backgroundSize = `${gridSize}px ${gridSize}px`;
@@ -141,8 +155,7 @@ const getComponentType = (type: NodeType) => {
       return 'div';
   }
 };
-// 3. 事件转发 -> 逻辑层 (ToolManager)
-// 滚轮缩放
+
 // 框选状态响应式数据
 const isBoxSelecting = ref(false);
 const boxSelectStart = ref({ x: 0, y: 0 });
@@ -181,17 +194,20 @@ const boxSelectStyle = computed(() => {
   };
 });
 
-// 3. 事件转发 -> 逻辑层
+// 3. 事件转发 -> 逻辑层 (ToolManager)
+// 滚轮缩放
 const handleWheel = (e: WheelEvent) => {
   if (!toolManagerRef.value) return; // 防御性判断
   toolManagerRef.value.handleWheel(e);
 };
-// 鼠标按下
+
+// 画布鼠标按下
 const handleMouseDown = (e: MouseEvent) => {
   if (!toolManagerRef.value) return;
   toolManagerRef.value.handleMouseDown(e);
 };
-// 鼠标移动
+
+// 全局鼠标移动
 const handleMouseMove = (e: MouseEvent) => {
   if (!toolManagerRef.value) return;
   toolManagerRef.value.handleMouseMove(e);
@@ -201,14 +217,15 @@ const handleMouseMove = (e: MouseEvent) => {
   boxSelectStart.value = boxState.boxSelectStart;
   boxSelectEnd.value = boxState.boxSelectEnd;
 };
-// 鼠标抬起
+
+// 全局鼠标抬起
 const handleMouseUp = () => {
   if (!toolManagerRef.value) return;
   toolManagerRef.value.handleMouseUp();
   isBoxSelecting.value = false;
 };
 
-// 节点交互转发
+// 节点鼠标按下
 const handleNodeDown = (e: MouseEvent, id: string) => {
   // 注意：这里传入 e，以便 ToolManager 处理 stopPropagation 或其他逻辑
   if (!toolManagerRef.value) return;
@@ -225,13 +242,22 @@ const handleNodeDoubleClick = (e: MouseEvent, id: string) => {
 const createRect = () => toolManagerRef.value?.createRect();
 const createCircle = () => toolManagerRef.value?.createCircle();
 const createText = () => toolManagerRef.value?.createText();
+const createImageWithUrl = (imageUrl?: string) =>
+  toolManagerRef.value?.createImageWithUrl(imageUrl);
 const deleteSelected = () => toolManagerRef.value?.deleteSelected();
 
-// 键盘快捷键处理
+// 键盘事件处理（整合所有键盘逻辑：快捷键 + 空格键）
 const handleKeyDown = (e: KeyboardEvent) => {
   // 忽略输入框内的键盘事件
   const target = e.target as HTMLElement;
   if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+    return;
+  }
+
+  // 空格键按下（迁移自ToolManager）
+  if (e.code === 'Space') {
+    isSpacePressed.value = true;
+    e.preventDefault(); // 阻止空格的默认行为（页面滚动）
     return;
   }
 
@@ -291,27 +317,48 @@ const handleKeyDown = (e: KeyboardEvent) => {
   }
 };
 
-// 全局事件监听
+// 空格键松开（迁移自ToolManager）
+const handleKeyUp = (e: KeyboardEvent) => {
+  if (e.code === 'Space') {
+    isSpacePressed.value = false;
+  }
+};
+
+// 窗口失去焦点时重置空格键状态（迁移自ToolManager）
+const handleWindowBlur = () => {
+  isSpacePressed.value = false;
+};
+
+// 全局事件监听（整合所有事件：鼠标 + 键盘）
 onMounted(() => {
-  // 1. 初始化 toolManager 并赋值给 ref
-  toolManagerRef.value = new ToolManager(stageRef.value);
+  // 1. 初始化 toolManager，传入空格键状态获取函数
+  toolManagerRef.value = new ToolManager(stageRef.value, () => isSpacePressed.value);
 
   // 2. 暴露方法给父组件（可选，若需要外部调用）
   provide('createRect', createRect);
   provide('createCircle', createCircle);
   provide('createText', createText);
+  provide('createImageWithUrl', createImageWithUrl);
   provide('deleteSelected', deleteSelected);
 
-  // 绑定事件
+  // 3. 绑定全局事件（鼠标 + 键盘）
   window.addEventListener('mousemove', handleMouseMove);
   window.addEventListener('mouseup', handleMouseUp);
   window.addEventListener('keydown', handleKeyDown);
+  window.addEventListener('keyup', handleKeyUp);
+  window.addEventListener('blur', handleWindowBlur);
 });
 
+// 解绑全局事件（防止内存泄漏）
 onUnmounted(() => {
   window.removeEventListener('mousemove', handleMouseMove);
   window.removeEventListener('mouseup', handleMouseUp);
   window.removeEventListener('keydown', handleKeyDown);
+  window.removeEventListener('keyup', handleKeyUp);
+  window.removeEventListener('blur', handleWindowBlur);
+
+  // 销毁 toolManager
+  toolManagerRef.value?.destroy();
 });
 </script>
 
