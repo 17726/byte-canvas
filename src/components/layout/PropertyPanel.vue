@@ -73,12 +73,12 @@
           <div class="section-title">变换</div>
           <a-row :gutter="8" class="prop-row">
             <a-col :span="12">
-              <a-input-number v-model="transformX" size="small" precision="2">
+              <a-input-number v-model="transformX" size="small" :precision="1">
                 <template #prefix>X</template>
               </a-input-number>
             </a-col>
             <a-col :span="12">
-              <a-input-number v-model="transformY" size="small" precision="2">
+              <a-input-number v-model="transformY" size="small" :precision="1">
                 <template #prefix>Y</template>
               </a-input-number>
             </a-col>
@@ -97,29 +97,31 @@
           </a-row>
           <a-row :gutter="8" class="prop-row">
             <a-col :span="24">
-              <a-input-number v-model="transformRotation" size="small">
+              <!-- <a-input-number v-model="transformRotation" size="small">
                 <template #prefix>∠</template>
                 <template #suffix>°</template>
-              </a-input-number>
+              </a-input-number> -->
+              <span class="section-title">旋转角度</span>
+              <a-slider v-model="transformRotation" :min="-180" :max="180" :step="0.1" show-input size="small" />
             </a-col>
           </a-row>
         </div>
 
         <a-divider style="margin: 12px 0" />
-
+ 
         <!-- Section 2: 外观 (Appearance) -->
         <div class="panel-section">
-          <div class="section-title">外观</div>
+          <div class="label">外观</div>
 
           <!-- Fill -->
           <div class="prop-item" v-if="!isImage">
-            <span class="label">填充</span>
+            <div class="section-title">填充</div>
             <a-color-picker v-model="fillColor" size="small" />
           </div>
 
           <!-- Stroke -->
           <div class="prop-item">
-            <span class="label">描边</span>
+            <div class="section-title">描边</div>
             <div class="flex-row">
               <a-color-picker v-model="strokeColor" size="small" />
               <a-input-number v-model="strokeWidth" size="small" style="width: 80px" :min="0">
@@ -127,10 +129,9 @@
               </a-input-number>
             </div>
           </div>
-
           <!-- Opacity -->
           <div class="prop-item">
-            <span class="label">不透明度</span>
+            <div class="section-title">不透明度</div>
             <a-slider v-model="opacity" :min="0" :max="1" :step="0.01" show-input size="small" />
           </div>
           <template v-if="isShape">
@@ -152,31 +153,31 @@
 
         <!-- Section 3: 特有属性 (Specific) -->
         <div class="panel-section" v-if="isText || isShape || isImage">
-          <div class="section-title">属性</div>
+          <div class="label">属性</div>
             <div class="common">
-              <span class="label">z-Index</span>
+              <div class="section-title">z-Index</div>
               <a-input-number v-model="zIndex" size="small" :min="1" mode="button" />
             </div>
             <br/>
           <!-- Text Specific -->
           <template v-if="isText">
             <div class="prop-item">
-              <span class="label">内容</span>
+              <div class="section-title">内容</div>
               <a-textarea v-model="textContent" :auto-size="{ minRows: 2, maxRows: 5 }" />
             </div>
             <div class="prop-item">
-              <span class="label">字号</span>
+              <div class="section-title">字号</div>
               <a-input-number v-model="fontSize" size="small" :min="1" />
             </div>
             <div class="prop-item">
-              <span class="label">字重</span>
+              <div class="section-title">字重</div>
               <a-select v-model="fontWeight" size="small">
                 <a-option :value="400">Normal</a-option>
                 <a-option :value="700">Bold</a-option>
               </a-select>
             </div>
             <div class="prop-item">
-              <span class="label">颜色</span>
+              <div class="section-title">颜色</div>
               <a-color-picker v-model="textColor" show-text size="small" />
             </div>
           </template>

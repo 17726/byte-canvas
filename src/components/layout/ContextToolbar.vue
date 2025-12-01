@@ -4,7 +4,7 @@
     <div class="tool-section">
         <div class="tool-item">
           <a-tooltip placement="top" title="不透明度" :mouseEnterDelay="0.3">
-            <span class="label" style="pointer-events: none;">Opacity</span>
+            <span class="label" style="pointer-events: none;width: 38px;">透明度</span>
             <a-slider
               v-model="opacity"
               :min="0"
@@ -48,14 +48,22 @@
       </div>
       <div class="tool-item">
         <span style="width: 50px;">边框：</span>
-        <a-input-number
+        <!-- <a-input-number
           size="mini"
           v-model="strokeWidth"
           :min="0"
           :max="20"
           style="width: 50px"
           hide-button
-        />
+          class="input-demo"
+        /> -->
+        <a-input-number 
+        size="mini"
+        v-model="strokeWidth" 
+        style="width: 50px" 
+         class="input-demo"
+         :min="0" 
+         :max="100"/>
       </div>
     </template>
 
@@ -63,14 +71,22 @@
     <template v-if="isText">
       <div class="tool-item" style="width: 85px">
         字号:
-        <a-input-number
+        <!-- <a-input-number
           size="mini"
           v-model="fontSize"
           :min="12"
           :max="100"
           style="width: 50px;margin-left: 2px;"
           hide-button
-        />
+          mode="button" 
+        /> -->
+        <a-input-number 
+        size="mini"
+        v-model="fontSize" 
+        style="width: 50px;margin-left: 2px;" 
+         class="input-demo"
+         :min="12" 
+         :max="100"/>
       </div>
       <div class="tool-item">
         <a-tooltip placement="top" content="加粗">
@@ -106,10 +122,9 @@
     </template>
 
     <template v-if="isImage">
-      <div class="tool-item">
+      <!-- <div class="tool-item">
         <div class="prop-item">
               <div class="filter-options">
-                <!-- 黑白滤镜 -->
                 <a-tooltip placement="top" content="黑白">
                   <div class="filter-item" @click="selectFilter('grayscale')">
                     <div
@@ -122,7 +137,6 @@
                     ></div>
                   </div>
                 </a-tooltip>
-                <!-- 模糊滤镜 -->
                 <a-tooltip placement="top" content="模糊">
                   <div class="filter-item" @click="selectFilter('blur')">
                     <div
@@ -135,7 +149,6 @@
                     ></div>
                   </div>
                 </a-tooltip>
-                <!-- 复古滤镜 -->
                 <a-tooltip placement="top" content="复古">
                   <div class="filter-item" @click="selectFilter('vintage')">
                     <div
@@ -149,7 +162,6 @@
                     ></div>
                   </div>
                 </a-tooltip>
-                <!-- 重置滤镜 -->
                  <a-tooltip placement="top" content="重置">
                   <div class="filter-item" @click="selectFilter('reset')">
                     <div
@@ -164,7 +176,7 @@
                  </a-tooltip>
               </div>
         </div>
-      </div>
+      </div> -->
     </template>
 
     <!-- Delete -->
@@ -180,11 +192,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed,ref } from 'vue';
+import { computed} from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
-import { NodeType, type ImageState,type ShapeState, type TextState } from '@/types/state';
+import { NodeType,type ShapeState, type TextState } from '@/types/state';
 import { worldToClient } from '@/core/utils/geometry';
-import { DEFAULT_IMAGE_FILTERS, DEFAULT_IMAGE_URL } from '@/config/defaults';
+// import { DEFAULT_IMAGE_FILTERS, DEFAULT_IMAGE_URL } from '@/config/defaults';
 import {
   Delete as IconDelete,
   TextBold as IconTextBold,
@@ -383,98 +395,98 @@ const handleDelete = () => {
 };
 
 // 选择滤镜
-const selectedFilter = ref<string | null>(null);
-const selectFilter = (filterType: string) => {
-  selectedFilter.value = filterType;
+// const selectedFilter = ref<string | null>(null);
+// const selectFilter = (filterType: string) => {
+//   selectedFilter.value = filterType;
 
-  switch (filterType) {
-    case 'grayscale':
-      grayscaleFilter();
-      break;
-    case 'blur':
-      blurFilter();
-      break;
-    case 'vintage':
-      vintageFilter();
-      break;
-    case 'reset':
-      resetFilter();
-      break;
-  }
-};
-const grayscaleFilter = () => {
-  store.activeElements.forEach((element) => {
-    if (element && element.id && element.type === 'image') {
-      store.updateNode(element.id, {
-        props: {
-          ...element.props,
-          filters: {
-            grayscale: 100,
-            contrast: 110,
-            brightness: 95,
-          },
-        },
-      });
-    }
-  });
-};
+//   switch (filterType) {
+//     case 'grayscale':
+//       grayscaleFilter();
+//       break;
+//     case 'blur':
+//       blurFilter();
+//       break;
+//     case 'vintage':
+//       vintageFilter();
+//       break;
+//     case 'reset':
+//       resetFilter();
+//       break;
+//   }
+// };
+// const grayscaleFilter = () => {
+//   store.activeElements.forEach((element) => {
+//     if (element && element.id && element.type === 'image') {
+//       store.updateNode(element.id, {
+//         props: {
+//           ...element.props,
+//           filters: {
+//             grayscale: 100,
+//             contrast: 110,
+//             brightness: 95,
+//           },
+//         },
+//       });
+//     }
+//   });
+// };
 
-const blurFilter = () => {
-  store.activeElements.forEach((element) => {
-    if (element && element.id && element.type === 'image') {
-      store.updateNode(element.id, {
-        props: {
-          ...element.props,
-          filters: {
-            blur: 8,
-            brightness: 98,
-            filterOpacity: 95,
-          },
-        },
-      });
-    }
-  });
-};
+// const blurFilter = () => {
+//   store.activeElements.forEach((element) => {
+//     if (element && element.id && element.type === 'image') {
+//       store.updateNode(element.id, {
+//         props: {
+//           ...element.props,
+//           filters: {
+//             blur: 8,
+//             brightness: 98,
+//             filterOpacity: 95,
+//           },
+//         },
+//       });
+//     }
+//   });
+// };
 
-const vintageFilter = () => {
-  store.activeElements.forEach((element) => {
-    if (element && element.id && element.type === 'image') {
-      store.updateNode(element.id, {
-        props: {
-          ...element.props,
-          filters: {
-            sepia: 60, // 棕褐色调
-            contrast: 115, // 增强对比度
-            brightness: 95, // 降低亮度
-            saturate: 85, // 降低饱和度
-            hueRotate: -10, // 轻微色相偏移
-          },
-        },
-      });
-    }
-  });
-};
+// const vintageFilter = () => {
+//   store.activeElements.forEach((element) => {
+//     if (element && element.id && element.type === 'image') {
+//       store.updateNode(element.id, {
+//         props: {
+//           ...element.props,
+//           filters: {
+//             sepia: 60, // 棕褐色调
+//             contrast: 115, // 增强对比度
+//             brightness: 95, // 降低亮度
+//             saturate: 85, // 降低饱和度
+//             hueRotate: -10, // 轻微色相偏移
+//           },
+//         },
+//       });
+//     }
+//   });
+// };
 
-const resetFilter = () => {
-  store.activeElements.forEach((element) => {
-    if (element && element.id && element.type === 'image') {
-      store.updateNode(element.id, {
-        props: {
-          ...element.props,
-          filters: DEFAULT_IMAGE_FILTERS,
-        },
-      });
-    }
-  });
-};
-// 预览图片（可以使用当前选中图片的缩略图）
-const previewImage = computed(() => {
-  // 这里可以返回当前选中图片的URL
-  return (activeNode.value as ImageState)?.props?.imageUrl || DEFAULT_IMAGE_URL;
-});
+// const resetFilter = () => {
+//   store.activeElements.forEach((element) => {
+//     if (element && element.id && element.type === 'image') {
+//       store.updateNode(element.id, {
+//         props: {
+//           ...element.props,
+//           filters: DEFAULT_IMAGE_FILTERS,
+//         },
+//       });
+//     }
+//   });
+// };
+// // 预览图片（可以使用当前选中图片的缩略图）
+// const previewImage = computed(() => {
+//   // 这里可以返回当前选中图片的URL
+//   return (activeNode.value as ImageState)?.props?.imageUrl || DEFAULT_IMAGE_URL;
+// });
 
-// 默认预览图片（当没有选中图片时使用）
-const defaultImage = DEFAULT_IMAGE_URL;
+// // 默认预览图片（当没有选中图片时使用）
+// const defaultImage = DEFAULT_IMAGE_URL;
 </script>
 
 <style scoped>
