@@ -731,6 +731,12 @@ export class ToolManager {
 
       // 删除组合节点
       delete this.store.nodes[id];
+
+      // 无论是否嵌套，都确保从 nodeOrder 中移除该组合 ID，防止悬空引用
+      const indexInOrder = this.store.nodeOrder.indexOf(id);
+      if (indexInOrder >= 0) {
+        this.store.nodeOrder.splice(indexInOrder, 1);
+      }
     });
 
     if (ungroupedIds.length > 0) {
