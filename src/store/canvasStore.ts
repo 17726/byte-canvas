@@ -125,56 +125,61 @@ export const useCanvasStore = defineStore('canvas', () => {
       // 处理组合的 style 变更：同步更新子节点的相应样式
       if ('style' in patch && patch.style) {
         const stylePatch = patch.style;
+        const currentStyle = node.style;
 
-        // 递归更新所有后代节点的样式
-        const updateChildrenStyle = (childIds: string[]) => {
-          childIds.forEach((childId) => {
-            const child = nodes.value[childId];
-            if (!child) return;
+        const opacityChanged =
+          stylePatch.opacity !== undefined && stylePatch.opacity !== currentStyle.opacity;
+        const backgroundChanged =
+          stylePatch.backgroundColor !== undefined &&
+          stylePatch.backgroundColor !== currentStyle.backgroundColor;
+        const borderColorChanged =
+          stylePatch.borderColor !== undefined &&
+          stylePatch.borderColor !== currentStyle.borderColor;
+        const borderWidthChanged =
+          stylePatch.borderWidth !== undefined &&
+          stylePatch.borderWidth !== currentStyle.borderWidth;
 
-            // 构建子节点的样式更新
-            const childStylePatch: Record<string, unknown> = {};
+        const shouldSyncChildren =
+          opacityChanged || backgroundChanged || borderColorChanged || borderWidthChanged;
 
-            // 透明度同步
-            if ('opacity' in stylePatch && stylePatch.opacity !== undefined) {
-              childStylePatch.opacity = stylePatch.opacity;
-            }
+        if (shouldSyncChildren) {
+          const updateChildrenStyle = (childIds: string[]) => {
+            childIds.forEach((childId) => {
+              const child = nodes.value[childId];
+              if (!child) return;
 
-            // 填充色同步（仅对形状节点）
-            if ('backgroundColor' in stylePatch && stylePatch.backgroundColor !== undefined) {
-              if (child.type === NodeType.RECT || child.type === NodeType.CIRCLE) {
+              const childStylePatch: Record<string, unknown> = {};
+              const isShapeNode = child.type === NodeType.RECT || child.type === NodeType.CIRCLE;
+
+              if (opacityChanged) {
+                childStylePatch.opacity = stylePatch.opacity;
+              }
+
+              if (backgroundChanged && isShapeNode) {
                 childStylePatch.backgroundColor = stylePatch.backgroundColor;
               }
-            }
 
-            // 描边色同步（仅对形状节点）
-            if ('borderColor' in stylePatch && stylePatch.borderColor !== undefined) {
-              if (child.type === NodeType.RECT || child.type === NodeType.CIRCLE) {
+              if (borderColorChanged && isShapeNode) {
                 childStylePatch.borderColor = stylePatch.borderColor;
               }
-            }
 
-            // 描边宽度同步（仅对形状节点）
-            if ('borderWidth' in stylePatch && stylePatch.borderWidth !== undefined) {
-              if (child.type === NodeType.RECT || child.type === NodeType.CIRCLE) {
+              if (borderWidthChanged && isShapeNode) {
                 childStylePatch.borderWidth = stylePatch.borderWidth;
               }
-            }
 
-            // 应用样式更新
-            if (Object.keys(childStylePatch).length > 0) {
-              child.style = { ...child.style, ...childStylePatch };
-            }
+              if (Object.keys(childStylePatch).length > 0) {
+                child.style = { ...child.style, ...childStylePatch };
+              }
 
-            // 如果子节点也是组合，递归处理
-            if (child.type === NodeType.GROUP) {
-              const childGroup = child as import('@/types/state').GroupState;
-              updateChildrenStyle(childGroup.children);
-            }
-          });
-        };
+              if (child.type === NodeType.GROUP) {
+                const childGroup = child as import('@/types/state').GroupState;
+                updateChildrenStyle(childGroup.children);
+              }
+            });
+          };
 
-        updateChildrenStyle(groupNode.children);
+          updateChildrenStyle(groupNode.children);
+        }
       }
     }
     // ==================== 组合节点特殊处理结束 ====================
