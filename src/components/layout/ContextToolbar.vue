@@ -2,25 +2,32 @@
   <div v-if="isVisible" class="context-toolbar" :style="positionStyle" @mousedown.stop>
     <!-- Common Properties (Opacity & Layer) -->
     <div class="tool-section">
-      <div class="tool-item" title="不透明度">
-        <span class="label">Opacity</span>
-        <a-slider
-          v-model="opacity"
-          :min="0"
-          :max="1"
-          :step="0.01"
-          style="width: 60px; margin-left: 8px"
-          size="mini"
-        />
-      </div>
+        <div class="tool-item">
+          <a-tooltip placement="top" title="不透明度" :mouseEnterDelay="0.3">
+            <span class="label" style="pointer-events: none;">Opacity</span>
+            <a-slider
+              v-model="opacity"
+              :min="0"
+              :max="1"
+              :step="0.01"
+              style="width: 60px; margin-left: 8px"
+              size="mini"
+              :tooltip-visible="false"
+            />
+          </a-tooltip>
+        </div>
       <div class="divider"></div>
       <div class="tool-item">
-        <a-button size="mini" type="text" @click="bringToFront" title="置于最前">
-          <icon-bring-to-front />
-        </a-button>
-        <a-button size="mini" type="text" @click="sendToBack" title="置于最底">
-          <icon-send-to-back />
-        </a-button>
+        <a-tooltip placement="top" content="置顶">
+          <a-button size="mini" type="text" @click="bringToFront">
+            <icon-bring-to-front />
+          </a-button>
+        </a-tooltip>
+        <a-tooltip placement="top" content="置底">
+          <a-button size="mini" type="text" @click="sendToBack">
+            <icon-send-to-back />
+          </a-button>
+        </a-tooltip>
       </div>
     </div>
 
@@ -29,11 +36,15 @@
     <!-- Shape Controls -->
     <template v-if="isShape">
       <div class="tool-item">
-        <a-color-picker size="mini" v-model="fillColor" trigger="hover" disabled-alpha />
+        <a-tooltip placement="top" content="填充色">
+          <a-color-picker size="mini" v-model="fillColor" trigger="hover" disabled-alpha />
+        </a-tooltip>
       </div>
       <div class="divider"></div>
       <div class="tool-item">
-        <a-color-picker size="mini" v-model="strokeColor" trigger="hover" />
+        <a-tooltip placement="top" content="边框色">
+          <a-color-picker size="mini" v-model="strokeColor" trigger="hover" />
+        </a-tooltip>
       </div>
       <div class="tool-item">
         <span style="width: 50px;">边框：</span>
@@ -62,51 +73,118 @@
         />
       </div>
       <div class="tool-item">
-        <a-button size="mini" :type="isBold ? 'primary' : 'text'" @click="toggleBold">
-          <icon-text-bold />
-        </a-button>
+        <a-tooltip placement="top" content="加粗">
+          <a-button size="mini" :type="isBold ? 'primary' : 'text'" @click="toggleBold">
+            <icon-text-bold />
+          </a-button>
+        </a-tooltip>
       </div>
       <div class="tool-item">
-        <a-button size="mini" :type="isItalic ? 'primary' : 'text'" @click="toggleItalic">
-          <icon-text-italic />
-        </a-button>
+        <a-tooltip placement="top" content="倾斜">
+          <a-button size="mini" :type="isItalic ? 'primary' : 'text'" @click="toggleItalic">
+            <icon-text-italic />
+          </a-button>
+        </a-tooltip>
       </div>
       <div class="tool-item">
-        <a-button size="mini" :type="isUnderline ? 'primary' : 'text'" @click="toggleUnderline">
-          <icon-text-underline />
-        </a-button>
+        <a-tooltip placement="top" content="下划线">
+            <a-button size="mini" :type="isUnderline ? 'primary' : 'text'" @click="toggleUnderline">
+              <icon-text-underline />
+            </a-button>
+        </a-tooltip>
       </div>
       <div class="tool-item">
-        <a-button
-          size="mini"
-          :type="isStrikethrough ? 'primary' : 'text'"
-          @click="toggleStrikethrough"
-        >
-          <icon-strikethrough />
-        </a-button>
+        <a-tooltip placement="top" content="删除线">
+          <a-button size="mini" :type="isStrikethrough ? 'primary' : 'text'" @click="toggleStrikethrough">
+            <icon-strikethrough />
+          </a-button>
+        </a-tooltip>
       </div>
       <div class="tool-item">
         <a-color-picker size="mini" v-model="textColor" trigger="hover" />
       </div>
     </template>
 
- 
+    <template v-if="isImage">
+      <div class="tool-item">
+        <div class="prop-item">
+              <div class="filter-options">
+                <!-- 黑白滤镜 -->
+                <a-tooltip placement="top" content="黑白">
+                  <div class="filter-item" @click="selectFilter('grayscale')">
+                    <div
+                      class="filter-preview"
+                      :class="{ active: selectedFilter === 'grayscale' }"
+                      :style="{
+                        backgroundImage: 'url(' + (previewImage || defaultImage) + ')',
+                        filter: 'grayscale(100%) contrast(110%) brightness(95%)',
+                      }"
+                    ></div>
+                  </div>
+                </a-tooltip>
+                <!-- 模糊滤镜 -->
+                <a-tooltip placement="top" content="模糊">
+                  <div class="filter-item" @click="selectFilter('blur')">
+                    <div
+                      class="filter-preview"
+                      :class="{ active: selectedFilter === 'blur' }"
+                      :style="{
+                        backgroundImage: 'url(' + (previewImage || defaultImage) + ')',
+                        filter: 'blur(8px) brightness(98%) opacity(95%)',
+                      }"
+                    ></div>
+                  </div>
+                </a-tooltip>
+                <!-- 复古滤镜 -->
+                <a-tooltip placement="top" content="复古">
+                  <div class="filter-item" @click="selectFilter('vintage')">
+                    <div
+                      class="filter-preview"
+                      :class="{ active: selectedFilter === 'vintage' }"
+                      :style="{
+                        backgroundImage: 'url(' + (previewImage || defaultImage) + ')',
+                        filter:
+                          'sepia(60%) contrast(115%) brightness(95%) saturate(85%) hue-rotate(-10deg) ',
+                      }"
+                    ></div>
+                  </div>
+                </a-tooltip>
+                <!-- 重置滤镜 -->
+                 <a-tooltip placement="top" content="重置">
+                  <div class="filter-item" @click="selectFilter('reset')">
+                    <div
+                      class="filter-preview"
+                      :class="{ active: selectedFilter === 'reset' }"
+                      :style="{
+                        backgroundImage: 'url(' + (previewImage || defaultImage) + ')',
+                        filter: 'none',
+                      }"
+                    ></div>
+                  </div>
+                 </a-tooltip>
+              </div>
+        </div>
+      </div>
+    </template>
 
     <!-- Delete -->
     <div class="tool-item">
       <div class="divider"></div>
-      <a-button size="mini" status="danger" type="text" @click="handleDelete">
-        <icon-delete />
-      </a-button>
+      <a-tooltip placement="top" content="删除">
+        <a-button size="mini" status="danger" type="text" @click="handleDelete">
+          <icon-delete />
+        </a-button>
+      </a-tooltip>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed,ref } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
-import { NodeType, type ShapeState, type TextState } from '@/types/state';
+import { NodeType, type ImageState,type ShapeState, type TextState } from '@/types/state';
 import { worldToClient } from '@/core/utils/geometry';
+import { DEFAULT_IMAGE_FILTERS, DEFAULT_IMAGE_URL } from '@/config/defaults';
 import {
   Delete as IconDelete,
   TextBold as IconTextBold,
@@ -160,6 +238,10 @@ const isShape = computed(() => {
 
 const isText = computed(() => {
   return activeNode.value?.type === NodeType.TEXT;
+});
+
+const isImage = computed(() => {
+  return activeNode.value?.type === NodeType.IMAGE;
 });
 
 // --- Common Actions (对选中节点的操作，例如置于最前 / 置于最底 / 删除) ---
@@ -299,6 +381,100 @@ const handleDelete = () => {
     store.deleteNode(activeNode.value.id);
   }
 };
+
+// 选择滤镜
+const selectedFilter = ref<string | null>(null);
+const selectFilter = (filterType: string) => {
+  selectedFilter.value = filterType;
+
+  switch (filterType) {
+    case 'grayscale':
+      grayscaleFilter();
+      break;
+    case 'blur':
+      blurFilter();
+      break;
+    case 'vintage':
+      vintageFilter();
+      break;
+    case 'reset':
+      resetFilter();
+      break;
+  }
+};
+const grayscaleFilter = () => {
+  store.activeElements.forEach((element) => {
+    if (element && element.id && element.type === 'image') {
+      store.updateNode(element.id, {
+        props: {
+          ...element.props,
+          filters: {
+            grayscale: 100,
+            contrast: 110,
+            brightness: 95,
+          },
+        },
+      });
+    }
+  });
+};
+
+const blurFilter = () => {
+  store.activeElements.forEach((element) => {
+    if (element && element.id && element.type === 'image') {
+      store.updateNode(element.id, {
+        props: {
+          ...element.props,
+          filters: {
+            blur: 8,
+            brightness: 98,
+            filterOpacity: 95,
+          },
+        },
+      });
+    }
+  });
+};
+
+const vintageFilter = () => {
+  store.activeElements.forEach((element) => {
+    if (element && element.id && element.type === 'image') {
+      store.updateNode(element.id, {
+        props: {
+          ...element.props,
+          filters: {
+            sepia: 60, // 棕褐色调
+            contrast: 115, // 增强对比度
+            brightness: 95, // 降低亮度
+            saturate: 85, // 降低饱和度
+            hueRotate: -10, // 轻微色相偏移
+          },
+        },
+      });
+    }
+  });
+};
+
+const resetFilter = () => {
+  store.activeElements.forEach((element) => {
+    if (element && element.id && element.type === 'image') {
+      store.updateNode(element.id, {
+        props: {
+          ...element.props,
+          filters: DEFAULT_IMAGE_FILTERS,
+        },
+      });
+    }
+  });
+};
+// 预览图片（可以使用当前选中图片的缩略图）
+const previewImage = computed(() => {
+  // 这里可以返回当前选中图片的URL
+  return (activeNode.value as ImageState)?.props?.imageUrl || DEFAULT_IMAGE_URL;
+});
+
+// 默认预览图片（当没有选中图片时使用）
+const defaultImage = DEFAULT_IMAGE_URL;
 </script>
 
 <style scoped>
@@ -337,5 +513,35 @@ const handleDelete = () => {
   width: 1px;
   height: 16px;
   background-color: var(--color-border-2);
+}
+
+.filter-options {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+.filter-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+}
+.filter-preview {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  background-size: cover;
+  background-position: center;
+  border: 2px solid #e5e5e5;
+  transition: all 0.2s ease;
+}
+.filter-preview.active {
+  border-color: #1890ff;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+}
+.filter-name {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #666;
 }
 </style>
