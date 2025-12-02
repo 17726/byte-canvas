@@ -1,23 +1,17 @@
-import type {
-  InternalResizeState,
-  ResizeHandle,
-  InternalMultiResizeState,
-  NodeStartState,
-} from '@/types/editor';
-import {
-  clientToWorld,
-  isNodeInRect,
-  calculateRectResize,
-  calculateCircleResize,
-  calculateTextResize,
-} from '@/core/utils/geometry';
+import { clientToWorld, isNodeInRect } from '@/core/utils/geometry';
 import { useCanvasStore } from '@/store/canvasStore';
 import { useUIStore } from '@/store/uiStore';
-import type { InternalDragState } from '@/types/editor';
-import type { ViewportState, TransformState } from '@/types/state';
-import { NodeType, type BaseNodeState, type GroupState, type NodeState } from '@/types/state';
+import {
+  NodeType,
+  type BaseNodeState,
+  type GroupState,
+  type ViewportState,
+  type NodeState,
+} from '@/types/state';
+import { ViewportHandler } from './handlers/ViewportHandler';
+import { TransformHandler, type ResizeHandle } from './handlers/TransformHandler';
 import { v4 as uuidv4 } from 'uuid';
-import { MIN_NODE_SIZE } from '@/config/defaults';
+
 /**
  * 逻辑层：工具管理器
  * 职责：接收来自交互层（Vue组件）的原始事件，处理鼠标点击、拖拽、工具切换逻辑。
@@ -26,67 +20,27 @@ import { MIN_NODE_SIZE } from '@/config/defaults';
  * 工具管理器（ToolManager）
  * 说明：负责将 UI 层（鼠标事件/键盘事件）转发为对 `store` 的状态更新。
  * 主要职责：
- * - 处理画布平移、缩放
- * - 处理节点的选中/拖拽/缩放/删除/创建
+ * - 协调 ViewportHandler（视口操作）和 TransformHandler（节点变换）
+ * - 处理框选操作
+ * - 处理节点组合/解组操作
  * - 在交互时控制 `store.isInteracting` 避免额外的昂贵操作
  */
 export class ToolManager {
   private store: ReturnType<typeof useCanvasStore>;
   private ui: ReturnType<typeof useUIStore>;
-  private isPanDragging = false;
-  private lastPos = { x: 0, y: 0 };
   private stageEl: HTMLElement | null; // 画布根元素
+
+  // 专用处理器
+  private viewportHandler: ViewportHandler;
+  private transformHandler: TransformHandler;
 
   // 改为从外部获取空格键状态（不再内部维护）
   private getIsSpacePressed: () => boolean;
-  /**
-   *临时拖动状态
-   */
-  private dragState: InternalDragState & {
-    // 改为TransformState类型（与节点的transform类型一致）
-    startTransformMap: Record<string, TransformState>;
-    // 新增：是否为多选区域拖拽（点击空白区域拖拽选中节点）
-    isMultiAreaDrag: boolean;
-  } = {
-    isDragging: false,
-    type: null,
-    nodeId: '',
-    startMouseX: 0,
-    startMouseY: 0,
-    // 同时将startTransform的类型明确为TransformState
-    startTransform: { x: 0, y: 0, width: 0, height: 0, rotation: 0 } as TransformState,
-    startTransformMap: {}, // 初始值为空对象，类型匹配
-    isMultiAreaDrag: false,
-  };
-
-  /** 单选缩放状态（修正：移到类属性区，与dragState同级） */
-  private resizeState: InternalResizeState = {
-    isResizing: false,
-    handle: null,
-    nodeId: null,
-    startX: 0,
-    startY: 0,
-    startWidth: 0,
-    startHeight: 0,
-    startNodeX: 0,
-    startNodeY: 0,
-  };
 
   // 框选相关状态
   private isBoxSelecting = false;
   private boxSelectStart = { x: 0, y: 0 };
   private boxSelectEnd = { x: 0, y: 0 };
-
-  // 多选缩放状态
-  private multiResizeState: InternalMultiResizeState = {
-    isMultiResizing: false,
-    handle: null,
-    nodeIds: [],
-    startBounds: { x: 0, y: 0, width: 0, height: 0 },
-    startMouseX: 0,
-    startMouseY: 0,
-    nodeStartStates: {},
-  };
 
   // 构造函数新增：接收空格键状态获取函数
   constructor(stageEl: HTMLElement | null, getIsSpacePressed: () => boolean) {
@@ -94,6 +48,10 @@ export class ToolManager {
     this.ui = useUIStore();
     this.stageEl = stageEl; // 保存画布根元素引用
     this.getIsSpacePressed = getIsSpacePressed; // 接收外部状态
+
+    // 初始化处理器
+    this.viewportHandler = new ViewportHandler(this.store);
+    this.transformHandler = new TransformHandler(this.store);
   }
 
   /**
@@ -106,7 +64,7 @@ export class ToolManager {
   /** 暴露框选状态给Vue组件 */
   getBoxSelectState() {
     return {
-      isDragging: this.dragState.isDragging,
+      isDragging: this.transformHandler.isDragging,
       isBoxSelecting: this.isBoxSelecting,
       boxSelectStart: { ...this.boxSelectStart },
       boxSelectEnd: { ...this.boxSelectEnd },
@@ -201,24 +159,8 @@ export class ToolManager {
    * - 这里以窗口中心为基准进行缩放，可改为以鼠标为缩放中心（更符合用户期望）
    */
   handleWheel(e: WheelEvent) {
-    e.preventDefault();
-    // 新增：触摸板双指平移逻辑（无Ctrl键时触发）
-    if (!(e.ctrlKey || e.shiftKey) && (e.deltaX !== 0 || e.deltaY !== 0)) {
-      // 平移偏移量适配画布缩放比例，保证平移速度一致
-      const dx = -e.deltaX / this.store.viewport.zoom;
-      const dy = -e.deltaY / this.store.viewport.zoom;
-      this.store.viewport.offsetX += dx;
-      this.store.viewport.offsetY += dy;
-      return; // 平移时跳过缩放逻辑
-    }
-
-    // 原有缩放逻辑（完全保留，注释不变）
-    const zoomSensitivity = 0.001;
-    const delta = -e.deltaY * zoomSensitivity;
-    const newZoom = Math.max(0.1, Math.min(5, this.store.viewport.zoom + delta));
-
-    // TODO: 以鼠标为中心缩放
-    this.store.viewport.zoom = newZoom;
+    // 委托给 ViewportHandler
+    this.viewportHandler.onWheel(e);
   }
   /**
    * 处理画布鼠标按下事件（平移开始 / 取消选中 / 多选区域拖拽启动）
@@ -230,23 +172,17 @@ export class ToolManager {
   handleMouseDown(e: MouseEvent) {
     // 核心修改1：只要按下空格+左键，直接进入平移模式（最高优先级）
     if (this.getIsSpacePressed() && e.button === 0) {
-      this.isPanDragging = true;
-      this.lastPos.x = e.clientX;
-      this.lastPos.y = e.clientY;
+      this.viewportHandler.startPan(e);
       // 空格平移时保留选中状态（不取消选中）
       return;
     }
 
     // 互斥逻辑：如果正在拖拽节点，不触发画布平移
-    if (this.dragState.isDragging) return;
-
-    // 记录起始位置
-    this.lastPos.x = e.clientX;
-    this.lastPos.y = e.clientY;
+    if (this.transformHandler.isDragging) return;
 
     // 中键直接平移（原有逻辑）
     if (e.button === 1) {
-      this.isPanDragging = true;
+      this.viewportHandler.startPan(e);
       this.store.setActive([]); // 中键平移取消选中
       // 退出组合编辑模式
       if (this.store.editingGroupId) {
@@ -257,38 +193,8 @@ export class ToolManager {
 
     // 仅当未按空格时，才执行原有框选/多选区域拖拽逻辑
     if (e.button === 0 && !this.getIsSpacePressed()) {
-      // 新增：判断是否点击在选中区域空白处 → 启动多选区域拖拽
-      const hasActiveNodes = this.store.activeElementIds.size > 0;
-      const isClickInArea = this.isClickInSelectedArea(e);
-
-      if (hasActiveNodes && isClickInArea) {
-        // 启动多选区域拖拽
-        this.store.isInteracting = true;
-
-        // 初始化拖拽状态
-        const activeIds = Array.from(this.store.activeElementIds).filter((id) => {
-          const node = this.store.nodes[id] as BaseNodeState;
-          return node && !node.isLocked;
-        });
-        if (activeIds.length === 0) return;
-        const startTransformMap: Record<string, TransformState> = {};
-        activeIds.forEach((id) => {
-          const node = this.store.nodes[id] as BaseNodeState;
-          startTransformMap[id] = { ...node.transform };
-        });
-
-        this.dragState = {
-          isDragging: true,
-          type: 'move',
-          nodeId: '', // 无基准节点
-          startMouseX: e.clientX,
-          startMouseY: e.clientY,
-          startTransform: { x: 0, y: 0, width: 0, height: 0, rotation: 0 },
-          startTransformMap,
-          isMultiAreaDrag: true,
-        };
-        return; // 阻止后续框选逻辑
-      }
+      // TODO: 多选区域空白处拖拽功能（需要单独实现）
+      // 暂时禁用此功能，等待后续完善
 
       // 点击空白区域时，如果在组合编辑模式下，退出编辑模式
       if (this.store.editingGroupId) {
@@ -307,31 +213,26 @@ export class ToolManager {
    */
   handleMouseMove(e: MouseEvent) {
     // 最高优先级：多选缩放
-    if (this.multiResizeState.isMultiResizing) {
-      this.handleMultiResizeMove(e);
+    if (this.transformHandler.isMultiResizing) {
+      this.transformHandler.updateMultiResize(e);
       return;
     }
 
     // 其次：单选缩放
-    if (this.resizeState.isResizing) {
-      this.handleResizeMove(e);
+    if (this.transformHandler.isResizing) {
+      this.transformHandler.updateResize(e);
       return;
     }
 
     // 然后：节点拖拽（包含多选区域拖拽）
-    if (this.dragState.isDragging) {
-      this.handleNodeMove(e);
+    if (this.transformHandler.isDragging) {
+      this.transformHandler.updateDrag(e);
       return;
     }
 
     // 最后：画布平移/框选
-    if (this.isPanDragging) {
-      const dx = e.clientX - this.lastPos.x;
-      const dy = e.clientY - this.lastPos.y;
-      this.store.viewport.offsetX += dx;
-      this.store.viewport.offsetY += dy;
-      this.lastPos.x = e.clientX;
-      this.lastPos.y = e.clientY;
+    if (this.viewportHandler.isPanning) {
+      this.viewportHandler.updatePan(e);
       return;
     }
 
@@ -346,20 +247,13 @@ export class ToolManager {
    */
   handleMouseUp() {
     // 在重置状态之前，检查是否需要扩展组合边界
-    // 只有在有实际拖拽或缩放操作时才检查
-    const hadDragOrResize =
-      this.dragState.isDragging ||
-      this.resizeState.isResizing ||
-      this.multiResizeState.isMultiResizing;
-
-    // 重置多选缩放状态
-    this.multiResizeState.isMultiResizing = false;
-    this.multiResizeState.handle = null;
-    this.multiResizeState.nodeIds = [];
+    const hadDragOrResize = this.transformHandler.isTransforming;
 
     // 重置画布平移状态
-    this.isPanDragging = false;
-    this.handleNodeUp();
+    this.viewportHandler.endPan();
+
+    // 重置所有变换状态
+    this.transformHandler.reset();
 
     // 仅未按空格时处理框选结束
     if (this.isBoxSelecting && !this.getIsSpacePressed()) {
@@ -367,30 +261,10 @@ export class ToolManager {
       this.isBoxSelecting = false;
     }
 
-    // 重置节点拖拽状态（包含新增的多选区域拖拽状态）
-    this.dragState = {
-      isDragging: false,
-      type: null,
-      nodeId: '',
-      startMouseX: 0,
-      startMouseY: 0,
-      startTransform: { x: 0, y: 0, width: 0, height: 0, rotation: 0 },
-      startTransformMap: {}, // 新增：重置多节点初始状态映射
-      isMultiAreaDrag: false,
-    };
-
-    // 重置单选缩放状态
-    this.resizeState.isResizing = false;
-    this.resizeState.handle = null;
-    this.resizeState.nodeId = null;
-
     // 如果在组合编辑模式下有拖拽或缩放操作，检查并扩展组合边界
     if (hadDragOrResize && this.store.editingGroupId) {
       this.expandGroupToFitChildren();
     }
-
-    // 统一解除交互锁
-    this.store.isInteracting = false;
   }
 
   /** 结束框选，计算并选中区域内的节点 */
@@ -476,7 +350,7 @@ export class ToolManager {
     // 1.阻止事件冒泡，避免触发画布的 handleMouseDown (导致取消选中)
     e.stopPropagation();
     // 如果正在缩放，不处理节点拖拽
-    if (this.resizeState.isResizing) return;
+    if (this.transformHandler.isResizing) return;
 
     // 2. 多选逻辑核心修改：框选后点击已选中节点不取消多选
     if (e.ctrlKey || e.shiftKey) {
@@ -498,37 +372,12 @@ export class ToolManager {
     const node = this.store.nodes[id] as BaseNodeState;
     if (!node || node.isLocked) return;
 
-    // 4. 标记交互中，防止昂贵操作（如自动保存）
-    this.store.isInteracting = true;
-    // 展示右侧属性面板并切换为节点模式
+    // 4. 展示右侧属性面板并切换为节点模式
     this.ui.setActivePanel('node');
     this.ui.setPanelExpanded(true);
 
-    // 5. 初始化拖拽状态（适配多选拖拽）
-    const activeIds = Array.from(this.store.activeElementIds).filter((activeId) => {
-      // 过滤锁定节点，避免拖拽锁定节点
-      const activeNode = this.store.nodes[activeId] as BaseNodeState;
-      return activeNode && !activeNode.isLocked;
-    });
-
-    // 初始化多节点初始变换状态映射
-    const startTransformMap: Record<string, typeof node.transform> = {};
-    activeIds.forEach((activeId) => {
-      const activeNode = this.store.nodes[activeId] as BaseNodeState;
-      startTransformMap[activeId] = { ...activeNode.transform };
-    });
-
-    // 5. 初始化拖拽状态（深拷贝节点初始transform，避免引用同步）
-    this.dragState = {
-      isDragging: true,
-      type: 'move',
-      nodeId: id, // 基准节点（鼠标点击的节点）
-      startMouseX: e.clientX,
-      startMouseY: e.clientY,
-      startTransform: { ...node.transform }, // 基准节点初始状态
-      startTransformMap, // 新增：所有选中节点的初始状态
-      isMultiAreaDrag: false, // 非区域拖拽
-    };
+    // 5. 委托给 TransformHandler 处理拖拽
+    this.transformHandler.startNodeDrag(e, id, this.getIsSpacePressed());
   }
 
   /**
@@ -922,60 +771,8 @@ export class ToolManager {
     e.stopPropagation();
     e.preventDefault(); // 阻止默认行为
 
-    const node = this.store.nodes[nodeId];
-    if (!node || node.isLocked) return;
-
-    // 标记交互中
-    this.store.isInteracting = true;
-
-    // 重置拖拽状态，确保不会与缩放冲突
-    this.dragState.isDragging = false;
-    this.dragState.type = null;
-    this.dragState.nodeId = '';
-
-    // 如果是组合节点，递归存储所有后代节点的初始状态（包括嵌套组合的子节点）
-    let childStartStates:
-      | Record<string, { x: number; y: number; width: number; height: number }>
-      | undefined;
-    if (node.type === NodeType.GROUP) {
-      childStartStates = {};
-
-      // 递归收集所有后代节点的初始状态（每个节点存储相对于其父节点的坐标）
-      const collectDescendants = (groupNode: GroupState) => {
-        groupNode.children.forEach((childId) => {
-          const child = this.store.nodes[childId];
-          if (!child) return;
-
-          // 存储节点相对于其父节点的原始坐标
-          childStartStates![childId] = {
-            x: child.transform.x,
-            y: child.transform.y,
-            width: child.transform.width,
-            height: child.transform.height,
-          };
-
-          // 如果子节点也是组合，递归收集其子节点
-          if (child.type === NodeType.GROUP) {
-            collectDescendants(child as GroupState);
-          }
-        });
-      };
-
-      collectDescendants(node as GroupState);
-    }
-
-    this.resizeState = {
-      isResizing: true,
-      handle,
-      nodeId,
-      startX: e.clientX,
-      startY: e.clientY,
-      startWidth: node.transform.width,
-      startHeight: node.transform.height,
-      startNodeX: node.transform.x,
-      startNodeY: node.transform.y,
-      childStartStates,
-    };
+    // 委托给 TransformHandler
+    this.transformHandler.startResize(e, nodeId, handle);
   }
 
   /**
@@ -988,595 +785,22 @@ export class ToolManager {
     startBounds: { x: number; y: number; width: number; height: number },
     nodeIds: string[]
   ) {
-    // 核心修改4：按下空格时，不处理多选缩放逻辑
-    if (this.getIsSpacePressed()) {
-      return;
-    }
-
     e.stopPropagation();
     e.preventDefault();
 
-    // 互斥：重置拖拽/单选缩放状态
-    this.dragState.isDragging = false;
-    this.dragState.type = null;
-    this.dragState.nodeId = '';
-    this.dragState.startTransformMap = {};
-    this.resizeState.isResizing = false;
-
-    // 过滤锁定节点
-    const validNodeIds = nodeIds.filter((id) => {
-      const node = this.store.nodes[id];
-      return node && !node.isLocked;
-    });
-    if (validNodeIds.length === 0) return;
-
-    // 初始化每个节点的初始状态（替换any为显式类型）
-    const nodeStartStates: Record<string, NodeStartState> = {};
-    validNodeIds.forEach((id) => {
-      const node = this.store.nodes[id] as BaseNodeState;
-      // 计算节点相对于大框的偏移比例和尺寸比例
-      const offsetX =
-        startBounds.width > 0 ? (node.transform.x - startBounds.x) / startBounds.width : 0;
-      const offsetY =
-        startBounds.height > 0 ? (node.transform.y - startBounds.y) / startBounds.height : 0;
-      const scaleX = startBounds.width > 0 ? node.transform.width / startBounds.width : 0;
-      const scaleY = startBounds.height > 0 ? node.transform.height / startBounds.height : 0;
-
-      nodeStartStates[id] = {
-        x: node.transform.x,
-        y: node.transform.y,
-        width: node.transform.width,
-        height: node.transform.height,
-        offsetX,
-        offsetY,
-        scaleX,
-        scaleY,
-      };
-    });
-
-    this.multiResizeState = {
-      isMultiResizing: true,
-      handle,
-      nodeIds: validNodeIds,
-      startBounds: { ...startBounds },
-      startMouseX: e.clientX,
-      startMouseY: e.clientY,
-      nodeStartStates,
-    };
-
-    this.store.isInteracting = true;
-  }
-
-  /**
-   * 节点鼠标移动事件（处理拖拽位移计算）
-   * 新增：支持多选节点同步拖拽 + 多选区域空白处拖拽
-   */
-  handleNodeMove(e: MouseEvent) {
-    // 核心修改5：按下空格时，禁用节点拖拽（优先平移）
-    if (this.getIsSpacePressed()) {
-      this.handleNodeUp(); // 终止拖拽
-      return;
-    }
-
-    // 1. 非拖拽状态，直接返回
-    if (!this.dragState.isDragging) return;
-    // 如果没有按住鼠标，强制结束拖拽
-    if ((e.buttons & 1) === 0) {
-      this.handleNodeUp();
-      return;
-    }
-
-    const viewport = this.store.viewport as ViewportState;
-    const stageRect = this.stageEl?.getBoundingClientRect() || { left: 0, top: 0 };
-    const currentWorldPos = clientToWorld(
-      viewport,
-      e.clientX - stageRect.left,
-      e.clientY - stageRect.top
-    );
-    const startWorldPos = clientToWorld(
-      viewport,
-      this.dragState.startMouseX - stageRect.left,
-      this.dragState.startMouseY - stageRect.top
-    );
-
-    // 4. 计算鼠标偏移量（世界坐标下，避免缩放影响）
-    const deltaX = currentWorldPos.x - startWorldPos.x;
-    const deltaY = currentWorldPos.y - startWorldPos.y;
-
-    // 5. 多选拖拽：遍历所有选中节点，同步应用偏移量
-    Object.entries(this.dragState.startTransformMap).forEach(([nodeId, startTransform]) => {
-      const node = this.store.nodes[nodeId] as BaseNodeState;
-      if (!node || node.isLocked) return;
-
-      // 计算节点新位置（初始位置 + 偏移）
-      const newX = startTransform.x + deltaX;
-      const newY = startTransform.y + deltaY;
-
-      // TODO: Implement grid snapping逻辑（如果 viewport.isSnapToGrid 为 true）
-      // 该逻辑应该在世界坐标系中进行（已转换为 world 坐标），以保证缩放/平移下 snapping 的一致性
-      // Example:
-      // if (viewport.isSnapToGrid) {
-      //   const snapped = snapToGrid(viewport, newX, newY);
-      //   newX = snapped.x;
-      //   newY = snapped.y;
-      // }
-
-      // 7. 细粒度更新节点位置（触发响应式刷新）
-      this.store.updateNode(nodeId, {
-        transform: { ...node.transform, x: newX, y: newY },
-      });
-    });
-  }
-
-  /**
-   * 节点鼠标松开事件（重置拖拽状态）
-   */
-  handleNodeUp() {
-    // 修正：移除重复的 dragState 重置（仅保留整体重置即可）
-    this.dragState = {
-      isDragging: false,
-      type: null,
-      nodeId: '',
-      startMouseX: 0,
-      startMouseY: 0,
-      startTransform: { x: 0, y: 0, width: 0, height: 0, rotation: 0 },
-      startTransformMap: {}, // 新增：重置多节点初始状态映射
-      isMultiAreaDrag: false,
-    };
-    // 解除交互锁
-    this.store.isInteracting = false;
-  }
-
-  /**
-   * 处理缩放过程中的鼠标移动
-   */
-  private handleResizeMove(e: MouseEvent) {
-    // 核心修改6：按下空格时，终止缩放并返回
-    if (this.getIsSpacePressed()) {
-      this.resizeState.isResizing = false;
-      this.store.isInteracting = false;
-      return;
-    }
-
-    const { handle, nodeId, startX, startY, startWidth, startHeight, startNodeX, startNodeY } =
-      this.resizeState;
-
-    if (!handle || !nodeId || (e.buttons & 1) === 0) {
-      this.resizeState.isResizing = false;
-      this.store.isInteracting = false;
-      return;
-    }
-
-    const node = this.store.nodes[nodeId];
-    if (!node) return;
-
-    const dx = (e.clientX - startX) / this.store.viewport.zoom;
-    const dy = (e.clientY - startY) / this.store.viewport.zoom;
-
-    let newWidth = startWidth;
-    let newHeight = startHeight;
-    let newX = startNodeX;
-    let newY = startNodeY;
-
-    // 根据节点类型选择缩放策略
-    let result;
-    switch (node.type) {
-      case NodeType.CIRCLE:
-        // 圆形：等比缩放，保持圆形，锚点为与当前缩放手柄相对的对角（即以对角点为固定点进行缩放）
-        result = calculateCircleResize(
-          handle,
-          dx,
-          dy,
-          startWidth,
-          startHeight,
-          startNodeX,
-          startNodeY
-        );
-        break;
-      case NodeType.RECT:
-        // 矩形：独立缩放宽高
-        result = calculateRectResize(
-          handle,
-          dx,
-          dy,
-          startWidth,
-          startHeight,
-          startNodeX,
-          startNodeY
-        );
-        break;
-      case NodeType.IMAGE:
-        // 图片：自由缩放（允许畸变）
-        result = calculateRectResize(
-          handle,
-          dx,
-          dy,
-          startWidth,
-          startHeight,
-          startNodeX,
-          startNodeY
-        );
-        break;
-      case NodeType.TEXT:
-        // 文本：只改变容器大小，不缩放字体
-        result = calculateTextResize(
-          handle,
-          dx,
-          dy,
-          startWidth,
-          startHeight,
-          startNodeX,
-          startNodeY
-        );
-        break;
-      case NodeType.GROUP:
-        // 组合：等比缩放组合和所有子元素
-        result = calculateRectResize(
-          handle,
-          dx,
-          dy,
-          startWidth,
-          startHeight,
-          startNodeX,
-          startNodeY
-        );
-        break;
-      default:
-        // 默认使用矩形缩放逻辑
-        result = calculateRectResize(
-          handle,
-          dx,
-          dy,
-          startWidth,
-          startHeight,
-          startNodeX,
-          startNodeY
-        );
-        break;
-    }
-
-    if (result) {
-      newWidth = result.width;
-      newHeight = result.height;
-      newX = result.x;
-      newY = result.y;
-    }
-
-    if (node.type === NodeType.GROUP) {
-      // 计算缩放因子
-      const scaleX = newWidth / startWidth;
-      const scaleY = newHeight / startHeight;
-
-      // 缩放所有后代节点（包括嵌套组合的子节点）
-      const { childStartStates } = this.resizeState;
-      if (childStartStates) {
-        // 遍历所有后代节点，不只是直接子节点
-        Object.entries(childStartStates).forEach(([childId, childStart]) => {
-          const child = this.store.nodes[childId];
-          if (!child) return;
-
-          // 按比例缩放子节点的位置和尺寸
-          const childNewX = childStart.x * scaleX;
-          const childNewY = childStart.y * scaleY;
-          const childNewWidth = Math.max(MIN_NODE_SIZE, childStart.width * scaleX);
-          const childNewHeight = Math.max(MIN_NODE_SIZE, childStart.height * scaleY);
-
-          this.store.updateNode(childId, {
-            transform: {
-              ...child.transform,
-              x: childNewX,
-              y: childNewY,
-              width: childNewWidth,
-              height: childNewHeight,
-            },
-          });
-        });
-      }
-    }
-
-    // ========== 新增：Shift键等比缩放处理 ==========
-    if (e.shiftKey || e.ctrlKey) {
-      // 安全计算原始比例，防止除以零
-      const safeStartHeight = Math.abs(startHeight) < 1e-6 ? MIN_NODE_SIZE : startHeight;
-      const originalRatio = startWidth / safeStartHeight;
-
-      // 计算基于宽度/高度的等比值，优先以主要变化轴为准
-      let ratioBasedWidth = newWidth;
-      let ratioBasedHeight = newHeight;
-
-      // 判断主要缩放轴（根据handle）
-      const isHorizontal = handle.includes('e') || handle.includes('w');
-      const isVertical = handle.includes('n') || handle.includes('s');
-
-      if (isHorizontal && isVertical) {
-        // 角点缩放：取宽高变化的绝对值最大者作为基准，并保留符号（统一策略）
-        const widthRatio = newWidth / startWidth;
-        const heightRatio = newHeight / safeStartHeight;
-        const dominantRatio =
-          Math.abs(widthRatio) > Math.abs(heightRatio) ? widthRatio : heightRatio;
-        ratioBasedWidth = startWidth * dominantRatio;
-        ratioBasedHeight = startHeight * dominantRatio;
-      } else if (isHorizontal) {
-        // 水平缩放：按宽度变化等比调整高度
-        ratioBasedHeight = newWidth / originalRatio;
-      } else if (isVertical) {
-        // 垂直缩放：按高度变化等比调整宽度
-        ratioBasedWidth = newHeight * originalRatio;
-      }
-
-      // 应用等比尺寸
-      newWidth = ratioBasedWidth;
-      newHeight = ratioBasedHeight;
-
-      // 调整位置以保持缩放中心
-      if (handle === 'nw') {
-        newX = startNodeX + startWidth - newWidth;
-        newY = startNodeY + startHeight - newHeight;
-      } else if (handle === 'ne') {
-        newY = startNodeY + startHeight - newHeight;
-      } else if (handle === 'sw') {
-        newX = startNodeX + startWidth - newWidth;
-      } else if (handle === 'se') {
-        // 东南角：锚点是西北角(startNodeX, startNodeY)，无需调整位置
-        newX = startNodeX;
-        newY = startNodeY;
-      } else if (handle === 'n') {
-        // 上边缘：锚点是底边中点 -> 保持底边位置，水平居中
-        newY = startNodeY + startHeight - newHeight;
-        newX = startNodeX + (startWidth - newWidth) / 2;
-      } else if (handle === 's') {
-        // 下边缘：锚点是顶边中点 -> 保持顶边位置，水平居中
-        newX = startNodeX + (startWidth - newWidth) / 2;
-      } else if (handle === 'e') {
-        // 右边缘：锚点是左边中点 -> 保持左边位置，垂直居中
-        newY = startNodeY + (startHeight - newHeight) / 2;
-      } else if (handle === 'w') {
-        // 左边缘：锚点是右边中点 -> 保持右边位置，垂直居中
-        newX = startNodeX + startWidth - newWidth;
-        newY = startNodeY + (startHeight - newHeight) / 2;
-      }
-    }
-    // ========== End Shift键等比缩放处理 ==========
-
-    // 限制最小尺寸
-    const minSize = MIN_NODE_SIZE;
-
-    // 圆形和矩形都使用独立的宽高限制（因为圆形现在可以拉伸成椭圆）
-    if (newWidth < minSize) {
-      newWidth = minSize;
-      if (handle.includes('w')) {
-        newX = startNodeX + startWidth - minSize;
-      }
-      // 等比调整高度
-      if (e.shiftKey || e.ctrlKey) {
-        // 安全计算，防止除以零
-        const safeStartHeight = Math.abs(startHeight) < 1e-6 ? MIN_NODE_SIZE : startHeight;
-        newHeight = newWidth / (startWidth / safeStartHeight);
-      }
-    }
-    if (newHeight < minSize) {
-      newHeight = minSize;
-      if (handle.includes('n')) {
-        newY = startNodeY + startHeight - minSize;
-      }
-      // 等比调整宽度
-      if (e.shiftKey || e.ctrlKey) {
-        // 安全计算，防止除以零
-        const safeStartHeight = Math.abs(startHeight) < 1e-6 ? MIN_NODE_SIZE : startHeight;
-        newWidth = newHeight * (startWidth / safeStartHeight);
-      }
-    }
-
-    // 使用 updateNode 方法更新节点的变换状态
-    this.store.updateNode(nodeId, {
-      transform: {
-        ...node.transform,
-        width: newWidth,
-        height: newHeight,
-        x: newX,
-        y: newY,
-      },
-    });
-  }
-
-  /**
-   * 处理多选缩放过程中的鼠标移动计算
-   */
-  private handleMultiResizeMove(e: MouseEvent) {
-    // 核心修改7：按下空格时，终止多选缩放并返回
-    if (this.getIsSpacePressed()) {
-      this.multiResizeState.isMultiResizing = false;
-      this.store.isInteracting = false;
-      return;
-    }
-
-    const {
-      isMultiResizing,
+    // 委托给 TransformHandler
+    this.transformHandler.startMultiResize(
+      e,
       handle,
       startBounds,
-      startMouseX,
-      startMouseY,
       nodeIds,
-      nodeStartStates,
-    } = this.multiResizeState;
-
-    if (!isMultiResizing || !handle || nodeIds.length === 0 || (e.buttons & 1) === 0) {
-      this.multiResizeState.isMultiResizing = false;
-      this.store.isInteracting = false;
-      return;
-    }
-
-    // 计算鼠标偏移（世界坐标系）
-    const dx = (e.clientX - startMouseX) / this.store.viewport.zoom;
-    const dy = (e.clientY - startMouseY) / this.store.viewport.zoom;
-
-    // 计算缩放后的大框尺寸和位置
-    const newBounds = { ...startBounds };
-    switch (handle) {
-      case 'nw': // 左上
-        newBounds.x = startBounds.x + dx;
-        newBounds.y = startBounds.y + dy;
-        newBounds.width = startBounds.width - dx;
-        newBounds.height = startBounds.height - dy;
-        break;
-      case 'n': // 上
-        newBounds.y = startBounds.y + dy;
-        newBounds.height = startBounds.height - dy;
-        break;
-      case 'ne': // 右上
-        newBounds.y = startBounds.y + dy;
-        newBounds.width = startBounds.width + dx;
-        newBounds.height = startBounds.height - dy;
-        break;
-      case 'e': // 右
-        newBounds.width = startBounds.width + dx;
-        break;
-      case 'se': // 右下
-        newBounds.width = startBounds.width + dx;
-        newBounds.height = startBounds.height + dy;
-        break;
-      case 's': // 下
-        newBounds.height = startBounds.height + dy;
-        break;
-      case 'sw': // 左下
-        newBounds.x = startBounds.x + dx;
-        newBounds.width = startBounds.width - dx;
-        newBounds.height = startBounds.height + dy;
-        break;
-      case 'w': // 左
-        newBounds.x = startBounds.x + dx;
-        newBounds.width = startBounds.width - dx;
-        break;
-    }
-
-    // ========== 新增：Shift键等比缩放处理 ==========
-    if (e.shiftKey || e.ctrlKey) {
-      // 安全计算原始比例，防止除以零
-      const safeStartHeight =
-        Math.abs(startBounds.height) < 1e-6 ? MIN_NODE_SIZE : startBounds.height;
-      const originalRatio = startBounds.width / safeStartHeight;
-
-      // 计算等比后的宽高
-      let ratioBasedWidth = newBounds.width;
-      let ratioBasedHeight = newBounds.height;
-
-      // 判断主要缩放轴
-      const isHorizontal = handle.includes('e') || handle.includes('w');
-      const isVertical = handle.includes('n') || handle.includes('s');
-
-      if (isHorizontal && isVertical) {
-        // 角点缩放：保持原始比例
-        const widthRatio = newBounds.width / startBounds.width;
-        const heightRatio = newBounds.height / safeStartHeight;
-        // Use the dominant axis (the one with the larger absolute ratio) and preserve its sign
-        let scaleRatio: number;
-        if (Math.abs(widthRatio) > Math.abs(heightRatio)) {
-          scaleRatio = Math.abs(widthRatio) * Math.sign(widthRatio);
-        } else {
-          scaleRatio = Math.abs(heightRatio) * Math.sign(heightRatio);
-        }
-        ratioBasedWidth = startBounds.width * scaleRatio;
-        ratioBasedHeight = startBounds.height * scaleRatio;
-      } else if (isHorizontal) {
-        // 水平缩放：按宽度等比调整高度
-        ratioBasedHeight = ratioBasedWidth / originalRatio;
-      } else if (isVertical) {
-        // 垂直缩放：按高度等比调整宽度
-        ratioBasedWidth = ratioBasedHeight * originalRatio;
-      }
-
-      // 调整位置以保持缩放中心
-      if (handle === 'nw') {
-        newBounds.x = startBounds.x + startBounds.width - ratioBasedWidth;
-        newBounds.y = startBounds.y + startBounds.height - ratioBasedHeight;
-      } else if (handle === 'ne') {
-        newBounds.y = startBounds.y + startBounds.height - ratioBasedHeight;
-      } else if (handle === 'sw') {
-        newBounds.x = startBounds.x + startBounds.width - ratioBasedWidth;
-      } else if (handle === 'se') {
-        // 东南角：锚点是西北角，无需调整位置
-        newBounds.x = startBounds.x;
-        newBounds.y = startBounds.y;
-      } else if (handle === 'n') {
-        // 上边缘：锚点是底边中点
-        newBounds.y = startBounds.y + startBounds.height - ratioBasedHeight;
-        newBounds.x = startBounds.x + (startBounds.width - ratioBasedWidth) / 2;
-      } else if (handle === 's') {
-        // 下边缘：锚点是顶边中点
-        newBounds.x = startBounds.x + (startBounds.width - ratioBasedWidth) / 2;
-      } else if (handle === 'e') {
-        // 右边缘：锚点是左边中点
-        newBounds.y = startBounds.y + (startBounds.height - ratioBasedHeight) / 2;
-      } else if (handle === 'w') {
-        // 左边缘：锚点是右边中点
-        newBounds.x = startBounds.x + startBounds.width - ratioBasedWidth;
-        newBounds.y = startBounds.y + (startBounds.height - ratioBasedHeight) / 2;
-      }
-
-      // 应用等比尺寸
-      newBounds.width = ratioBasedWidth;
-      newBounds.height = ratioBasedHeight;
-    }
-    // ========== End Shift键等比缩放处理 ==========
-
-    // 限制最小尺寸
-    const clampedWidth = Math.max(MIN_NODE_SIZE, newBounds.width);
-    const clampedHeight = Math.max(MIN_NODE_SIZE, newBounds.height);
-    // 如果发生了clamp，且handle影响位置，则调整x/y
-    if (clampedWidth !== newBounds.width) {
-      switch (handle) {
-        case 'nw':
-        case 'w':
-        case 'sw':
-          newBounds.x = startBounds.x + startBounds.width - MIN_NODE_SIZE;
-          break;
-      }
-    }
-    if (clampedHeight !== newBounds.height) {
-      switch (handle) {
-        case 'nw':
-        case 'n':
-        case 'ne':
-          newBounds.y = startBounds.y + startBounds.height - MIN_NODE_SIZE;
-          break;
-      }
-    }
-    newBounds.width = clampedWidth;
-    newBounds.height = clampedHeight;
-
-    // 遍历所有节点同步更新
-    nodeIds.forEach((id) => {
-      const startState = nodeStartStates[id];
-      const node = this.store.nodes[id] as BaseNodeState;
-      if (!node) return;
-      if (!startState) return;
-
-      // 按比例计算新尺寸和位置
-      const scaleX = newBounds.width / startBounds.width;
-      const scaleY = newBounds.height / startBounds.height;
-
-      // ========== 新增：Shift键等比缩放处理 ==========
-      let finalScaleX = scaleX;
-      let finalScaleY = scaleY;
-      if (e.shiftKey || e.ctrlKey) {
-        // 等比缩放时使用统一的缩放比例
-        const uniformScale = Math.max(Math.abs(scaleX), Math.abs(scaleY)); // 使用主轴缩放比例保证等比
-        finalScaleX = uniformScale;
-        finalScaleY = uniformScale;
-      }
-      // ========== End Shift键等比缩放处理 ==========
-
-      const newWidth = Math.max(MIN_NODE_SIZE, startState.width * finalScaleX);
-      const newHeight = Math.max(MIN_NODE_SIZE, startState.height * finalScaleY);
-      const newX = newBounds.x + startState.offsetX * newBounds.width;
-      const newY = newBounds.y + startState.offsetY * newBounds.height;
-
-      // 更新节点
-      this.store.updateNode(id, {
-        transform: { ...node.transform, x: newX, y: newY, width: newWidth, height: newHeight },
-      });
-    });
+      this.getIsSpacePressed()
+    );
   }
+
+  // ==================== 节点拖拽/缩放方法（已迁移到 TransformHandler） ====================
+  // handleNodeMove(), handleNodeUp(), handleResizeMove(), handleMultiResizeMove()
+  // 已完全迁移到 src/core/tools/handlers/TransformHandler.ts
 
   // ==================== 节点创建功能 ====================
   // 已迁移至 UI 组件层（CanvasToolbar.vue / ImageMenu.vue）
