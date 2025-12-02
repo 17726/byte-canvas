@@ -10,7 +10,9 @@
  *
  * 架构特点：
  * - **纯事件路由器**：<300 行，零业务逻辑，零状态存储
- * - **严格分层**：UI 层（Vue）→ ToolManager（路由）→ Handlers（交互逻辑）→ Services（业务逻辑）
+ * - **严格分层/调用链**：存在两条主要调用路径：
+ *   1. UI 层（Vue） → ToolManager（路由） → Handlers（交互逻辑） （有状态/交互）
+ *   2. UI 层（Vue） → Services（业务逻辑，无状态） （直接调用，不通过 ToolManager）
  * - **单一职责**：仅负责"事件分发"，所有具体逻辑委托给专用模块
  * - **无状态设计**：所有状态由 Store 和各 Handler 管理，ToolManager 不持有业务数据
  *
