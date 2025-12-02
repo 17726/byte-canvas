@@ -24,11 +24,12 @@
       -->
       <!-- 图元渲染层 -->
       <component
-        v-for="node in store.renderList"
+        v-for="node in store.visibleRenderList"
         :key="node!.id"
         :is="getComponentType(node!.type)"
         :node="node"
         @mousedown="handleNodeDown($event, node!.id)"
+        @dblclick="handleNodeDoubleClick($event, node!.id)"
       />
 
       <!-- 选中覆盖层 (处理拖拽缩放) -->
@@ -39,6 +40,9 @@
     <!-- 注意：ContextToolbar 读取 store.activeElementIds 并计算屏幕位置，它不直接受 viewport transform 的 DOM 影响，
           因此 implement 上需要使用 worldToClient 等工具方法计算位置 -->
     <ContextToolbar />
+
+    <!-- 组合工具栏 - 多选时显示组合/解组合按钮 -->
+    <GroupToolbar />
 
     <!-- 辅助信息：显示当前视口状态 -->
     <div class="debug-info" @click="resetViewport" title="点击恢复默认视图">
@@ -57,8 +61,10 @@ import RectLayer from './layers/RectLayer.vue';
 import TextLayer from './layers/TextLayer.vue';
 import CircleLayer from './layers/CircleLayer.vue';
 import ImageLayer from './layers/ImageLayer.vue';
+import GroupLayer from './layers/GroupLayer.vue';
 import SelectionOverlay from './SelectionOverlay.vue';
-import ContextToolbar from '../layout/ContextToolbar.vue'; // Import ContextToolbar
+import ContextToolbar from '../layout/ContextToolbar.vue';
+import GroupToolbar from './GroupToolbar.vue';
 import { ToolManager } from '@/core/tools/ToolManager';
 import {
   DEFAULT_VIEWPORT,
@@ -134,7 +140,6 @@ const resetViewport = () => {
 
 // 2. 组件映射工厂
 const getComponentType = (type: NodeType) => {
-  // Removed excessive debug log
   switch (type) {
     case NodeType.RECT:
       return RectLayer;
@@ -144,6 +149,8 @@ const getComponentType = (type: NodeType) => {
       return TextLayer;
     case NodeType.IMAGE:
       return ImageLayer;
+    case NodeType.GROUP:
+      return GroupLayer;
     default:
       return 'div';
   }
@@ -225,6 +232,12 @@ const handleNodeDown = (e: MouseEvent, id: string) => {
   toolManagerRef.value.handleNodeDown(e, id);
 };
 
+// 节点双击事件（进入组合编辑模式）
+const handleNodeDoubleClick = (e: MouseEvent, id: string) => {
+  if (!toolManagerRef.value) return;
+  toolManagerRef.value.handleNodeDoubleClick(e, id);
+};
+
 // 暴露创建节点的方法（供父组件/子组件调用）
 const createRect = () => toolManagerRef.value?.createRect();
 const createCircle = () => toolManagerRef.value?.createCircle();
@@ -245,6 +258,33 @@ const handleKeyDown = (e: KeyboardEvent) => {
   if (e.code === 'Space') {
     isSpacePressed.value = true;
     e.preventDefault(); // 阻止空格的默认行为（页面滚动）
+    return;
+  }
+
+  // Escape: 退出组合编辑模式
+  if (e.key === 'Escape') {
+    if (store.editingGroupId) {
+      e.preventDefault();
+      toolManagerRef.value?.exitGroupEdit();
+      return;
+    }
+  }
+
+  // Ctrl/Cmd + G: 组合
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'g') {
+    e.preventDefault();
+    if (store.canGroup) {
+      toolManagerRef.value?.groupSelected();
+    }
+    return;
+  }
+
+  // Ctrl/Cmd + Shift + G: 解组合
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'G') {
+    e.preventDefault();
+    if (store.canUngroup) {
+      toolManagerRef.value?.ungroupSelected();
+    }
     return;
   }
 

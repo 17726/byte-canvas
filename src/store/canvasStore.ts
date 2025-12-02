@@ -2,7 +2,9 @@
 import { defineStore } from 'pinia';
 import { ref, reactive, computed, watch } from 'vue';
 import type { NodeState, ShapeState, TextState, ImageState, ViewportState } from '@/types/state';
+import { NodeType } from '@/types/state';
 import { DEFAULT_VIEWPORT } from '@/config/defaults';
+import { calculateBounds } from '@/core/utils/geometry';
 import {
   loadFromLocalStorage,
   createDebouncedSave,
@@ -41,6 +43,10 @@ export const useCanvasStore = defineStore('canvas', () => {
   const isInteracting = ref(false);
   // 注意：activePanel 与 isPanelExpanded 为 UI 控制字段，已迁移至 uiStore
 
+  // ==================== 组合编辑状态 ====================
+  // 当前正在编辑的组合 ID（双击组合进入编辑模式）
+  const editingGroupId = ref<string | null>(null);
+
   // Getters
   // 获取排序后的渲染列表，供 v-for 使用
   const renderList = computed(() => {
@@ -63,6 +69,120 @@ export const useCanvasStore = defineStore('canvas', () => {
   function updateNode(id: string, patch: Partial<NodeState>) {
     const node = nodes.value[id];
     if (!node) return;
+
+    // ==================== 组合节点特殊处理 ====================
+    // 注意：只有在非编辑模式下才触发子节点同步更新
+    // 编辑模式下，用户直接操作子节点，组合边框由 expandGroupToFitChildren 单独处理
+    if (node.type === NodeType.GROUP && editingGroupId.value !== id) {
+      const groupNode = node as import('@/types/state').GroupState;
+
+      // 处理组合的 transform 变更：同步更新子节点
+      // 注意：子节点坐标是相对于组合的，所以：
+      // - 组合移动时：子节点不需要更新（相对位置不变）
+      // - 组合缩放时：子节点的位置和尺寸需要等比例缩放
+      if ('transform' in patch && patch.transform) {
+        const oldTransform = node.transform;
+        const newTransform = { ...oldTransform, ...patch.transform };
+
+        // 计算缩放比例
+        const scaleX = oldTransform.width > 0 ? newTransform.width / oldTransform.width : 1;
+        const scaleY = oldTransform.height > 0 ? newTransform.height / oldTransform.height : 1;
+
+        // 只有当尺寸发生变化时才需要更新子节点
+        if (scaleX !== 1 || scaleY !== 1) {
+          // 递归更新所有后代节点
+          const updateDescendants = (childIds: string[]) => {
+            childIds.forEach((childId) => {
+              const child = nodes.value[childId];
+              if (!child) return;
+
+              // 等比例缩放子节点的位置和尺寸
+              const childNewX = child.transform.x * scaleX;
+              const childNewY = child.transform.y * scaleY;
+              const childNewWidth = Math.max(1, child.transform.width * scaleX);
+              const childNewHeight = Math.max(1, child.transform.height * scaleY);
+
+              child.transform = {
+                ...child.transform,
+                x: childNewX,
+                y: childNewY,
+                width: childNewWidth,
+                height: childNewHeight,
+              };
+
+              // 如果子节点也是组合，递归处理其子节点
+              if (child.type === NodeType.GROUP) {
+                const childGroup = child as import('@/types/state').GroupState;
+                updateDescendants(childGroup.children);
+              }
+            });
+          };
+
+          updateDescendants(groupNode.children);
+        }
+      }
+
+      // 处理组合的 style 变更：同步更新子节点的相应样式
+      if ('style' in patch && patch.style) {
+        const stylePatch = patch.style;
+        const currentStyle = node.style;
+
+        const opacityChanged =
+          stylePatch.opacity !== undefined && stylePatch.opacity !== currentStyle.opacity;
+        const backgroundChanged =
+          stylePatch.backgroundColor !== undefined &&
+          stylePatch.backgroundColor !== currentStyle.backgroundColor;
+        const borderColorChanged =
+          stylePatch.borderColor !== undefined &&
+          stylePatch.borderColor !== currentStyle.borderColor;
+        const borderWidthChanged =
+          stylePatch.borderWidth !== undefined &&
+          stylePatch.borderWidth !== currentStyle.borderWidth;
+
+        const shouldSyncChildren =
+          opacityChanged || backgroundChanged || borderColorChanged || borderWidthChanged;
+
+        if (shouldSyncChildren) {
+          const updateChildrenStyle = (childIds: string[]) => {
+            childIds.forEach((childId) => {
+              const child = nodes.value[childId];
+              if (!child) return;
+
+              const childStylePatch: Record<string, unknown> = {};
+              const isShapeNode = child.type === NodeType.RECT || child.type === NodeType.CIRCLE;
+
+              if (opacityChanged) {
+                childStylePatch.opacity = stylePatch.opacity;
+              }
+
+              if (backgroundChanged && isShapeNode) {
+                childStylePatch.backgroundColor = stylePatch.backgroundColor;
+              }
+
+              if (borderColorChanged && isShapeNode) {
+                childStylePatch.borderColor = stylePatch.borderColor;
+              }
+
+              if (borderWidthChanged && isShapeNode) {
+                childStylePatch.borderWidth = stylePatch.borderWidth;
+              }
+
+              if (Object.keys(childStylePatch).length > 0) {
+                child.style = { ...child.style, ...childStylePatch };
+              }
+
+              if (child.type === NodeType.GROUP) {
+                const childGroup = child as import('@/types/state').GroupState;
+                updateChildrenStyle(childGroup.children);
+              }
+            });
+          };
+
+          updateChildrenStyle(groupNode.children);
+        }
+      }
+    }
+    // ==================== 组合节点特殊处理结束 ====================
 
     // 核心优化：处理 props 的深度合并 (Deep Merge for props)
     // 防止 updateNode(id, { props: { fontSize: 20 } }) 导致 content 等其他属性丢失
@@ -99,31 +219,69 @@ export const useCanvasStore = defineStore('canvas', () => {
     version.value++; // 触发更新
   }
 
-  // 3. 删除节点
+  // 3. 删除节点（如果是组合，递归删除所有子节点）
   function deleteNode(id: string) {
-    if (!nodes.value[id]) return;
+    const node = nodes.value[id];
+    if (!node) return;
+
+    // 如果是组合节点，先递归删除所有子节点
+    if (node.type === NodeType.GROUP) {
+      const groupNode = node as import('@/types/state').GroupState;
+      groupNode.children.forEach((childId) => {
+        deleteNode(childId); // 递归删除子节点
+      });
+    }
+
     delete nodes.value[id];
     nodeOrder.value = nodeOrder.value.filter((nId) => nId !== id);
     activeElementIds.value.delete(id); // 清除选中态
+
+    // 如果正在编辑这个组合，退出编辑模式
+    if (editingGroupId.value === id) {
+      editingGroupId.value = null;
+    }
+
     version.value++; // 触发更新
   }
 
   // 4. 批量删除节点（仅触发一次 version 更新）
+  // 注意：如果包含组合，会递归删除其子节点
   function deleteNodes(ids: string[]) {
     if (ids.length === 0) return;
 
     const idsToDelete = ids.filter((id) => nodes.value[id]);
     if (idsToDelete.length === 0) return;
 
+    // 收集所有需要删除的节点（包括组合的子节点）
+    const allIdsToDelete = new Set<string>();
+
+    function collectIds(id: string) {
+      const node = nodes.value[id];
+      if (!node) return;
+      allIdsToDelete.add(id);
+
+      // 如果是组合，递归收集子节点
+      if (node.type === NodeType.GROUP) {
+        const groupNode = node as import('@/types/state').GroupState;
+        groupNode.children.forEach((childId) => collectIds(childId));
+      }
+    }
+
+    idsToDelete.forEach((id) => collectIds(id));
+
     // 批量删除节点
-    idsToDelete.forEach((id) => {
+    allIdsToDelete.forEach((id) => {
       delete nodes.value[id];
       activeElementIds.value.delete(id);
+
+      // 如果正在编辑这个组合，退出编辑模式
+      if (editingGroupId.value === id) {
+        editingGroupId.value = null;
+      }
     });
 
     // 一次性过滤 nodeOrder
-    const deleteSet = new Set(idsToDelete);
-    nodeOrder.value = nodeOrder.value.filter((nId) => !deleteSet.has(nId));
+    nodeOrder.value = nodeOrder.value.filter((nId) => !allIdsToDelete.has(nId));
 
     // 仅触发一次版本更新
     version.value++;
@@ -370,6 +528,92 @@ export const useCanvasStore = defineStore('canvas', () => {
     globalTextSelection.value = selection;
     //console.log('Pinia 全局选区更新：', selection); // 调试日志（可选）
   }
+  // ==================== 组合相关状态（只读计算属性）====================
+
+  /**
+   * 获取可渲染的节点列表
+   * 始终只渲染顶层节点（parentId为null的节点）
+   * 组合编辑模式通过 GroupLayer 内部处理，不影响渲染结构
+   */
+  const visibleRenderList = computed(() => {
+    return nodeOrder.value
+      .map((id) => nodes.value[id])
+      .filter((node) => node && node.parentId === null);
+  });
+
+  /**
+   * 检查选中的元素是否可以组合（UI状态）
+   */
+  const canGroup = computed(() => {
+    const ids = Array.from(activeElementIds.value);
+    if (ids.length < 2) return false;
+    return ids.every((id) => nodes.value[id]);
+  });
+
+  /**
+   * 检查选中的元素是否可以解组合（UI状态）
+   */
+  const canUngroup = computed(() => {
+    const ids = Array.from(activeElementIds.value);
+    return ids.some((id) => {
+      const node = nodes.value[id];
+      return node && node.type === NodeType.GROUP;
+    });
+  });
+
+  /**
+   * 获取节点的绝对坐标（考虑父组合的位置）
+   */
+  function getAbsoluteTransform(
+    nodeId: string
+  ): { x: number; y: number; width: number; height: number; rotation: number } | null {
+    const node = nodes.value[nodeId];
+    if (!node) return null;
+
+    let absoluteX = node.transform.x;
+    let absoluteY = node.transform.y;
+    let currentNode = node;
+
+    // 遍历父链，累加所有父组合的偏移
+    while (currentNode.parentId) {
+      const parent = nodes.value[currentNode.parentId];
+      if (!parent) break;
+      absoluteX += parent.transform.x;
+      absoluteY += parent.transform.y;
+      currentNode = parent;
+    }
+
+    return {
+      x: absoluteX,
+      y: absoluteY,
+      width: node.transform.width,
+      height: node.transform.height,
+      rotation: node.transform.rotation,
+    };
+  }
+
+  /**
+   * 获取选中节点的边界框（供UI使用，使用绝对坐标）
+   */
+  function getSelectionBounds(nodeIds: string[]) {
+    // 创建一个使用绝对坐标的虚拟节点映射
+    const absoluteNodes: Record<
+      string,
+      { transform: { x: number; y: number; width: number; height: number; rotation: number } }
+    > = {};
+
+    nodeIds.forEach((id) => {
+      const absTransform = getAbsoluteTransform(id);
+      if (absTransform) {
+        absoluteNodes[id] = { transform: absTransform };
+      }
+    });
+
+    return calculateBounds(
+      absoluteNodes as Record<string, import('@/types/state').BaseNodeState>,
+      nodeIds
+    );
+  }
 
   return {
     nodes,
@@ -395,6 +639,13 @@ export const useCanvasStore = defineStore('canvas', () => {
     copySelected,
     cutSelected,
     paste,
+    // 组合相关状态（只读）
+    editingGroupId,
+    visibleRenderList,
+    canGroup,
+    canUngroup,
+    getSelectionBounds,
+    getAbsoluteTransform,
     // UI 状态请使用 uiStore 中的 activePanel 和 isPanelExpanded
     updateGlobalTextSelection
   };
