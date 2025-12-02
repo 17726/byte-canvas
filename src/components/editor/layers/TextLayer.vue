@@ -7,7 +7,7 @@
       class="textBox"
       :class="{ 'is-editing': isEditing }"
       contenteditable="true"
-      placeholder="双击编辑文本"
+      
       v-html="HTMLstring"
       @input="handleContentChange"
       @keyup="handleSelectionChange"
