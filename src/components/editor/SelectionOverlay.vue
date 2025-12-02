@@ -53,9 +53,11 @@ const allNodesLocked = computed(() =>
 // 选中的节点列表
 const selectedNodes = computed(() => store.activeElements as BaseNodeState[]);
 
-// 单个元素选中框样式
+// 单个元素选中框样式（使用绝对坐标，考虑父组合位置）
 const getIndividualStyle = (node: BaseNodeState) => {
-  const { x, y, width, height, rotation } = node.transform;
+  // 获取绝对坐标（如果节点在组合内，会累加父组合的偏移）
+  const absTransform = store.getAbsoluteTransform(node.id);
+  const { x, y, width, height, rotation } = absTransform || node.transform;
   return {
     transform: `translate(${x}px, ${y}px) rotate(${rotation}deg)`,
     transformOrigin: `${width / 2}px ${height / 2}px`,
@@ -67,9 +69,11 @@ const getIndividualStyle = (node: BaseNodeState) => {
 /**
  * 计算旋转后的节点边界框（AABB）
  * 将节点四个角点按旋转角度变换后，求最小外接矩形
+ * 使用绝对坐标，考虑父组合位置
  */
 const getRotatedBounds = (node: BaseNodeState) => {
-  const { x, y, width, height, rotation } = node.transform;
+  const absTransform = store.getAbsoluteTransform(node.id);
+  const { x, y, width, height, rotation } = absTransform || node.transform;
 
   // 如果没有旋转，直接返回原始边界
   if (rotation === 0) {
@@ -117,23 +121,26 @@ const getRotatedBounds = (node: BaseNodeState) => {
 };
 
 // 2. 计算多选大框的包围盒（核心：包裹所有选中节点的最小矩形，考虑旋转）
+// 使用绝对坐标，支持组合内子节点的正确显示
 const selectionBounds = computed(() => {
   const nodes = store.activeElements as BaseNodeState[];
   if (nodes.length === 0) return null;
   if (!nodes[0]) return null;
 
-  // 单选时：返回节点原始边界（选中框会跟着旋转）
+  // 单选时：返回节点绝对边界（选中框会跟着旋转）
   if (nodes.length === 1) {
     const node = nodes[0];
+    const absTransform = store.getAbsoluteTransform(node.id);
+    const transform = absTransform || node.transform;
     return {
-      x: node.transform.x,
-      y: node.transform.y,
-      width: node.transform.width,
-      height: node.transform.height,
+      x: transform.x,
+      y: transform.y,
+      width: transform.width,
+      height: transform.height,
     };
   }
 
-  // 多选时：计算所有节点旋转后的 AABB 并合并
+  // 多选时：计算所有节点旋转后的 AABB 并合并（getRotatedBounds 已使用绝对坐标）
   let minX = Infinity,
     maxX = -Infinity,
     minY = Infinity,
