@@ -171,15 +171,32 @@ export class ToolManager {
 
     // 仅当未按空格时，才执行原有框选/多选区域拖拽逻辑
     if (e.button === 0 && !this.getIsSpacePressed()) {
-      // TODO: 多选区域空白处拖拽功能（需要单独实现）
-      // 暂时禁用此功能，等待后续完善
+      // 判断是否点击在选中区域空白处 → 启动多选区域拖拽
+      const hasActiveNodes = this.store.activeElementIds.size > 0;
+      const isClickInArea = this.selectionHandler.isClickInSelectedArea(e);
+
+      if (hasActiveNodes && isClickInArea) {
+        // 启动多选区域拖拽
+        const activeIds = Array.from(this.store.activeElementIds).filter((id) => {
+          const node = this.store.nodes[id];
+          return node && !node.isLocked;
+        });
+        if (activeIds.length === 0) return;
+
+        // 使用第一个节点 ID 启动拖拽（实际会拖拽所有选中节点）
+        const firstNodeId = activeIds[0];
+        if (firstNodeId) {
+          this.transformHandler.startNodeDrag(e, firstNodeId, false);
+        }
+        return; // 阻止后续框选逻辑
+      }
 
       // 点击空白区域时，如果在组合编辑模式下，退出编辑模式
       if (this.store.editingGroupId) {
         GroupService.exitGroupEdit(this.store);
       }
 
-      // 原有框选逻辑（仅未按空格时执行）
+      // 启动框选（仅未按空格时）
       this.selectionHandler.startBoxSelect(e);
     }
   }
