@@ -1,16 +1,42 @@
 /**
- * TransformHandler - 节点变换处理器
- * 
+ * @file TransformHandler.ts
+ * @description 节点变换处理器 - 处理节点的拖拽和缩放
+ *
  * 职责：
- * - 管理节点拖拽（单个/多个节点、区域框拖拽）
- * - 管理节点缩放（单个节点缩放、多选缩放）
- * - 处理 Shift/Ctrl 等比缩放
- * - 处理组合节点及其子节点的联动变换
- * 
+ * 1. 管理节点拖拽（单个/多个节点、区域框拖拽）
+ * 2. 管理节点缩放（单个节点缩放、多选缩放）
+ * 3. 处理 Shift/Ctrl 等比缩放
+ * 4. 处理组合节点及其子节点的联动变换
+ *
+ * 特点：
+ * - 有状态处理器：维护拖拽和缩放相关的私有状态
+ * - 支持多选：可同时拖拽或缩放多个节点，保持相对位置和比例
+ * - 组合联动：缩放组合节点时，子节点自动按比例调整
+ * - 边界限制：最小尺寸保护，防止节点缩放到无效尺寸
+ * - 等比缩放：按住 Shift 键可进行等比缩放
+ *
  * 状态管理：
  * - dragState: 拖拽状态（包括多节点拖拽的初始变换映射）
  * - resizeState: 单节点缩放状态（包括组合子节点的初始状态）
  * - multiResizeState: 多选缩放状态（包括所有节点的位置/尺寸比例）
+ *
+ * 包含方法列表：
+ *
+ * 生命周期：
+ * - constructor: 初始化处理器
+ * - reset: 重置所有变换状态
+ *
+ * 拖拽方法：
+ * - startNodeDrag: 开始节点拖拽
+ * - updateDrag: 更新拖拽位置
+ *
+ * 单选缩放方法：
+ * - startResize: 开始单节点缩放
+ * - updateResize: 更新单节点缩放
+ *
+ * 多选缩放方法：
+ * - startMultiResize: 开始多选缩放
+ * - updateMultiResize: 更新多选缩放
  */
 
 import { useCanvasStore } from '@/store/canvasStore';
@@ -793,7 +819,11 @@ export class TransformHandler {
    * 检查是否有任何变换操作正在进行
    */
   get isTransforming(): boolean {
-    return this.dragState.isDragging || this.resizeState.isResizing || this.multiResizeState.isMultiResizing;
+    return (
+      this.dragState.isDragging ||
+      this.resizeState.isResizing ||
+      this.multiResizeState.isMultiResizing
+    );
   }
 
   /**

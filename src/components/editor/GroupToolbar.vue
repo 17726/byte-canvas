@@ -25,15 +25,13 @@
 </template>
 
 <script setup lang="ts">
-import { computed, inject, type Ref } from 'vue';
+import { computed } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
 import { worldToClient } from '@/core/utils/geometry';
 import { Group as IconGroup, Ungroup as IconUngroup } from '@icon-park/vue-next';
-import type { ToolManager } from '@/core/ToolManager';
 import { GroupService } from '@/core/services/GroupService';
 
 const store = useCanvasStore();
-const toolManagerRef = inject<Ref<ToolManager | null>>('toolManager');
 
 // 显示条件：选中多个元素时显示组合按钮，选中组合时显示解组合按钮
 const isVisible = computed(() => {

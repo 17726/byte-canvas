@@ -55,8 +55,7 @@
 
 import { useCanvasStore } from '@/store/canvasStore';
 import { useUIStore } from '@/store/uiStore';
-import { NodeType, type BaseNodeState, type GroupState, type ViewportState } from '@/types/state';
-import { clientToWorld } from '@/core/utils/geometry';
+import { NodeType, type BaseNodeState } from '@/types/state';
 import { ViewportHandler } from './handlers/ViewportHandler';
 import { TransformHandler, type ResizeHandle } from './handlers/TransformHandler';
 import { SelectionHandler } from './handlers/SelectionHandler';
@@ -359,6 +358,7 @@ export class ToolManager {
     );
   }
   // ==================== 组合/解组合功能（已迁移至 GroupService）====================
+
   // ==================== 节点拖拽/缩放方法（已迁移到 TransformHandler） ====================
   // handleNodeMove(), handleNodeUp(), handleResizeMove(), handleMultiResizeMove()
   // 已完全迁移到 src/core/tools/handlers/TransformHandler.ts
