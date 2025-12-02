@@ -1,3 +1,65 @@
+/**
+ * @file canvasStore.ts
+ * @description Canvas Store - 画布状态管理中心
+ *
+ * 职责：
+ * 1. 管理所有节点数据（nodes）和渲染顺序（nodeOrder）
+ * 2. 管理视口状态（zoom, offsetX, offsetY）
+ * 3. 管理选中状态（activeElementIds）和组合编辑状态（editingGroupId）
+ * 4. 提供节点的增删改查操作
+ * 5. 处理复制/剪切/粘贴操作
+ * 6. 管理本地存储的持久化
+ *
+ * 特点：
+ * - 使用 Pinia 进行状态管理
+ * - State/Node 分离：节点存储在 Record 中，渲染顺序单独维护
+ * - 脏标记机制：version 字段追踪变更，优化重渲染
+ * - 性能优化：使用 Set 管理选中状态，提高查找效率
+ * - 自动保存：通过 debounce 实现自动保存到 LocalStorage
+ * - 坐标转换：提供绝对坐标计算（支持嵌套组合）
+ *
+ * 包含状态：
+ * - nodes: 节点字典（Record<id, NodeState>）
+ * - nodeOrder: 渲染顺序数组
+ * - version: 脏标记计数器
+ * - viewport: 视口状态（zoom, offset, canvasSize）
+ * - activeElementIds: 选中元素集合（Set）
+ * - isInteracting: 交互锁（防止交互时触发自动保存）
+ * - editingGroupId: 当前编辑的组合 ID
+ *
+ * 包含方法列表：
+ * 节点操作：
+ * - updateNode: 更新单个节点
+ * - addNode: 添加节点到画布
+ * - deleteNode: 删除单个节点
+ * - deleteNodes: 批量删除节点
+ *
+ * 选中操作：
+ * - setActive: 设置选中状态
+ * - toggleSelection: 切换节点选中状态
+ *
+ * 持久化操作：
+ * - initFromStorage: 从 LocalStorage 加载
+ * - saveToStorage: 保存到 LocalStorage
+ * - clearStorage: 清空 LocalStorage
+ *
+ * 剪贴板操作：
+ * - copySelected: 复制选中节点
+ * - cutSelected: 剪切选中节点
+ * - paste: 粘贴节点
+ *
+ * 辅助方法：
+ * - getAbsoluteTransform: 计算节点的绝对坐标
+ * - getSelectionBounds: 计算选中节点的包围盒
+ *
+ * 计算属性：
+ * - renderList: 按顺序的可渲染节点列表
+ * - activeElements: 选中的节点列表
+ * - visibleRenderList: 可见的节点列表（过滤不可见节点）
+ * - canGroup: 是否可以组合选中节点
+ * - canUngroup: 是否可以解散选中节点
+ */
+
 // stores/canvasStore.ts
 import { defineStore } from 'pinia';
 import { ref, reactive, computed, watch } from 'vue';
@@ -17,8 +79,11 @@ import {
 import { v4 as uuidv4 } from 'uuid';
 import { cloneDeep } from 'lodash-es';
 
-// 全局画布状态管理（Pinia store）
-// 说明：该 store 管理整个编辑器的核心状态，包括节点、渲染顺序、视口、交互态等。
+/**
+ * Canvas Store
+ *
+ * 管理整个编辑器的核心状态，包括节点、渲染顺序、视口、交互状态等
+ */
 export const useCanvasStore = defineStore('canvas', () => {
   // 1. 核心数据
   // 使用 Record 存储，对应调研报告中的 "State/Node分离" 思想
@@ -523,10 +588,8 @@ export const useCanvasStore = defineStore('canvas', () => {
   // ref(null) 表示初始值为 null，泛型指定类型
   const globalTextSelection = ref<{ start: number; end: number } | null>(null);
 
-   // 新增：更新全局选区（供文本组件调用）
-   function updateGlobalTextSelection(
-    selection: { start: number; end: number } | null
-  ) {
+  // 新增：更新全局选区（供文本组件调用）
+  function updateGlobalTextSelection(selection: { start: number; end: number } | null) {
     // 响应式 ref 需通过 .value 赋值
     globalTextSelection.value = selection;
     //console.log('Pinia 全局选区更新：', selection); // 调试日志（可选）
@@ -650,6 +713,6 @@ export const useCanvasStore = defineStore('canvas', () => {
     getSelectionBounds,
     getAbsoluteTransform,
     // UI 状态请使用 uiStore 中的 activePanel 和 isPanelExpanded
-    updateGlobalTextSelection
+    updateGlobalTextSelection,
   };
 });

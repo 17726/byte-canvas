@@ -36,14 +36,19 @@ import {
 
 /**
  * 节点工厂类
- * 负责创建各类节点的数据结构
+ *
+ * 负责创建各类节点的数据结构，遵循工厂模式。
+ * 所有方法为纯函数，仅返回节点对象，不涉及 Store 操作。
  */
 export class NodeFactory {
   /**
    * 创建矩形节点
-   * @param x 节点 X 坐标（可选，默认随机）
-   * @param y 节点 Y 坐标（可选，默认随机）
-   * @returns 矩形节点数据对象
+   *
+   * 生成一个带默认样式的矩形节点数据对象。
+   *
+   * @param x - 节点 X 坐标，可选，默认随机生成 0-800 范围
+   * @param y - 节点 Y 坐标，可选，默认随机生成 0-600 范围
+   * @returns 矩形节点状态对象
    */
   static createRect(x?: number, y?: number): ShapeState {
     const id = uuidv4();
@@ -72,9 +77,12 @@ export class NodeFactory {
 
   /**
    * 创建圆形节点
-   * @param x 节点 X 坐标（可选，默认随机）
-   * @param y 节点 Y 坐标（可选，默认随机）
-   * @returns 圆形节点数据对象
+   *
+   * 生成一个带默认样式的圆形节点数据对象。
+   *
+   * @param x - 节点 X 坐标，可选，默认随机生成 0-800 范围
+   * @param y - 节点 Y 坐标，可选，默认随机生成 0-600 范围
+   * @returns 圆形节点状态对象
    */
   static createCircle(x?: number, y?: number): ShapeState {
     const id = uuidv4();
@@ -103,9 +111,12 @@ export class NodeFactory {
 
   /**
    * 创建文本节点
-   * @param x 节点 X 坐标（可选，默认随机）
-   * @param y 节点 Y 坐标（可选，默认随机）
-   * @returns 文本节点数据对象
+   *
+   * 生成一个带默认内容和样式的文本节点数据对象。
+   *
+   * @param x - 节点 X 坐标，可选，默认随机生成 0-800 范围
+   * @param y - 节点 Y 坐标，可选，默认随机生成 0-600 范围
+   * @returns 文本节点状态对象
    */
   static createText(x?: number, y?: number): TextState {
     const id = uuidv4();
@@ -132,11 +143,15 @@ export class NodeFactory {
   }
 
   /**
-   * 创建图片节点（异步方法，会尝试获取图片原始尺寸）
-   * @param imageUrl 图片 URL（可选，默认使用配置中的默认图片）
-   * @param x 节点 X 坐标（可选，默认随机）
-   * @param y 节点 Y 坐标（可选，默认随机）
-   * @returns 图片节点数据对象（异步）
+   * 创建图片节点（异步）
+   *
+   * 异步获取图片原始尺寸并自动缩放到合适大小（50-400px）。
+   * 如果获取尺寸失败，则使用默认尺寸。
+   *
+   * @param imageUrl - 图片 URL，可选，默认使用配置中的默认图片
+   * @param x - 节点 X 坐标，可选，默认随机生成 0-800 范围
+   * @param y - 节点 Y 坐标，可选，默认随机生成 0-600 范围
+   * @returns Promise 解析为图片节点状态对象
    */
   static async createImage(
     imageUrl: string = DEFAULT_IMAGE_URL,
@@ -199,9 +214,12 @@ export class NodeFactory {
   }
 
   /**
-   * 获取图片原始尺寸（辅助方法）
-   * @param url 图片 URL
-   * @returns 图片的宽高信息
+   * 获取图片原始尺寸
+   *
+   * 辅助方法，用于异步加载图片并获取其宽高。
+   *
+   * @param url - 图片 URL
+   * @returns Promise 解析为包含 width 和 height 的对象
    */
   static getImageDimensions(url: string): Promise<{ width: number; height: number }> {
     return new Promise((resolve, reject) => {

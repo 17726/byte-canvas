@@ -1,23 +1,41 @@
+/**
+ * @file SelectionHandler.ts
+ * @description 框选处理器 - 处理画布框选交互
+ *
+ * 职责：
+ * 1. 管理框选状态（起点、终点、进行中标记）
+ * 2. 处理框选的启动、更新、结束逻辑
+ * 3. 根据框选区域计算并选中节点
+ * 4. 支持组合编辑模式下的分层选择
+ *
+ * 特点：
+ * - 有状态处理器：维护框选相关的私有状态（区别于 GroupService）
+ * - 智能选择：正常模式选顶层节点，编辑模式选当前组合的子节点
+ * - 坐标转换：自动将屏幕坐标转换为世界坐标进行碰撞检测
+ * - 过滤锁定：自动跳过锁定的节点
+ * - 小区域判定：框选面积小于 4 像素时视为点击，取消所有选中
+ *
+ * 包含方法列表：
+ * - constructor: 初始化处理器
+ * - getBoxSelectState: 获取框选状态（供 Vue 组件使用）
+ * - startBoxSelect: 开始框选
+ * - updateBoxSelect: 更新框选终点
+ * - finishBoxSelect: 结束框选并计算选中节点
+ * - cancelBoxSelect: 取消框选
+ * - reset: 重置所有框选状态
+ */
+
 import { isNodeInRect, clientToWorld } from '@/core/utils/geometry';
 import type { ViewportState, BaseNodeState } from '@/types/state';
 import type { useCanvasStore } from '@/store/canvasStore';
 
-/**
- * SelectionHandler - 框选处理器
- * 
- * 职责：
- * - 管理框选状态（起点、终点、进行中标记）
- * - 处理框选的启动、更新、结束逻辑
- * - 根据框选区域计算并选中节点
- * 
- * 特点：
- * - 有状态处理器：维护框选相关的状态
- * - 支持组合编辑模式：只选择当前层级的节点
- * - 支持碰撞检测：使用绝对坐标进行准确计算
- */
-
 type CanvasStore = ReturnType<typeof useCanvasStore>;
 
+/**
+ * 框选处理器类
+ *
+ * 负责处理画布上的框选交互逻辑
+ */
 export class SelectionHandler {
   private store: CanvasStore;
   private stageEl: HTMLElement | null;
@@ -27,13 +45,23 @@ export class SelectionHandler {
   private boxSelectStart = { x: 0, y: 0 };
   private boxSelectEnd = { x: 0, y: 0 };
 
+  /**
+   * 构造框选处理器
+   *
+   * @param store - Canvas Store 实例
+   * @param stageEl - 画布根 DOM 元素，用于坐标转换
+   */
   constructor(store: CanvasStore, stageEl: HTMLElement | null) {
     this.store = store;
     this.stageEl = stageEl;
   }
 
   /**
-   * 获取框选状态（供 Vue 组件使用）
+   * 获取框选状态
+   *
+   * 用于 Vue 组件渲染框选矩形
+   *
+   * @returns 包含 isBoxSelecting、boxSelectStart、boxSelectEnd 的状态对象
    */
   getBoxSelectState() {
     return {
@@ -45,7 +73,10 @@ export class SelectionHandler {
 
   /**
    * 开始框选
-   * @param e 鼠标事件
+   *
+   * 记录框选起点并设置框选状态
+   *
+   * @param e - 鼠标事件
    */
   startBoxSelect(e: MouseEvent): void {
     this.isBoxSelecting = true;
@@ -55,7 +86,10 @@ export class SelectionHandler {
 
   /**
    * 更新框选终点
-   * @param e 鼠标事件
+   *
+   * 随鼠标移动更新框选区域
+   *
+   * @param e - 鼠标事件
    */
   updateBoxSelect(e: MouseEvent): void {
     if (!this.isBoxSelecting) return;
@@ -64,6 +98,9 @@ export class SelectionHandler {
 
   /**
    * 结束框选，计算并选中区域内的节点
+   *
+   * 将屏幕坐标转换为世界坐标，进行碰撞检测并更新选中状态。
+   * 小于 4 像素的框选视为点击，会取消所有选中。
    */
   finishBoxSelect(): void {
     if (!this.isBoxSelecting) return;
@@ -108,7 +145,7 @@ export class SelectionHandler {
 
     Object.entries(this.store.nodes).forEach(([id, node]) => {
       const baseNode = node as BaseNodeState;
-      
+
       // 跳过锁定的节点
       if (baseNode.isLocked) return;
 
@@ -147,6 +184,8 @@ export class SelectionHandler {
 
   /**
    * 取消框选
+   *
+   * 结束框选状态但不更改选中状态
    */
   cancelBoxSelect(): void {
     this.isBoxSelecting = false;
@@ -154,6 +193,8 @@ export class SelectionHandler {
 
   /**
    * 重置框选状态
+   *
+   * 清空所有框选相关的状态
    */
   reset(): void {
     this.isBoxSelecting = false;

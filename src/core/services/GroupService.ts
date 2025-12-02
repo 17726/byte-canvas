@@ -1,30 +1,51 @@
+/**
+ * @file GroupService.ts
+ * @description 组合管理服务 - 处理节点组合的所有业务逻辑
+ *
+ * 职责：
+ * 1. 创建和解散节点组合
+ * 2. 管理组合编辑模式的进入和退出
+ * 3. 自动调整组合边界以适应子元素
+ * 4. 同步组合样式到子节点
+ *
+ * 特点：
+ * - 无状态服务：所有方法为静态方法，接收 store 作为参数
+ * - 纯业务逻辑：不涉及 UI 交互或事件处理（区别于 Handler）
+ * - 支持嵌套组合：可以在组合内部创建子组合
+ * - 坐标转换：自动处理绝对坐标与相对坐标的转换
+ * - 类型安全：严格的 TypeScript 类型定义
+ *
+ * 包含方法列表：
+ * - groupSelected: 将选中的元素组合成一个组
+ * - ungroupSelected: 解散选中的组合节点
+ * - enterGroupEdit: 进入组合编辑模式
+ * - exitGroupEdit: 退出组合编辑模式
+ * - expandGroupToFitChildren: 调整组合边界以精确适应所有子元素
+ * - canGroup: 检查选中的元素是否可以组合
+ * - canUngroup: 检查选中的元素是否可以解组合
+ * - updateGroupStyle: 同步更新组合的样式到所有子节点
+ */
+
 import { v4 as uuidv4 } from 'uuid';
 import { NodeType, type GroupState, type NodeState } from '@/types/state';
 import type { useCanvasStore } from '@/store/canvasStore';
 
-/**
- * GroupService - 组合管理服务
- * 
- * 职责：
- * - 创建/解散节点组合
- * - 进入/退出组合编辑模式
- * - 调整组合边界以适应子元素
- * - 同步组合样式到子元素
- * 
- * 特点：
- * - 无状态服务：所有方法接收 store 作为参数
- * - 纯业务逻辑：不涉及 UI 交互或事件处理
- * - 类型安全：严格的 TypeScript 类型定义
- */
-
 type CanvasStore = ReturnType<typeof useCanvasStore>;
 
+/**
+ * 组合管理服务类
+ *
+ * 提供与组合操作相关的所有静态方法
+ */
 export class GroupService {
   /**
    * 将选中的元素组合成一个组
-   * 支持嵌套组合：可以将已有的组合元素与其他元素一起组合
-   * @param store Canvas Store 实例
-   * @returns 新创建的组合ID，失败返回null
+   *
+   * 支持嵌套组合：可以将已有的组合元素与其他元素一起组合。
+   * 在组合编辑模式下，新组合会成为当前编辑组合的子节点。
+   *
+   * @param store - Canvas Store 实例
+   * @returns 新创建的组合 ID，失败时返回 null
    */
   static groupSelected(store: CanvasStore): string | null {
     const selectedIds = Array.from(store.activeElementIds);
@@ -133,10 +154,13 @@ export class GroupService {
   }
 
   /**
-   * 解组合选中的组合节点
-   * 只解开最外层的组合，保留内部嵌套的组合结构
-   * @param store Canvas Store 实例
-   * @returns 解组合后的子节点ID列表
+   * 解散选中的组合节点
+   *
+   * 只解开最外层的组合，保留内部嵌套的组合结构。
+   * 将子节点的相对坐标转换为绝对坐标。
+   *
+   * @param store - Canvas Store 实例
+   * @returns 解组合后的子节点 ID 列表
    */
   static ungroupSelected(store: CanvasStore): string[] {
     const selectedIds = Array.from(store.activeElementIds);
@@ -207,9 +231,12 @@ export class GroupService {
 
   /**
    * 进入组合编辑模式
-   * @param store Canvas Store 实例
-   * @param groupId 要编辑的组合ID
-   * @returns 是否成功进入编辑模式
+   *
+   * 进入后可以直接编辑组合内部的子节点，并支持嵌套组合创建。
+   *
+   * @param store - Canvas Store 实例
+   * @param groupId - 要编辑的组合 ID
+   * @returns true 表示成功进入，false 表示节点不存在或不是组合
    */
   static enterGroupEdit(store: CanvasStore, groupId: string): boolean {
     const node = store.nodes[groupId];
@@ -226,7 +253,10 @@ export class GroupService {
 
   /**
    * 退出组合编辑模式
-   * @param store Canvas Store 实例
+   *
+   * 退出后会自动选中当前编辑的组合节点。
+   *
+   * @param store - Canvas Store 实例
    */
   static exitGroupEdit(store: CanvasStore): void {
     if (store.editingGroupId) {
@@ -239,8 +269,11 @@ export class GroupService {
 
   /**
    * 调整组合边界以精确适应所有子元素
-   * 支持扩展和收缩边界，考虑子元素旋转
-   * @param store Canvas Store 实例
+   *
+   * 支持扩展和收缩边界，考虑子元素旋转。
+   * 在组合编辑模式下拖拽或缩放子节点后自动调用。
+   *
+   * @param store - Canvas Store 实例
    */
   static expandGroupToFitChildren(store: CanvasStore): void {
     const editingGroupId = store.editingGroupId;
@@ -344,8 +377,11 @@ export class GroupService {
 
   /**
    * 检查选中的元素是否可以组合
-   * @param store Canvas Store 实例
-   * @returns 是否可以组合
+   *
+   * 需要至少选中 2 个有效节点。
+   *
+   * @param store - Canvas Store 实例
+   * @returns true 表示可以组合，false 表示不可以
    */
   static canGroup(store: CanvasStore): boolean {
     const ids = Array.from(store.activeElementIds);
@@ -355,8 +391,11 @@ export class GroupService {
 
   /**
    * 检查选中的元素是否可以解组合
-   * @param store Canvas Store 实例
-   * @returns 是否可以解组合
+   *
+   * 需要至少选中一个组合节点。
+   *
+   * @param store - Canvas Store 实例
+   * @returns true 表示可以解组合，false 表示不可以
    */
   static canUngroup(store: CanvasStore): boolean {
     const ids = Array.from(store.activeElementIds);
@@ -367,10 +406,13 @@ export class GroupService {
   }
 
   /**
-   * 同步更新组合的属性到所有子节点
-   * @param store Canvas Store 实例
-   * @param groupId 组合ID
-   * @param stylePatch 样式更新
+   * 更新组合样式并同步到所有子节点
+   *
+   * 目前仅同步 opacity 属性到子节点。
+   *
+   * @param store - Canvas Store 实例
+   * @param groupId - 组合 ID
+   * @param stylePatch - 要更新的样式属性
    */
   static updateGroupStyle(
     store: CanvasStore,

@@ -15,18 +15,33 @@
 
 import { useCanvasStore } from '@/store/canvasStore';
 
+/**
+ * 视口处理器类
+ *
+ * 负责处理画布的缩放和平移操作
+ */
 export class ViewportHandler {
   private store: ReturnType<typeof useCanvasStore>;
   public isPanning = false;
   private lastPanPos = { x: 0, y: 0 };
 
+  /**
+   * 构造视口处理器
+   *
+   * @param store - Canvas Store 实例
+   */
   constructor(store: ReturnType<typeof useCanvasStore>) {
     this.store = store;
   }
 
   /**
-   * 处理滚轮事件（缩放 + 触摸板平移）
-   * @param e 滚轮事件
+   * 处理滚轮事件
+   *
+   * 根据按键组合决定行为：
+   * - 无 Ctrl/Shift：触摸板双指平移
+   * - Ctrl/Shift + 滚轮：缩放画布
+   *
+   * @param e - 滚轮事件
    */
   onWheel(e: WheelEvent): void {
     e.preventDefault();
@@ -51,8 +66,11 @@ export class ViewportHandler {
   }
 
   /**
-   * 开始平移（鼠标按下）
-   * @param e 鼠标事件
+   * 开始平移
+   *
+   * 记录鼠标起始位置并设置平移状态
+   *
+   * @param e - 鼠标事件
    */
   startPan(e: MouseEvent): void {
     this.isPanning = true;
@@ -61,8 +79,11 @@ export class ViewportHandler {
   }
 
   /**
-   * 执行平移（鼠标移动）
-   * @param e 鼠标事件
+   * 更新平移位置
+   *
+   * 根据鼠标移动距离更新视口偏移
+   *
+   * @param e - 鼠标事件
    */
   updatePan(e: MouseEvent): void {
     if (!this.isPanning) return;
@@ -78,7 +99,9 @@ export class ViewportHandler {
   }
 
   /**
-   * 结束平移（鼠标松开）
+   * 结束平移
+   *
+   * 重置平移状态
    */
   endPan(): void {
     this.isPanning = false;
@@ -86,13 +109,17 @@ export class ViewportHandler {
 
   /**
    * 检查是否正在平移
+   *
+   * @returns true 表示正在平移，false 表示未在平移
    */
   isPanActive(): boolean {
     return this.isPanning;
   }
 
   /**
-   * 重置平移状态（用于清理）
+   * 重置平移状态
+   *
+   * 清空所有平移相关的状态
    */
   reset(): void {
     this.isPanning = false;
