@@ -1,51 +1,56 @@
 /**
  * @file ToolManager.ts
- * @description 工具管理器 - 画布交互事件的中央协调器
+ * @description 工具管理器 - 纯粹的画布事件分发器（Pure Event Dispatcher）
  *
- * 职责：
- * 1. 接收来自 Vue 组件的原始鼠标/键盘事件
- * 2. 协调各个专用处理器（ViewportHandler, TransformHandler, SelectionHandler）
- * 3. 委托组合管理逻辑到 GroupService
- * 4. 管理交互状态（isInteracting）以优化性能
+ * 核心职责：
+ * 1. 接收来自 Vue 组件的原始 DOM 事件（鼠标/键盘/滚轮）
+ * 2. 根据事件类型和当前上下文将事件路由到对应的 Handler
+ * 3. 管理全局交互状态（isInteracting）以优化渲染性能
+ * 4. 协调多个 Handler 之间的优先级和互斥关系
  *
- * 特点：
- * - 轻量级协调器：仅 293 行，不包含具体业务逻辑
- * - 职责分离：视口/变换/选择/组合逻辑均已提取到专用模块
- * - 事件路由：根据事件类型和状态将事件分发给对应处理器
- * - 无状态设计：自身不维护业务状态，状态由各处理器和 Store 管理
+ * 架构特点：
+ * - **纯事件路由器**：<300 行，零业务逻辑，零状态存储
+ * - **严格分层**：UI 层（Vue）→ ToolManager（路由）→ Handlers（交互逻辑）→ Services（业务逻辑）
+ * - **单一职责**：仅负责"事件分发"，所有具体逻辑委托给专用模块
+ * - **无状态设计**：所有状态由 Store 和各 Handler 管理，ToolManager 不持有业务数据
+ *
+ * Handler 协调关系：
+ * - ViewportHandler：视口平移、缩放（滚轮、中键拖拽、空格+左键）
+ * - TransformHandler：节点拖拽、单选/多选缩放
+ * - SelectionHandler：框选、点选、选区边界计算
+ * - GroupService：组合/解组合业务逻辑（直接由 UI 调用，不经过 ToolManager）
  *
  * 包含方法列表：
- * - constructor: 初始化管理器及所有处理器
- * - destroy: 清理资源
- * - getBoxSelectState: 获取框选状态（供 Vue 组件使用）
  *
- * 画布事件处理：
- * - handleWheel: 处理滚轮事件（缩放/平移）
- * - handleMouseDown: 处理画布鼠标按下（平移/框选/退出编辑）
- * - handleMouseMove: 处理鼠标移动（更新拖拽/缩放/框选）
- * - handleMouseUp: 处理鼠标松开（结束所有交互）
+ * 生命周期：
+ * - constructor(store, stageEl): 初始化管理器及所有 Handlers
+ * - destroy(): 清理事件监听器和资源
  *
- * 节点事件处理：
- * - handleNodeDown: 处理节点鼠标按下（选中/拖拽准备）
- * - handleNodeDoubleClick: 处理节点双击（进入组合编辑）
+ * 状态查询：
+ * - getBoxSelectState(): 获取框选状态（供 SelectionOverlay 组件使用）
+ * - getIsSpacePressed(): 获取空格键状态（私有）
  *
- * 组合操作（委托给 GroupService）：
- * - groupSelected: 将选中元素组合
- * - ungroupSelected: 解散选中的组合
- * - enterGroupEdit: 进入组合编辑模式
- * - exitGroupEdit: 退出组合编辑模式
- * - expandGroupToFitChildren: 调整组合边界适应子元素
- * - canGroup: 检查是否可以组合
- * - canUngroup: 检查是否可以解组合
- * - updateGroupStyle: 更新组合样式
+ * 画布事件（Stage Events）：
+ * - handleWheel(e): 滚轮事件 → 路由到 ViewportHandler（缩放/平移）
+ * - handleMouseDown(e): 画布鼠标按下 → 根据按键决定平移/框选/退出编辑
+ * - handleMouseMove(e): 鼠标移动 → 按优先级更新多选缩放 > 单选缩放 > 拖拽 > 平移 > 框选
+ * - handleMouseUp(e): 鼠标松开 → 结束所有交互操作
  *
- * 缩放操作（委托给 TransformHandler）：
- * - handleResizeHandleDown: 处理缩放控制点按下
- * - handleMultiResizeHandleDown: 处理多选缩放控制点按下
+ * 节点事件（Node Events）：
+ * - handleNodeDown(e, nodeId): 节点鼠标按下 → 选中逻辑 + 拖拽准备
+ * - handleNodeDoubleClick(e, nodeId): 节点双击 → 进入组合编辑模式（调用 GroupService）
  *
- * 辅助方法：
- * - getSelectedNodesBounds: 计算选中节点的包围盒
- * - isClickInSelectedArea: 判断点击是否在选中区域空白处
+ * 缩放控制点事件（Resize Handle Events）：
+ * - handleResizeHandleDown(e, direction): 单选缩放控制点按下 → TransformHandler
+ * - handleMultiResizeHandleDown(e, direction): 多选缩放控制点按下 → TransformHandler
+ *
+ * @example
+ * // Vue 组件中使用
+ * const toolManager = new ToolManager(store, stageRef.value)
+ * toolManager.handleMouseDown(e)  // 事件自动路由到正确的 Handler
+ *
+ * // 组合操作直接调用 Service（不经过 ToolManager）
+ * GroupService.groupSelected(store)
  */
 
 import { useCanvasStore } from '@/store/canvasStore';
@@ -117,94 +122,6 @@ export class ToolManager {
     };
   }
 
-  /**
-   * 计算选中节点的包围盒
-   *
-   * 用于多选区域拖拽等功能的边界判断
-   *
-   * @returns 包围盒信息（x, y, width, height），无选中节点时返回 null
-   * @private
-   */
-  private getSelectedNodesBounds(): { x: number; y: number; width: number; height: number } | null {
-    const activeIds = Array.from(this.store.activeElementIds);
-    if (activeIds.length === 0) return null;
-
-    let minX = Infinity,
-      minY = Infinity,
-      maxX = -Infinity,
-      maxY = -Infinity;
-    activeIds.forEach((id) => {
-      const node = this.store.nodes[id] as BaseNodeState;
-      if (!node) return;
-      const { x, y, width, height } = node.transform;
-      minX = Math.min(minX, x);
-      minY = Math.min(minY, y);
-      maxX = Math.max(maxX, x + width);
-      maxY = Math.max(maxY, y + height);
-    });
-
-    return {
-      x: minX,
-      y: minY,
-      width: maxX - minX,
-      height: maxY - minY,
-    };
-  }
-
-  /**
-   * 判断点击位置是否在选中区域内（但不在任何具体节点上）
-   *
-   * 用于实现多选区域空白处拖拽功能
-   *
-   * @param e - 鼠标事件
-   * @returns true 表示点击在选中区域空白处，false 表示不在或在具体节点上
-   * @private
-   */
-  private isClickInSelectedArea(e: MouseEvent): boolean {
-    const bounds = this.getSelectedNodesBounds();
-    if (!bounds) return false;
-
-    // 获取画布偏移
-    const stageRect = this.stageEl?.getBoundingClientRect() || { left: 0, top: 0 };
-    // 转换为世界坐标
-    const worldPos = clientToWorld(
-      this.store.viewport as ViewportState,
-      e.clientX - stageRect.left,
-      e.clientY - stageRect.top
-    );
-
-    // 1. 判断是否在选中区域包围盒内
-    if (
-      !(
-        worldPos.x >= bounds.x &&
-        worldPos.x <= bounds.x + bounds.width &&
-        worldPos.y >= bounds.y &&
-        worldPos.y <= bounds.y + bounds.height
-      )
-    ) {
-      return false;
-    }
-
-    // 2. 判断是否不在任何选中节点上
-    const activeIds = Array.from(this.store.activeElementIds);
-    for (const id of activeIds) {
-      const node = this.store.nodes[id] as BaseNodeState;
-      if (!node) continue;
-      const { x, y, width, height } = node.transform;
-      if (
-        worldPos.x >= x &&
-        worldPos.x <= x + width &&
-        worldPos.y >= y &&
-        worldPos.y <= y + height
-      ) {
-        // 点击在具体节点上，走原有节点拖拽逻辑
-        return false;
-      }
-    }
-
-    return true;
-  }
-
   // ==================== 画布事件处理 ====================
 
   /**
@@ -245,7 +162,7 @@ export class ToolManager {
       this.store.setActive([]); // 中键平移取消选中
       // 退出组合编辑模式
       if (this.store.editingGroupId) {
-        this.exitGroupEdit();
+        GroupService.exitGroupEdit(this.store);
       }
       return;
     }
@@ -398,94 +315,6 @@ export class ToolManager {
       GroupService.enterGroupEdit(this.store, id);
     }
     this.store.isInteracting = false;
-  }
-
-  // ==================== 组合/解组合功能（委托给 GroupService）====================
-
-  /**
-   * 将选中的元素组合
-   *
-   * 委托给 GroupService.groupSelected
-   *
-   * @returns 新创建的组合 ID，失败返回 null
-   */
-  groupSelected(): string | null {
-    return GroupService.groupSelected(this.store);
-  }
-
-  /**
-   * 解散选中的组合
-   *
-   * 委托给 GroupService.ungroupSelected
-   *
-   * @returns 解组合后的子节点 ID 列表
-   */
-  ungroupSelected(): string[] {
-    return GroupService.ungroupSelected(this.store);
-  }
-
-  /**
-   * 进入组合编辑模式
-   *
-   * 委托给 GroupService.enterGroupEdit
-   *
-   * @param groupId - 要编辑的组合 ID
-   * @returns 是否成功进入编辑模式
-   */
-  enterGroupEdit(groupId: string): boolean {
-    return GroupService.enterGroupEdit(this.store, groupId);
-  }
-
-  /**
-   * 退出组合编辑模式
-   *
-   * 委托给 GroupService.exitGroupEdit
-   */
-  exitGroupEdit() {
-    GroupService.exitGroupEdit(this.store);
-  }
-
-  /**
-   * 调整组合边界以适应所有子元素
-   *
-   * 委托给 GroupService.expandGroupToFitChildren
-   */
-  expandGroupToFitChildren() {
-    GroupService.expandGroupToFitChildren(this.store);
-  }
-
-  /**
-   * 检查选中的元素是否可以组合
-   *
-   * 委托给 GroupService.canGroup
-   *
-   * @returns 是否可以组合
-   */
-  canGroup(): boolean {
-    return GroupService.canGroup(this.store);
-  }
-
-  /**
-   * 检查选中的元素是否可以解组合
-   *
-   * 委托给 GroupService.canUngroup
-   *
-   * @returns 是否可以解组合
-   */
-  canUngroup(): boolean {
-    return GroupService.canUngroup(this.store);
-  }
-
-  /**
-   * 更新组合样式
-   *
-   * 委托给 GroupService.updateGroupStyle
-   *
-   * @param groupId - 组合 ID
-   * @param stylePatch - 要更新的样式属性
-   */
-  updateGroupStyle(groupId: string, stylePatch: Partial<GroupState['style']>) {
-    GroupService.updateGroupStyle(this.store, groupId, stylePatch);
   }
 
   // ==================== 单选缩放处理 ====================

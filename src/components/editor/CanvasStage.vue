@@ -67,6 +67,7 @@ import ContextToolbar from '../layout/ContextToolbar.vue';
 import GroupToolbar from './GroupToolbar.vue';
 import { ToolManager } from '@/core/ToolManager';
 import { NodeFactory } from '@/core/services/NodeFactory';
+import { GroupService } from '@/core/services/GroupService';
 import {
   DEFAULT_VIEWPORT,
   DEFAULT_CANVAS_BG,
@@ -288,7 +289,7 @@ const handleKeyDown = (e: KeyboardEvent) => {
   if (e.key === 'Escape') {
     if (store.editingGroupId) {
       e.preventDefault();
-      toolManagerRef.value?.exitGroupEdit();
+      GroupService.exitGroupEdit(store);
       return;
     }
   }
@@ -297,7 +298,7 @@ const handleKeyDown = (e: KeyboardEvent) => {
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'g') {
     e.preventDefault();
     if (store.canGroup) {
-      toolManagerRef.value?.groupSelected();
+      GroupService.groupSelected(store);
     }
     return;
   }
@@ -306,7 +307,7 @@ const handleKeyDown = (e: KeyboardEvent) => {
   if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'G') {
     e.preventDefault();
     if (store.canUngroup) {
-      toolManagerRef.value?.ungroupSelected();
+      GroupService.ungroupSelected(store);
     }
     return;
   }
