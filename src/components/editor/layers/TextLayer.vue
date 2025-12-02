@@ -369,7 +369,7 @@ const handleTextBoxClick = (e: MouseEvent) => {
 
     // 核心：执行选中逻辑（单击的核心需求）
     if (!isSelected.value) {
-      store.activeElementIds = new Set([props.node.id]);
+      store.setActive([props.node.id]);
     }
 
     // 关键3：强制让文本框失焦（兜底，避免意外聚焦）
