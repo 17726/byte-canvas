@@ -201,4 +201,90 @@ export class SelectionHandler {
     this.boxSelectStart = { x: 0, y: 0 };
     this.boxSelectEnd = { x: 0, y: 0 };
   }
+
+  /**
+   * 计算选中节点的包围盒
+   *
+   * 用于多选区域拖拽等功能的边界判断
+   *
+   * @returns 包围盒信息（x, y, width, height），无选中节点时返回 null
+   */
+  getSelectedNodesBounds(): { x: number; y: number; width: number; height: number } | null {
+    const activeIds = Array.from(this.store.activeElementIds);
+    if (activeIds.length === 0) return null;
+
+    let minX = Infinity,
+      minY = Infinity,
+      maxX = -Infinity,
+      maxY = -Infinity;
+    activeIds.forEach((id) => {
+      const node = this.store.nodes[id] as BaseNodeState;
+      if (!node) return;
+      const { x, y, width, height } = node.transform;
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x + width);
+      maxY = Math.max(maxY, y + height);
+    });
+
+    return {
+      x: minX,
+      y: minY,
+      width: maxX - minX,
+      height: maxY - minY,
+    };
+  }
+
+  /**
+   * 判断点击位置是否在选中区域内（但不在任何具体节点上）
+   *
+   * 用于实现多选区域空白处拖拽功能
+   *
+   * @param e - 鼠标事件
+   * @returns true 表示点击在选中区域空白处，false 表示不在或在具体节点上
+   */
+  isClickInSelectedArea(e: MouseEvent): boolean {
+    const bounds = this.getSelectedNodesBounds();
+    if (!bounds) return false;
+
+    // 获取画布偏移
+    const stageRect = this.stageEl?.getBoundingClientRect() || { left: 0, top: 0 };
+    // 转换为世界坐标
+    const worldPos = clientToWorld(
+      this.store.viewport as ViewportState,
+      e.clientX - stageRect.left,
+      e.clientY - stageRect.top
+    );
+
+    // 1. 判断是否在选中区域包围盒内
+    if (
+      !(
+        worldPos.x >= bounds.x &&
+        worldPos.x <= bounds.x + bounds.width &&
+        worldPos.y >= bounds.y &&
+        worldPos.y <= bounds.y + bounds.height
+      )
+    ) {
+      return false;
+    }
+
+    // 2. 判断是否不在任何选中节点上
+    const activeIds = Array.from(this.store.activeElementIds);
+    for (const id of activeIds) {
+      const node = this.store.nodes[id] as BaseNodeState;
+      if (!node) continue;
+      const { x, y, width, height } = node.transform;
+      if (
+        worldPos.x >= x &&
+        worldPos.x <= x + width &&
+        worldPos.y >= y &&
+        worldPos.y <= y + height
+      ) {
+        // 点击在具体节点上，走原有节点拖拽逻辑
+        return false;
+      }
+    }
+
+    return true;
+  }
 }

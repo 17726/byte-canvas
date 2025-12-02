@@ -30,6 +30,7 @@ import { useCanvasStore } from '@/store/canvasStore';
 import { worldToClient } from '@/core/utils/geometry';
 import { Group as IconGroup, Ungroup as IconUngroup } from '@icon-park/vue-next';
 import type { ToolManager } from '@/core/ToolManager';
+import { GroupService } from '@/core/services/GroupService';
 
 const store = useCanvasStore();
 const toolManagerRef = inject<Ref<ToolManager | null>>('toolManager');
@@ -70,12 +71,12 @@ const positionStyle = computed(() => {
 
 // 组合操作
 const handleGroup = () => {
-  toolManagerRef?.value?.groupSelected();
+  GroupService.groupSelected(store);
 };
 
 // 解组合操作
 const handleUngroup = () => {
-  toolManagerRef?.value?.ungroupSelected();
+  GroupService.ungroupSelected(store);
 };
 </script>
 
