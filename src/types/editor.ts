@@ -1,4 +1,4 @@
-// NOTE: 本地模块引用不应带后缀 .ts，当前写法在某些构建配置下会导致模块解析失败
+// NOTE: 本地模块引用不应带后缀 .ts，否则会在某些构建配置下导致模块解析失败
 import { type TransformState } from './state';
 export interface InternalDragState {
   isDragging: boolean; //是否正在拖拽
@@ -25,6 +25,8 @@ export interface InternalResizeState {
   startHeight: number;
   startNodeX: number;
   startNodeY: number;
+  // 组合缩放时存储子节点初始状态
+  childStartStates?: Record<string, { x: number; y: number; width: number; height: number }>;
 }
 
 // 多节点缩放状态
