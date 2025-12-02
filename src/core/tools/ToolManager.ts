@@ -4,7 +4,13 @@ import type {
   InternalMultiResizeState,
   NodeStartState,
 } from '@/types/editor';
-import { clientToWorld, isNodeInRect } from '@/core/utils/geometry';
+import {
+  clientToWorld,
+  isNodeInRect,
+  calculateRectResize,
+  calculateCircleResize,
+  calculateTextResize,
+} from '@/core/utils/geometry';
 import { useCanvasStore } from '@/store/canvasStore';
 import { useUIStore } from '@/store/uiStore';
 import type { InternalDragState } from '@/types/editor';
@@ -1174,145 +1180,119 @@ export class ToolManager {
     let newY = startNodeY;
 
     // 根据节点类型选择缩放策略
+    let result;
     switch (node.type) {
       case NodeType.CIRCLE:
         // 圆形：等比缩放，保持圆形，锚点为与当前缩放手柄相对的对角（即以对角点为固定点进行缩放）
-        this.resizeCircle(
+        result = calculateCircleResize(
           handle,
           dx,
           dy,
           startWidth,
           startHeight,
           startNodeX,
-          startNodeY,
-          (result) => {
-            newWidth = result.width;
-            newHeight = result.height;
-            newX = result.x;
-            newY = result.y;
-          }
+          startNodeY
         );
         break;
       case NodeType.RECT:
         // 矩形：独立缩放宽高
-        this.resizeRect(
+        result = calculateRectResize(
           handle,
           dx,
           dy,
           startWidth,
           startHeight,
           startNodeX,
-          startNodeY,
-          (result) => {
-            newWidth = result.width;
-            newHeight = result.height;
-            newX = result.x;
-            newY = result.y;
-          }
+          startNodeY
         );
         break;
       case NodeType.IMAGE:
         // 图片：自由缩放（允许畸变）
-        this.resizeImage(
+        result = calculateRectResize(
           handle,
           dx,
           dy,
           startWidth,
           startHeight,
           startNodeX,
-          startNodeY,
-          (result) => {
-            newWidth = result.width;
-            newHeight = result.height;
-            newX = result.x;
-            newY = result.y;
-          }
+          startNodeY
         );
         break;
       case NodeType.TEXT:
         // 文本：只改变容器大小，不缩放字体
-        this.resizeText(
+        result = calculateTextResize(
           handle,
           dx,
           dy,
           startWidth,
           startHeight,
           startNodeX,
-          startNodeY,
-          (result) => {
-            newWidth = result.width;
-            newHeight = result.height;
-            newX = result.x;
-            newY = result.y;
-          }
+          startNodeY
         );
         break;
       case NodeType.GROUP:
         // 组合：等比缩放组合和所有子元素
-        this.resizeRect(
+        result = calculateRectResize(
           handle,
           dx,
           dy,
           startWidth,
           startHeight,
           startNodeX,
-          startNodeY,
-          (result) => {
-            newWidth = result.width;
-            newHeight = result.height;
-            newX = result.x;
-            newY = result.y;
-          }
+          startNodeY
         );
-
-        // 计算缩放因子
-        const scaleX = newWidth / startWidth;
-        const scaleY = newHeight / startHeight;
-
-        // 缩放所有后代节点（包括嵌套组合的子节点）
-        const { childStartStates } = this.resizeState;
-        if (childStartStates) {
-          // 遍历所有后代节点，不只是直接子节点
-          Object.entries(childStartStates).forEach(([childId, childStart]) => {
-            const child = this.store.nodes[childId];
-            if (!child) return;
-
-            // 按比例缩放子节点的位置和尺寸
-            const childNewX = childStart.x * scaleX;
-            const childNewY = childStart.y * scaleY;
-            const childNewWidth = Math.max(MIN_NODE_SIZE, childStart.width * scaleX);
-            const childNewHeight = Math.max(MIN_NODE_SIZE, childStart.height * scaleY);
-
-            this.store.updateNode(childId, {
-              transform: {
-                ...child.transform,
-                x: childNewX,
-                y: childNewY,
-                width: childNewWidth,
-                height: childNewHeight,
-              },
-            });
-          });
-        }
         break;
       default:
         // 默认使用矩形缩放逻辑
-        this.resizeRect(
+        result = calculateRectResize(
           handle,
           dx,
           dy,
           startWidth,
           startHeight,
           startNodeX,
-          startNodeY,
-          (result) => {
-            newWidth = result.width;
-            newHeight = result.height;
-            newX = result.x;
-            newY = result.y;
-          }
+          startNodeY
         );
         break;
+    }
+
+    if (result) {
+      newWidth = result.width;
+      newHeight = result.height;
+      newX = result.x;
+      newY = result.y;
+    }
+
+    if (node.type === NodeType.GROUP) {
+      // 计算缩放因子
+      const scaleX = newWidth / startWidth;
+      const scaleY = newHeight / startHeight;
+
+      // 缩放所有后代节点（包括嵌套组合的子节点）
+      const { childStartStates } = this.resizeState;
+      if (childStartStates) {
+        // 遍历所有后代节点，不只是直接子节点
+        Object.entries(childStartStates).forEach(([childId, childStart]) => {
+          const child = this.store.nodes[childId];
+          if (!child) return;
+
+          // 按比例缩放子节点的位置和尺寸
+          const childNewX = childStart.x * scaleX;
+          const childNewY = childStart.y * scaleY;
+          const childNewWidth = Math.max(MIN_NODE_SIZE, childStart.width * scaleX);
+          const childNewHeight = Math.max(MIN_NODE_SIZE, childStart.height * scaleY);
+
+          this.store.updateNode(childId, {
+            transform: {
+              ...child.transform,
+              x: childNewX,
+              y: childNewY,
+              width: childNewWidth,
+              height: childNewHeight,
+            },
+          });
+        });
+      }
     }
 
     // ========== 新增：Shift键等比缩放处理 ==========
@@ -1853,249 +1833,5 @@ export class ToolManager {
   }
 
   // ==================== 缩放计算辅助方法 ====================
-
-  /**
-   * 圆形缩放计算
-   * - 四个角（nw, ne, se, sw）：等比缩放，保持圆形，锚点为对角
-   * - 四条边（n, e, s, w）：独立缩放宽高，可拉伸成椭圆，锚点为对边
-   */
-  private resizeCircle(
-    handle: ResizeHandle,
-    dx: number,
-    dy: number,
-    startWidth: number,
-    startHeight: number,
-    startNodeX: number,
-    startNodeY: number,
-    callback: (result: { width: number; height: number; x: number; y: number }) => void
-  ) {
-    let newWidth = startWidth;
-    let newHeight = startHeight;
-    let newX = startNodeX;
-    let newY = startNodeY;
-
-    // 宽高比
-    const ratio = startWidth / startHeight;
-
-    // 判断是否为角点（等比缩放）
-    const isCorner = handle.length === 2;
-
-    if (isCorner) {
-      // 角点：等比缩放，保持宽高比
-      // 以宽度变化为主导 (也可以取 max(dx, dy))
-
-      // 1. 计算基于宽度的预期新宽度
-      if (handle.includes('e')) {
-        newWidth = startWidth + dx;
-      } else {
-        newWidth = startWidth - dx;
-      }
-
-      // 2. 根据比例计算高度
-      newHeight = newWidth / ratio;
-
-      // 3. 根据锚点调整位置
-      if (handle === 'se') {
-        // 锚点在左上 (startNodeX, startNodeY) -> 不变
-      } else if (handle === 'sw') {
-        // 锚点在右上 (startNodeX + startWidth, startNodeY)
-        newX = startNodeX + startWidth - newWidth;
-      } else if (handle === 'ne') {
-        // 锚点在左下 (startNodeX, startNodeY + startHeight)
-        newY = startNodeY + startHeight - newHeight;
-      } else if (handle === 'nw') {
-        // 锚点在右下 (startNodeX + startWidth, startNodeY + startHeight)
-        newX = startNodeX + startWidth - newWidth;
-        newY = startNodeY + startHeight - newHeight;
-      }
-    } else {
-      // 边点：独立缩放宽高，可拉伸成椭圆 (与矩形逻辑一致)
-      switch (handle) {
-        case 'n': // 上：只改变高度，锚点在下
-          newHeight = startHeight - dy;
-          newY = startNodeY + dy;
-          break;
-        case 'e': // 右：只改变宽度，锚点在左
-          newWidth = startWidth + dx;
-          break;
-        case 's': // 下：只改变高度，锚点在上
-          newHeight = startHeight + dy;
-          break;
-        case 'w': // 左：只改变宽度，锚点在右
-          newWidth = startWidth - dx;
-          newX = startNodeX + dx;
-          break;
-      }
-    }
-
-    callback({
-      width: newWidth,
-      height: newHeight,
-      x: newX,
-      y: newY,
-    });
-  }
-
-  /**
-   * 图片缩放计算
-   * - 角点和边点均允许宽高独立缩放（自由缩放，允许畸变）
-   */
-  private resizeImage(
-    handle: ResizeHandle,
-    dx: number,
-    dy: number,
-    startWidth: number,
-    startHeight: number,
-    startNodeX: number,
-    startNodeY: number,
-    callback: (result: { width: number; height: number; x: number; y: number }) => void
-  ) {
-    // 图片现在默认使用自由缩放（允许畸变），逻辑与矩形一致
-    this.resizeRect(handle, dx, dy, startWidth, startHeight, startNodeX, startNodeY, callback);
-  }
-
-  /**
-   * 矩形缩放计算（独立缩放宽高）
-   */
-  private resizeRect(
-    handle: ResizeHandle,
-    dx: number,
-    dy: number,
-    startWidth: number,
-    startHeight: number,
-    startNodeX: number,
-    startNodeY: number,
-    callback: (result: { width: number; height: number; x: number; y: number }) => void
-  ) {
-    let newWidth = startWidth;
-    let newHeight = startHeight;
-    let newX = startNodeX;
-    let newY = startNodeY;
-
-    switch (handle) {
-      case 'nw': // 左上
-        newWidth = startWidth - dx;
-        newHeight = startHeight - dy;
-        newX = startNodeX + dx;
-        newY = startNodeY + dy;
-        break;
-      case 'n': // 上
-        newHeight = startHeight - dy;
-        newY = startNodeY + dy;
-        break;
-      case 'ne': // 右上
-        newWidth = startWidth + dx;
-        newHeight = startHeight - dy;
-        newY = startNodeY + dy;
-        break;
-      case 'e': // 右
-        newWidth = startWidth + dx;
-        break;
-      case 'se': // 右下
-        newWidth = startWidth + dx;
-        newHeight = startHeight + dy;
-        break;
-      case 's': // 下
-        newHeight = startHeight + dy;
-        break;
-      case 'sw': // 左下
-        newWidth = startWidth - dx;
-        newHeight = startHeight + dy;
-        newX = startNodeX + dx;
-        break;
-      case 'w': // 左
-        newWidth = startWidth - dx;
-        newX = startNodeX + dx;
-        break;
-    }
-
-    callback({
-      width: newWidth,
-      height: newHeight,
-      x: newX,
-      y: newY,
-    });
-  }
-
-  /**
-   * 文本缩放计算（只改变容器大小，不改变字号）
-   * 与矩形缩放逻辑相同，但不会影响文本的 fontSize
-   */
-  private resizeText(
-    handle: ResizeHandle,
-    dx: number,
-    dy: number,
-    startWidth: number,
-    startHeight: number,
-    startNodeX: number,
-    startNodeY: number,
-    callback: (result: { width: number; height: number; x: number; y: number }) => void
-  ) {
-    let newWidth = startWidth;
-    let newHeight = startHeight;
-    let newX = startNodeX;
-    let newY = startNodeY;
-
-    // 文本容器的缩放逻辑与矩形相同
-    // 区别在于：文本的字体大小（fontSize）不会随容器缩放而改变
-    switch (handle) {
-      case 'nw': // 左上
-        newWidth = startWidth - dx;
-        newHeight = startHeight - dy;
-        newX = startNodeX + dx;
-        newY = startNodeY + dy;
-        break;
-      case 'n': // 上
-        newHeight = startHeight - dy;
-        newY = startNodeY + dy;
-        break;
-      case 'ne': // 右上
-        newWidth = startWidth + dx;
-        newHeight = startHeight - dy;
-        newY = startNodeY + dy;
-        break;
-      case 'e': // 右
-        newWidth = startWidth + dx;
-        break;
-      case 'se': // 右下
-        newWidth = startWidth + dx;
-        newHeight = startHeight + dy;
-        break;
-      case 's': // 下
-        newHeight = startHeight + dy;
-        break;
-      case 'sw': // 左下
-        newWidth = startWidth - dx;
-        newHeight = startHeight + dy;
-        newX = startNodeX + dx;
-        break;
-      case 'w': // 左
-        newWidth = startWidth - dx;
-        newX = startNodeX + dx;
-        break;
-    }
-
-    // 限制最小尺寸（与其他缩放方法一致）
-    const minSize = MIN_NODE_SIZE;
-
-    if (newWidth < minSize) {
-      newWidth = minSize;
-      if (handle.includes('w')) {
-        newX = startNodeX + startWidth - minSize;
-      }
-    }
-    if (newHeight < minSize) {
-      newHeight = minSize;
-      if (handle.includes('n')) {
-        newY = startNodeY + startHeight - minSize;
-      }
-    }
-
-    callback({
-      width: newWidth,
-      height: newHeight,
-      x: newX,
-      y: newY,
-    });
-  }
+  // 已迁移至 @/core/utils/geometry.ts
 }
