@@ -1,4 +1,4 @@
-// NOTE: 本地模块引用不应带后缀 .ts，当前写法在某些构建配置下会导致模块解析失败
+// NOTE: 本地模块引用不应带后缀 .ts，否则会在某些构建配置下导致模块解析失败
 import { type TransformState } from './state';
 export interface InternalDragState {
   isDragging: boolean; //是否正在拖拽
