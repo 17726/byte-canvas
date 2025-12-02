@@ -385,8 +385,11 @@ export class TransformHandler {
         break;
     }
 
-    // Shift/Ctrl 键等比缩放处理
-    if (e.shiftKey || e.ctrlKey) {
+    // 等比缩放处理：四角默认等比，四边默认自由缩放；按 Shift/Ctrl 时也会启用等比
+    const isCorner = handle === 'nw' || handle === 'ne' || handle === 'se' || handle === 'sw';
+    const shouldEnforceRatio = isCorner || e.shiftKey || e.ctrlKey;
+
+    if (shouldEnforceRatio) {
       const safeStartHeight = Math.abs(startHeight) < 1e-6 ? MIN_NODE_SIZE : startHeight;
       const originalRatio = startWidth / safeStartHeight;
 
@@ -428,8 +431,8 @@ export class TransformHandler {
       newHeight = ratioBasedHeight;
     }
 
-    // 圆形节点强制等比
-    if (node.type === NodeType.CIRCLE) {
+    // 圆形：仅在应当强制等比时才强制（即角点或按住 Shift/Ctrl）
+    if (node.type === NodeType.CIRCLE && shouldEnforceRatio) {
       const avgSize = (Math.abs(newWidth) + Math.abs(newHeight)) / 2;
       newWidth = avgSize * Math.sign(newWidth || 1);
       newHeight = avgSize * Math.sign(newHeight || 1);
