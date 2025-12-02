@@ -2,56 +2,55 @@
   <a-sub-menu key="addImage" @mouseenter="handleImageMenuEnter">
     <template #icon><icon-image /></template>
     <template #title>图片</template>
-  <!-- 图片选择网格 - 延迟加载 -->
-  <!-- 只有当 isImageMenuLoaded 为 true 时，这个 div 和其内容才会被渲染到 DOM 中 -->
-  <div v-if="isImageMenuLoaded" class="image-selector">
-    <div class="image-grid" @click="handleImageGridClick">
-      <div
-        v-for="(image, index) in visibleImages"
-        :key="image.id"
-        class="image-item"
-        :data-image-url="image.url"
-        :data-image-index="index"
-      >
-        <!-- 使用 img 标签替代 background-image 支持原生懒加载-->
-        <img
-          :src="getOptimizedThumbnail(image)"
-          :alt="image.name"
-          width="60"
-          height="60"
-          loading="lazy"
-          class="image-preview"
-          @load="handleImageLoad"
-          @error="handleImageError"
-        />
-        <span class="image-name">{{ image.name }}</span>
-      </div>
+    <!-- 图片选择网格 - 延迟加载 -->
+    <!-- 只有当 isImageMenuLoaded 为 true 时，这个 div 和其内容才会被渲染到 DOM 中 -->
+    <div v-if="isImageMenuLoaded" class="image-selector">
+      <div class="image-grid" @click="handleImageGridClick">
+        <div
+          v-for="(image, index) in visibleImages"
+          :key="image.id"
+          class="image-item"
+          :data-image-url="image.url"
+          :data-image-index="index"
+        >
+          <!-- 使用 img 标签替代 background-image 支持原生懒加载-->
+          <img
+            :src="getOptimizedThumbnail(image)"
+            :alt="image.name"
+            width="60"
+            height="60"
+            loading="lazy"
+            class="image-preview"
+            @load="handleImageLoad"
+            @error="handleImageError"
+          />
+          <span class="image-name">{{ image.name }}</span>
+        </div>
 
-      <!-- 懒加载占位符 -->
-      <div
-        v-for="n in remainingPlaceholders"
-        :key="`placeholder-${n}`"
-        class="image-item image-placeholder"
-        :data-lazy-index="visibleImages.length + n - 1"
-      >
-        <div class="image-preview placeholder"></div>
-        <span class="image-name">加载中...</span>
+        <!-- 懒加载占位符 -->
+        <div
+          v-for="n in remainingPlaceholders"
+          :key="`placeholder-${n}`"
+          class="image-item image-placeholder"
+          :data-lazy-index="visibleImages.length + n - 1"
+        >
+          <div class="image-preview placeholder"></div>
+          <span class="image-name">加载中...</span>
+        </div>
       </div>
     </div>
-  </div>
-  <div v-else class="menu-loading">
-    加载图片库...
-  </div>
+    <div v-else class="menu-loading">加载图片库...</div>
   </a-sub-menu>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onUnmounted } from 'vue';
 import { IconImage } from '@arco-design/web-vue/es/icon';
-import { ToolManager } from '@/core/tools/ToolManager';
+import { NodeFactory } from '@/core/services/NodeFactory';
+import { useCanvasStore } from '@/store/canvasStore';
 import { DEFAULT_IMAGE_URL } from '@/config/defaults';
 
-const toolManager = new ToolManager(null, () => false);
+const store = useCanvasStore();
 
 interface ImageItem {
   id?: string;
@@ -67,10 +66,9 @@ const loadedImageIndexes = ref<Set<number>>(new Set());
 const imageObserver = ref<IntersectionObserver | null>(null);
 let loadTimeout: number | null = null;
 
-
 // 可见图片数量控制
 const initialLoadCount = 22; // 首次加载22张
-const lazyLoadCount = 6;    // 每次懒加载6张
+const lazyLoadCount = 6; // 每次懒加载6张
 
 //NOTE: 懒加载占位符数量计算
 const remainingPlaceholders = computed(() => {
@@ -95,7 +93,7 @@ const handleImageMenuEnter = () => {
     visibleImages.value = imageLibrary.value.slice(0, initialLoadCount);
     // 设置懒加载机制，准备加载剩余图片
     setupLazyLoading();
-  }, 100);// 延迟100毫秒执行
+  }, 100); // 延迟100毫秒执行
 };
 
 const getOptimizedThumbnail = (image: ImageItem) => {
@@ -111,26 +109,29 @@ const setupLazyLoading = () => {
     return;
   }
 
-  imageObserver.value = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        // 将 entry.target 断言为 HTMLElement 以访问 dataset
-        const target = entry.target as HTMLElement;
-        const lazyIndex = parseInt(target.dataset.lazyIndex || '0');
-        loadLazyImage(lazyIndex);
-        if (imageObserver.value) {
-          imageObserver.value.unobserve(entry.target);
+  imageObserver.value = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          // 将 entry.target 断言为 HTMLElement 以访问 dataset
+          const target = entry.target as HTMLElement;
+          const lazyIndex = parseInt(target.dataset.lazyIndex || '0');
+          loadLazyImage(lazyIndex);
+          if (imageObserver.value) {
+            imageObserver.value.unobserve(entry.target);
+          }
         }
-      }
-    });
-  }, {
-    rootMargin: '50px', // 提前50px开始加载
-    threshold: 0.1
-  });
+      });
+    },
+    {
+      rootMargin: '50px', // 提前50px开始加载
+      threshold: 0.1,
+    }
+  );
 
   // 延迟观察，确保DOM已更新
   setTimeout(() => {
-    document.querySelectorAll('.image-placeholder').forEach(el => {
+    document.querySelectorAll('.image-placeholder').forEach((el) => {
       if (imageObserver.value) {
         imageObserver.value.observe(el);
       }
@@ -164,158 +165,161 @@ const loadLazyImage = (index: number) => {
 };
 
 // 图片网格点击事件 - 事件委托 通过单个事件监听器处理多个子元素的点击事件，而不是为每个子元素单独绑定事件
-const handleImageGridClick = (event: Event) => {
-  console.log("图片被点击")
+const handleImageGridClick = async (event: Event) => {
+  console.log('图片被点击');
   // 1. 找到实际被点击的 .image-item 元素
   const imageItem = (event.target as HTMLElement).closest('.image-item');
   // 2. 如果点击的不是图片项，直接返回(点击了空白区域)
   if (!imageItem) return;
   // 3. 从 data 属性中获取图片URL
-  const imageUrl =(imageItem as HTMLElement).dataset.imageUrl;
+  const imageUrl = (imageItem as HTMLElement).dataset.imageUrl;
   // 4. 如果有URL，调用创建图片的函数
-  if (imageUrl) {
-    console.log("url:"+imageUrl);
-    toolManager.createImageWithUrl(imageUrl);
-  }else{
-    console.log("创建默认图片");
-    toolManager.createImageWithUrl(DEFAULT_IMAGE_URL);
+  const url = imageUrl || DEFAULT_IMAGE_URL;
+  console.log('创建图片, URL:', url);
+
+  try {
+    const node = await NodeFactory.createImage(url);
+    store.addNode(node);
+    store.setActive([node.id]);
+  } catch (error) {
+    console.error('创建图片节点失败:', error);
   }
 };
 
 // 图片库数据
 const imageLibrary = ref([
   {
-    id:'animals_1',
+    id: 'animals_1',
     name: '动物1',
     url: 'uploads/images/ori/animals_1.jpg',
-    thumbnail: 'uploads/images/thumbs/animals_1-thumb.jpg'
+    thumbnail: 'uploads/images/thumbs/animals_1-thumb.jpg',
   },
   {
-    id:'animals_2',
+    id: 'animals_2',
     name: '动物2',
     url: 'uploads/images/ori/animals_2.png',
-    thumbnail: 'uploads/images/thumbs/animals_2-thumb.jpg'
+    thumbnail: 'uploads/images/thumbs/animals_2-thumb.jpg',
   },
   {
-    id:'background_1',
+    id: 'background_1',
     name: '背景1',
     url: 'uploads/images/ori/background_1.jpg',
-    thumbnail: 'uploads/images/thumbs/background_1-thumb.jpg'
+    thumbnail: 'uploads/images/thumbs/background_1-thumb.jpg',
   },
   {
-    id:'background_2',
+    id: 'background_2',
     name: '背景2',
     url: 'uploads/images/ori/background_2.jpg',
-    thumbnail: 'uploads/images/thumbs/background_2-thumb.jpg'
+    thumbnail: 'uploads/images/thumbs/background_2-thumb.jpg',
   },
   {
-    id:'background_3',
+    id: 'background_3',
     name: '背景3',
     url: 'uploads/images/ori/background_3.jpg',
-    thumbnail: 'uploads/images/thumbs/background_3-thumb.jpg'
+    thumbnail: 'uploads/images/thumbs/background_3-thumb.jpg',
   },
   {
-    id:'festival_1',
+    id: 'festival_1',
     name: '节日1',
     url: 'uploads/images/ori/festival_1.jpg',
-    thumbnail: 'uploads/images/thumbs/festival_1-thumb.jpg'
+    thumbnail: 'uploads/images/thumbs/festival_1-thumb.jpg',
   },
   {
-    id:'festival_2',
+    id: 'festival_2',
     name: '节日2',
     url: 'uploads/images/ori/festival_2.jpg',
-    thumbnail: 'uploads/images/thumbs/festival_2-thumb.jpg'
+    thumbnail: 'uploads/images/thumbs/festival_2-thumb.jpg',
   },
   {
-    id:'festival_3',
+    id: 'festival_3',
     name: '节日3',
     url: 'uploads/images/ori/festival_3.jpg',
-    thumbnail: 'uploads/images/thumbs/festival_3-thumb.jpg'
+    thumbnail: 'uploads/images/thumbs/festival_3-thumb.jpg',
   },
   {
-    id:'flower_1',
+    id: 'flower_1',
     name: '花1',
     url: 'uploads/images/ori/flower_1.jpg',
-    thumbnail: 'uploads/images/thumbs/flower_1-thumb.jpg'
+    thumbnail: 'uploads/images/thumbs/flower_1-thumb.jpg',
   },
   {
-    id:'flower_2',
+    id: 'flower_2',
     name: '花2',
     url: 'uploads/images/ori/flower_2.jpg',
-    thumbnail: 'uploads/images/thumbs/flower_2-thumb.jpg'
+    thumbnail: 'uploads/images/thumbs/flower_2-thumb.jpg',
   },
   {
-    id:'flower_3',
+    id: 'flower_3',
     name: '花3',
     url: 'uploads/images/ori/flower_3.jpg',
-    thumbnail: 'uploads/images/thumbs/flower_3-thumb.jpg'
+    thumbnail: 'uploads/images/thumbs/flower_3-thumb.jpg',
   },
   {
-    id:'food_1',
+    id: 'food_1',
     name: '食物1',
     url: 'uploads/images/ori/food_1.jpg',
-    thumbnail: 'uploads/images/thumbs/food_1-thumb.jpg'
+    thumbnail: 'uploads/images/thumbs/food_1-thumb.jpg',
   },
   {
-    id:'food_2',
+    id: 'food_2',
     name: '食物2',
     url: 'uploads/images/ori/food_2.jpg',
-    thumbnail: 'uploads/images/thumbs/food_2-thumb.jpg'
+    thumbnail: 'uploads/images/thumbs/food_2-thumb.jpg',
   },
   {
-    id:'nature_1',
+    id: 'nature_1',
     name: '自然1',
     url: 'uploads/images/ori/nature_1.jpg',
-    thumbnail: 'uploads/images/thumbs/nature_1-thumb.jpg'
+    thumbnail: 'uploads/images/thumbs/nature_1-thumb.jpg',
   },
   {
-    id:'nature_2',
+    id: 'nature_2',
     name: '自然2',
     url: 'uploads/images/ori/nature_2.jpg',
-    thumbnail: 'uploads/images/thumbs/nature_2-thumb.jpg'
+    thumbnail: 'uploads/images/thumbs/nature_2-thumb.jpg',
   },
   {
-    id:'nature_3',
+    id: 'nature_3',
     name: '自然3',
     url: 'uploads/images/ori/nature_3.jpg',
-    thumbnail: 'uploads/images/thumbs/nature_3-thumb.jpg'
+    thumbnail: 'uploads/images/thumbs/nature_3-thumb.jpg',
   },
   {
-    id:'people_1',
+    id: 'people_1',
     name: '人像1',
     url: 'uploads/images/ori/people_1.jpg',
-    thumbnail: 'uploads/images/thumbs/people_1-thumb.jpg'
+    thumbnail: 'uploads/images/thumbs/people_1-thumb.jpg',
   },
   {
-    id:'people_2',
+    id: 'people_2',
     name: '人像2',
     url: 'uploads/images/ori/people_2.jpeg',
-    thumbnail: 'uploads/images/thumbs/people_2-thumb.jpg'
+    thumbnail: 'uploads/images/thumbs/people_2-thumb.jpg',
   },
   {
-    id:'travel_1',
+    id: 'travel_1',
     name: '旅行1',
     url: 'uploads/images/ori/travel_1.jpg',
-    thumbnail: 'uploads/images/thumbs/travel_1-thumb.jpg'
+    thumbnail: 'uploads/images/thumbs/travel_1-thumb.jpg',
   },
   {
-    id:'travel_2',
+    id: 'travel_2',
     name: '旅行2',
     url: 'uploads/images/ori/travel_2.jpg',
-    thumbnail: 'uploads/images/thumbs/travel_2-thumb.jpg'
+    thumbnail: 'uploads/images/thumbs/travel_2-thumb.jpg',
   },
   {
-    id:'travel_3',
+    id: 'travel_3',
     name: '旅行3',
     url: 'uploads/images/ori/travel_3.jpg',
-    thumbnail: 'uploads/images/thumbs/travel_3-thumb.jpg'
+    thumbnail: 'uploads/images/thumbs/travel_3-thumb.jpg',
   },
   {
-    id:'travel_4',
+    id: 'travel_4',
     name: '旅行4',
     url: 'uploads/images/ori/travel_4.jpg',
-    thumbnail: 'uploads/images/thumbs/travel_4-thumb.jpg'
-  }
+    thumbnail: 'uploads/images/thumbs/travel_4-thumb.jpg',
+  },
 ]);
 
 // 图片加载成功
@@ -337,7 +341,6 @@ onUnmounted(() => {
     imageObserver.value.disconnect();
   }
 });
-
 </script>
 <style scoped>
 /* 隐藏 Arco Design 默认滚动条 */
@@ -347,7 +350,7 @@ onUnmounted(() => {
 
 .image-selector {
   max-width: 300px;
-  overflow-y: auto;  /* 内部滚动 */
+  overflow-y: auto; /* 内部滚动 */
   padding: 8px;
 }
 
