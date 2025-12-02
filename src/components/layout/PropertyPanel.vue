@@ -73,24 +73,24 @@
           <div class="section-title">变换</div>
           <a-row :gutter="8" class="prop-row">
             <a-col :span="12">
-              <a-input-number v-model="transformX" size="small" :precision="1">
+              <a-input-number v-model="transformX" size="small" :precision="2">
                 <template #prefix>X</template>
               </a-input-number>
             </a-col>
             <a-col :span="12">
-              <a-input-number v-model="transformY" size="small" :precision="1">
+              <a-input-number v-model="transformY" size="small" :precision="2">
                 <template #prefix>Y</template>
               </a-input-number>
             </a-col>
           </a-row>
           <a-row :gutter="8" class="prop-row">
             <a-col :span="12">
-              <a-input-number v-model="transformW" size="small" :min="1" :precision="1">
+              <a-input-number v-model="transformW" size="small" :min="1" :precision="2">
                 <template #prefix>W</template>
               </a-input-number>
             </a-col>
             <a-col :span="12">
-              <a-input-number v-model="transformH" size="small" :min="1" :precision="1">
+              <a-input-number v-model="transformH" size="small" :min="1" :precision="2">
                 <template #prefix>H</template>
               </a-input-number>
             </a-col>
