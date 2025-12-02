@@ -90,6 +90,22 @@ export interface ShapeState extends BaseNodeState {
 }
 
 /** 2. 文本节点 State */
+export type TextDecorationValue =
+  | 'none'
+  | 'underline'
+  | 'line-through'
+  | 'underline line-through'; //允许同时使用
+
+// 1. 定义行内样式专属类型（仅允许文本片段独立设置的属性）
+export type InlineStyleProps = {
+  color?: string; // 文本颜色（支持行内独立设置）
+  fontWeight?: 'normal' | 'bold' | 400 | 700; // 字体粗细
+  fontStyle?: 'normal' | 'italic'; // 字体斜体
+  textDecoration?:  TextDecorationValue; // 文本装饰（下划线/删除线）
+  fontSize?: number | string; // 字体大小（支持行内局部调整）
+  letterSpacing?: number | string; // 字间距（仅行内有效）
+};
+
 export interface TextState extends BaseNodeState {
   type: NodeType.TEXT;
   props: {
@@ -100,13 +116,33 @@ export interface TextState extends BaseNodeState {
     fontStyle: 'normal' | 'italic'; // I (斜体)
     color: string;
     lineHeight: number;
-    underline: boolean;
-    strikethrough: boolean;
+    textDecoration?: TextDecorationValue;
     // 添加部分文本样式支持
+    /**
+     * 部分文本的行内样式（支持同一文本片段应用多个样式，或不同片段应用不同样式）
+     *
+     * 数组中每个对象代表一个文本范围及对应的样式，遵循以下规则：
+     *
+     * 1. 字段说明：
+     *    - start: 样式起始索引（零基于，包含），对应文本字符串的字符位置（如 "abc" 中 "a" 是索引 0）
+     *    - end: 样式结束索引（零基于，排除），示例：{start: 0, end: 3} 应用于索引 0、1、2 的字符
+     *    - styles: 该范围的行内样式（支持 CSS 文本相关属性，如 color、fontWeight 等）
+     *
+     * 2. 核心规则（避免实现不一致）：
+     *    - 允许重叠：多个范围可重叠（如 [0,3] 和 [2,5]），重叠部分样式会合并
+     *    - 优先级：数组顺序决定优先级，后出现的样式覆盖先出现的（同一属性冲突时）
+     *    - 越界处理：start < 0 按 0 算，end > 文本长度按文本长度算；仅保留有效部分
+     *    - 空范围：start >= end 时视为无效，不应用任何样式，建议过滤此类数据
+     *    - 索引基准：基于 UTF-16 代码单元（与 JavaScript 字符串索引一致，支持中文/特殊字符）
+     *
+     * 3. 样式限制：
+     *    - 仅支持文本相关 CSS 属性（如 color、fontWeight、fontStyle、textDecoration 等）
+     *    - 不支持布局类属性（如 width、height、margin 等），避免破坏文本容器结构
+     */
     inlineStyles?: Array<{
-      start: number; // 样式起始索引
-      end: number;   // 样式结束索引（不含）
-      styles: Partial<Omit<TextState['props'], 'content' | 'inlineStyles'>>;
+      start: number; // 起始索引（包含）
+      end: number; // 结束索引（排除）
+      styles: InlineStyleProps; // 替换为自定义类型
     }>;
   };
 }

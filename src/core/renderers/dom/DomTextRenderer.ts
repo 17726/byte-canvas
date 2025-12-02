@@ -62,13 +62,7 @@ export class DomTextRenderer implements INodeRenderer<string> {
       switch (key) {
         // 显式处理颜色属性（确保不被遗漏）
         case 'color':
-          // 颜色值合法性校验（支持 #xxx、#xxxxxx、rgb、rgba）
-          const colorRegex = /^(#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})|rgb\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*\)|rgba\(\s*\d+\s*,\s*\d+\s*,\s*\d+\s*,\s*[0-1](\.\d+)?\s*\))$/;
-          if (colorRegex.test(value as string) || value === 'transparent') {
-            cssEntries.push(`color:${value}`);
-          } else {
-            console.warn(`无效的颜色值：${value}，已忽略`);
-          }
+          cssEntries.push(`color:${value}`);
           break;
         // 下划线处理
         case 'underline':

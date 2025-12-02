@@ -113,13 +113,61 @@ const handleContentChange = (e: Event) => {
   // 关键1：更新 content 前，先保存当前光标位置
   const savedCursorPos = saveCursorPosition();
 
+  const newContent=target.textContent;
+  const textNode = props.node as TextState;
   // 关键2：更新 store 中的 content（会触发 v-html 重新渲染）
-  store.updateNode(props.node.id, {
-    props: { ...props.node.props, content: target.innerText }
+  store.updateNode(textNode.id, {
+    props: { ...textNode.props, content:newContent}
   });
 
   // 关键3：DOM 重新渲染后，恢复光标位置
   restoreCursorPosition(savedCursorPos);
+
+  updateInlineStylesOnContentChange(props.node.props.content, newContent!);
+};
+
+// 文本变化时，同步调整 inlineStyles 的 start/end 索引
+const updateInlineStylesOnContentChange = (oldContent: string, newContent: string) => {
+  const oldLength = oldContent.length;
+  const newLength = newContent.length;
+  const lengthDiff = newLength - oldLength;
+
+  // 无长度变化，无需调整
+  if (lengthDiff === 0) return;
+
+  const textNode = props.node as TextState;
+  const oldInlineStyles = textNode.props.inlineStyles || [];
+  const selection = window.getSelection();
+  if (!selection || !selection.rangeCount) return;
+
+  // 获取光标/选区的结束位置（以选区末尾为基准调整样式范围）
+  const range = selection.getRangeAt(0);
+  const cursorPos = range.endOffset;
+
+  // 调整所有样式范围的索引
+  const newInlineStyles = oldInlineStyles.map(style => {
+    let { start, end } = style;
+
+    // 场景1：文本插入（长度增加）—— 光标后的样式范围向后偏移
+    if (lengthDiff > 0 && end > cursorPos) {
+      start = start > cursorPos ? start + lengthDiff : start;
+      end += lengthDiff;
+    }
+
+    // 场景2：文本删除（长度减少）—— 光标后的样式范围向前偏移
+    if (lengthDiff < 0 && end > cursorPos) {
+      const offset = Math.abs(lengthDiff);
+      start = start > cursorPos ? Math.max(0, start - offset) : start;
+      end = Math.max(start, end - offset); // 避免 end < start（空范围）
+    }
+
+    return { ...style, start, end };
+  }).filter(style => style.start < style.end); // 过滤空范围（start >= end）
+
+  // 更新调整后的 inlineStyles
+  store.updateNode(textNode.id, {
+    props: { ...textNode.props, inlineStyles: newInlineStyles }
+  });
 };
 
 // 新增：保存当前光标位置（返回保存的位置信息）

@@ -183,7 +183,7 @@
 <script setup lang="ts">
 import { computed,ref } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
-import { NodeType, type ImageState,type ShapeState, type TextState } from '@/types/state';
+import { NodeType, type ImageState,type InlineStyleProps,type ShapeState, type TextDecorationValue, type TextState } from '@/types/state';
 import { worldToClient } from '@/core/utils/geometry';
 import { DEFAULT_IMAGE_FILTERS, DEFAULT_IMAGE_URL } from '@/config/defaults';
 import {
@@ -353,14 +353,14 @@ const isBold = computed(() => {
   return fw >= 700;
 });
 const isItalic = computed(() => activeTextNode.value?.props.fontStyle === 'italic');
-const isUnderline = computed(() => activeTextNode.value?.props.underline || false);
-const isStrikethrough = computed(() => activeTextNode.value?.props.strikethrough || false);
+const isUnderline = computed(() => activeTextNode.value?.props.textDecoration?.includes('underline') || false);
+const isStrikethrough = computed(() => activeTextNode.value?.props.textDecoration?.includes('line-through') || false);
 
 // 工具函数：添加/移除部分文本样式（修改依赖为全局状态）
 // 工具栏组件：优化 toggleInlineStyle 函数
 const toggleInlineStyle = (
-  styleKey: keyof Partial<Omit<TextState['props'], 'content' | 'inlineStyles'>>,
-  value: unknown
+  styleKey: keyof InlineStyleProps,
+  value: InlineStyleProps[keyof InlineStyleProps]
 ) => {
   if (!activeTextNode.value || !globalTextSelection.value) {
     console.warn('请先选中需要格式化的文本');
@@ -376,8 +376,15 @@ const toggleInlineStyle = (
   );
 
   if (existingIndex !== -1) {
-    // 情况1：已存在该样式 → 移除
-    newInlineStyles.splice(existingIndex, 1);
+    // 情况1：已存在该样式 → 仅移除该样式属性
+    const styleEntry = newInlineStyles[existingIndex];
+    if (styleEntry && styleEntry.styles && styleEntry.styles.hasOwnProperty(styleKey)) {
+      delete styleEntry.styles[styleKey];
+      // 如果该选区已无样式，则移除整个 entry
+      if (Object.keys(styleEntry.styles).length === 0) {
+        newInlineStyles.splice(existingIndex, 1);
+      }
+    }
   } else {
     // 情况2：不存在该样式 → 添加（合并到同一选区）
     newInlineStyles.push({ start, end, styles: { [styleKey]: value } });
@@ -402,19 +409,56 @@ const handleToggleItalic = () => {
   toggleInlineStyle('fontStyle', currentStyle === 'italic' ? 'normal' : 'italic');
 };
 
-// 下划线切换
+// 下划线切换（核心：通过值组合/移除实现单独切换）
 const handleToggleUnderline = () => {
-  if (!activeTextNode.value) return;
-  const currentUnderline = activeTextNode.value.props.underline;
-  toggleInlineStyle('underline', !currentUnderline);
+  if (!activeTextNode.value || !store.globalTextSelection) return;
+
+  const currentDecoration = getCurrentTextDecoration();
+  let newDecoration: TextDecorationValue = 'none';
+
+  if (currentDecoration.includes('underline')) {
+    // 情况1：已有下划线 → 移除（保留其他装饰）
+    newDecoration = currentDecoration
+      .split(' ')
+      .filter(part => part !== 'underline')
+      .join(' ') as TextDecorationValue;
+    // 若移除后为空，设为 'none'
+    newDecoration = newDecoration || 'none';
+  } else {
+    // 情况2：无下划线 → 添加（叠加其他装饰）
+    newDecoration = currentDecoration === 'none'
+      ? 'underline'
+      : `${currentDecoration} underline` as TextDecorationValue;
+  }
+
+  // 调用 toggleInlineStyle，styleKey 为 'textDecoration'，值为新的组合
+  toggleInlineStyle('textDecoration', newDecoration);
 };
 
-// 删除线切换
+// 删除线切换（逻辑与下划线一致）
 const handleToggleStrikeThrough = () => {
-  if (!activeTextNode.value) return;
-  const currentStrike = activeTextNode.value.props.strikethrough;
-  toggleInlineStyle('strikethrough', !currentStrike);
+  if (!activeTextNode.value || !store.globalTextSelection) return;
+
+  const currentDecoration = getCurrentTextDecoration();
+  let newDecoration: TextDecorationValue = 'none';
+
+  if (currentDecoration.includes('line-through')) {
+    // 移除删除线
+    newDecoration = currentDecoration
+      .split(' ')
+      .filter(part => part !== 'line-through')
+      .join(' ') as TextDecorationValue;
+    newDecoration = newDecoration || 'none';
+  } else {
+    // 添加删除线
+    newDecoration = currentDecoration === 'none'
+      ? 'line-through'
+      : `${currentDecoration} line-through` as TextDecorationValue;
+  }
+
+  toggleInlineStyle('textDecoration', newDecoration);
 };
+
 
 
 // 字体选择(稍后实现)
@@ -456,17 +500,38 @@ const handleFontSizeChange = (e: Event) => {
 };
 
 // 颜色选择
-const handleColorChange = (e: Event) => {
-  const target = e.target as HTMLInputElement;
-  const color = target.value.trim();
-
-  // 校验：有激活节点 + 有选区 + 颜色值有效（非空）
-  if (!activeTextNode.value || !globalTextSelection.value || !color) {
+const handleColorChange = (color: string) => {
+  // 无激活文本节点 → 直接返回
+  if (!activeTextNode.value) {
+    console.warn('请先选中文本节点再设置颜色');
     return;
   }
 
-  // 调用工具函数添加颜色样式（颜色选择无需重置，保持选中的颜色显示）
-  toggleInlineStyle('color', color);
+  // 更新文本节点的全局 color 属性（同步到 store）
+  store.updateNode(activeTextNode.value.id, {
+    props: {
+      ...activeTextNode.value.props,
+      color: color // 直接赋值验证后的有效颜色
+    }
+  });
+};
+
+// 辅助函数：获取选中文本的当前 textDecoration 状态（行内样式优先，无则取全局）
+const getCurrentTextDecoration = (): TextDecorationValue => {
+  const { globalTextSelection } = store;
+  if (!activeTextNode.value || !globalTextSelection) return 'none';
+
+  const { start, end } = globalTextSelection;
+  const { inlineStyles, textDecoration: globalDecoration } = activeTextNode.value.props;
+
+  // 1. 先找行内样式（选中范围的 textDecoration）
+  const targetInlineStyle = inlineStyles?.find(s => s.start === start && s.end === end);
+  if (targetInlineStyle?.styles.textDecoration) {
+    return targetInlineStyle.styles.textDecoration;
+  }
+
+  // 2. 无行内样式则取全局样式
+  return globalDecoration || 'none';
 };
 
 const handleDelete = () => {
