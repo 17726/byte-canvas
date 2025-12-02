@@ -166,12 +166,6 @@ export class TransformHandler {
     if (!node || node.isLocked) return;
 
     // 如果当前节点不在选中列表中，则单独选中它
-    if (!this.store.activeElementIds.has(nodeId)) {
-      if (!e.shiftKey) {
-        this.store.setActive([]);
-      }
-      this.store.setActive([nodeId]);
-    }
 
     // 标记交互中
     this.store.isInteracting = true;
