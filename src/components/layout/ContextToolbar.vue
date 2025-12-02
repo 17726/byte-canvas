@@ -321,6 +321,7 @@ const activeTextNode = computed(() => {
 
 // 2. 从 Pinia 获取全局选区（与激活节点对应）
 const globalTextSelection = computed(() => {
+  console.log('工具栏获取全局选区：', store.globalTextSelection);
   return store.globalTextSelection;
 });
 
@@ -356,32 +357,29 @@ const isUnderline = computed(() => activeTextNode.value?.props.underline || fals
 const isStrikethrough = computed(() => activeTextNode.value?.props.strikethrough || false);
 
 // 工具函数：添加/移除部分文本样式（修改依赖为全局状态）
+// 工具栏组件：优化 toggleInlineStyle 函数
 const toggleInlineStyle = (
   styleKey: keyof Partial<Omit<TextState['props'], 'content' | 'inlineStyles'>>,
-  value: any
+  value: unknown
 ) => {
-  // 第一步：判断是否有激活的文本节点
-  if (!activeTextNode.value) {
-    console.warn('请先选中一个文本节点');
-    return;
-  }
-
-  // 第二步：判断是否有选中文本
-  if (!globalTextSelection.value || globalTextSelection.value.start >= globalTextSelection.value.end) {
+  if (!activeTextNode.value || !globalTextSelection.value) {
     console.warn('请先选中需要格式化的文本');
     return;
   }
 
-  // 原有逻辑：更新 inlineStyles
   const { start, end } = globalTextSelection.value;
   const newInlineStyles = [...(activeTextNode.value.props.inlineStyles || [])];
+
+  // 关键：按选区+样式Key查找（而非全量匹配），支持同一选区添加多个样式
   const existingIndex = newInlineStyles.findIndex(
-    s => s.start === start && s.end === end && s.styles[styleKey] === value
+    s => s.start === start && s.end === end && s.styles.hasOwnProperty(styleKey)
   );
 
   if (existingIndex !== -1) {
+    // 情况1：已存在该样式 → 移除
     newInlineStyles.splice(existingIndex, 1);
   } else {
+    // 情况2：不存在该样式 → 添加（合并到同一选区）
     newInlineStyles.push({ start, end, styles: { [styleKey]: value } });
   }
 

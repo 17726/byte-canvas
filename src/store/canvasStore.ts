@@ -358,16 +358,17 @@ export const useCanvasStore = defineStore('canvas', () => {
 
   // ==================== 选中部分文本编辑属性功能 ====================
 
-  // 新增：全局文本选区（与 activeTextNode 一一对应）
-  const globalTextSelection=null as { start: number; end: number } | null;
+  // 关键修改：用 ref 包裹，创建响应式状态（组合式API核心）
+  // ref(null) 表示初始值为 null，泛型指定类型
+  const globalTextSelection = ref<{ start: number; end: number } | null>(null);
 
-  // 新增：更新全局选区（供文本组件调用）
-  function updateGlobalTextSelection(
-    this: ReturnType<typeof useCanvasStore>, // 关键：告诉 TS this 是 Store 实例
+   // 新增：更新全局选区（供文本组件调用）
+   function updateGlobalTextSelection(
     selection: { start: number; end: number } | null
   ) {
-    // 赋值操作会被 ESLint 正确识别为“有副作用的操作”，无报错
-    this.globalTextSelection = selection;
+    // 响应式 ref 需通过 .value 赋值
+    globalTextSelection.value = selection;
+    //console.log('Pinia 全局选区更新：', selection); // 调试日志（可选）
   }
 
   return {
