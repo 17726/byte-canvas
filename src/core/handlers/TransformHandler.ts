@@ -505,24 +505,20 @@ export class TransformHandler {
         const childStart = childStartStates[childId];
         if (!child || !childStart) return;
 
-        // 计算子节点相对于组合起点的偏移
-        const offsetX = childStart.x - startNodeX;
-        const offsetY = childStart.y - startNodeY;
-
-        // 缩放偏移
-        const newOffsetX = offsetX * scaleX;
-        const newOffsetY = offsetY * scaleY;
+        // childStart.x/y 已经是相对于组合的坐标，直接缩放即可
+        const newOffsetX = childStart.x * scaleX;
+        const newOffsetY = childStart.y * scaleY;
 
         // 缩放子节点尺寸
         const newChildWidth = Math.max(MIN_NODE_SIZE, childStart.width * scaleX);
         const newChildHeight = Math.max(MIN_NODE_SIZE, childStart.height * scaleY);
 
-        // 更新子节点
+        // 更新子节点（保持相对坐标）
         this.store.updateNode(childId, {
           transform: {
             ...child.transform,
-            x: newX + newOffsetX,
-            y: newY + newOffsetY,
+            x: newOffsetX,
+            y: newOffsetY,
             width: newChildWidth,
             height: newChildHeight,
           },
