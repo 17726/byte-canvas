@@ -31,7 +31,7 @@
 <script setup lang="ts">
 import { computed, inject, type Ref } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
-import type { ToolManager } from '@/core/tools/ToolManager';
+import type { ToolManager } from '@/core/ToolManager';
 import type { ResizeHandle } from '@/types/editor';
 import type { BaseNodeState } from '@/types/state';
 

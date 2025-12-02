@@ -26,7 +26,7 @@
 import { computed, inject, defineAsyncComponent, type Ref } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
 import { NodeType, type GroupState, type NodeState } from '@/types/state';
-import type { ToolManager } from '@/core/tools/ToolManager';
+import type { ToolManager } from '@/core/ToolManager';
 import RectLayer from './RectLayer.vue';
 import CircleLayer from './CircleLayer.vue';
 import TextLayer from './TextLayer.vue';

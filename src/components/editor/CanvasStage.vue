@@ -65,7 +65,8 @@ import GroupLayer from './layers/GroupLayer.vue';
 import SelectionOverlay from './SelectionOverlay.vue';
 import ContextToolbar from '../layout/ContextToolbar.vue';
 import GroupToolbar from './GroupToolbar.vue';
-import { ToolManager } from '@/core/tools/ToolManager';
+import { ToolManager } from '@/core/ToolManager';
+import { NodeFactory } from '@/core/services/NodeFactory';
 import {
   DEFAULT_VIEWPORT,
   DEFAULT_CANVAS_BG,
@@ -239,12 +240,34 @@ const handleNodeDoubleClick = (e: MouseEvent, id: string) => {
 };
 
 // 暴露创建节点的方法（供父组件/子组件调用）
-const createRect = () => toolManagerRef.value?.createRect();
-const createCircle = () => toolManagerRef.value?.createCircle();
-const createText = () => toolManagerRef.value?.createText();
-const createImageWithUrl = (imageUrl?: string) =>
-  toolManagerRef.value?.createImageWithUrl(imageUrl);
-const deleteSelected = () => toolManagerRef.value?.deleteSelected();
+const createRect = () => {
+  const node = NodeFactory.createRect();
+  store.addNode(node);
+  store.setActive([node.id]);
+};
+const createCircle = () => {
+  const node = NodeFactory.createCircle();
+  store.addNode(node);
+  store.setActive([node.id]);
+};
+const createText = () => {
+  const node = NodeFactory.createText();
+  store.addNode(node);
+  store.setActive([node.id]);
+};
+const createImageWithUrl = async (imageUrl?: string) => {
+  if (!imageUrl) return;
+  const node = await NodeFactory.createImage(imageUrl);
+  store.addNode(node);
+  store.setActive([node.id]);
+};
+const deleteSelected = () => {
+  const selectedIds = Array.from(store.activeElementIds);
+  selectedIds.forEach((id) => {
+    store.deleteNode(id);
+  });
+  store.setActive([]);
+};
 
 // 键盘事件处理（整合所有键盘逻辑：快捷键 + 空格键）
 const handleKeyDown = (e: KeyboardEvent) => {

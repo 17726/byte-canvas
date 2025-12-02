@@ -29,7 +29,7 @@ import { computed, inject, type Ref } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
 import { worldToClient } from '@/core/utils/geometry';
 import { Group as IconGroup, Ungroup as IconUngroup } from '@icon-park/vue-next';
-import type { ToolManager } from '@/core/tools/ToolManager';
+import type { ToolManager } from '@/core/ToolManager';
 
 const store = useCanvasStore();
 const toolManagerRef = inject<Ref<ToolManager | null>>('toolManager');
