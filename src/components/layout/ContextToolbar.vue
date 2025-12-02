@@ -360,13 +360,21 @@ const toggleInlineStyle = (
   styleKey: keyof Partial<Omit<TextState['props'], 'content' | 'inlineStyles'>>,
   value: any
 ) => {
-  if (!activeTextNode.value || !globalTextSelection.value) {
+  // 第一步：判断是否有激活的文本节点
+  if (!activeTextNode.value) {
+    console.warn('请先选中一个文本节点');
+    return;
+  }
+
+  // 第二步：判断是否有选中文本
+  if (!globalTextSelection.value || globalTextSelection.value.start >= globalTextSelection.value.end) {
     console.warn('请先选中需要格式化的文本');
     return;
   }
 
+  // 原有逻辑：更新 inlineStyles
   const { start, end } = globalTextSelection.value;
-  const newInlineStyles = [...activeTextNode.value.props.inlineStyles || []];
+  const newInlineStyles = [...(activeTextNode.value.props.inlineStyles || [])];
   const existingIndex = newInlineStyles.findIndex(
     s => s.start === start && s.end === end && s.styles[styleKey] === value
   );
@@ -377,7 +385,6 @@ const toggleInlineStyle = (
     newInlineStyles.push({ start, end, styles: { [styleKey]: value } });
   }
 
-  // 调用 Pinia 更新节点状态
   store.updateNode(activeTextNode.value.id, {
     props: { ...activeTextNode.value.props, inlineStyles: newInlineStyles }
   });
