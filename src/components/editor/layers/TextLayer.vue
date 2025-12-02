@@ -7,7 +7,7 @@
       class="textBox"
       :class="{ 'is-editing': isEditing }"
       contenteditable="true"
-      placeholder="双击编辑文本"
+      
       v-html="HTMLstring"
       @input="handleContentChange"
       @keyup="handleSelectionChange"
@@ -227,35 +227,19 @@ const findMatchingNode = (root: HTMLElement, targetNode: Node): Node | null => {
   return null;
 };
 
-// 文本组件：拆分 watch 监听器（核心修复）
-// 监听器1：仅监听选区变化（有选区且激活时才同步）
+// 文本组件：合并 watch 监听器（核心修复）
+// 合并监听 currentSelection 和 isActiveNode，统一管理选区同步逻辑
 watch(
-  currentSelection,
-  (newSelection) => {
-    console.log('watch-选区变化：', { newSelection, isActive: isActiveNode.value });
-    if (isActiveNode.value && newSelection) {
-      store.updateGlobalTextSelection(newSelection); // 同步有效选区
-    }
-    // 只有当选区为 null 且激活时，才清空（避免误清空）
-    else if (isActiveNode.value && newSelection === null) {
-      store.updateGlobalTextSelection(null);
+  [currentSelection, isActiveNode],
+  ([newSelection, isActive]) => {
+    console.log('watch-选区/激活变化：', { newSelection, isActive });
+    if (isActive && newSelection) {
+      store.updateGlobalTextSelection(newSelection); // 激活且有选区时同步
+    } else {
+      store.updateGlobalTextSelection(null); // 其他情况清空
     }
   },
-  { immediate: false, deep: true } // 关闭 immediate：初始不触发（避免误清空）
-);
-
-// 监听器2：仅监听激活状态变化
-watch(
-  isActiveNode,
-  (isActive) => {
-    console.log('watch-激活状态变化：', isActive);
-    if (isActive && currentSelection.value) {
-      store.updateGlobalTextSelection(currentSelection.value); // 激活时同步现有选区
-    } else if (!isActive) {
-      store.updateGlobalTextSelection(null); // 未激活时清空（合理场景）
-    }
-  },
-  { immediate: true } // 初始触发：确认激活状态
+  { immediate: true, deep: true }
 );
 
 watch(
@@ -417,7 +401,7 @@ const handleTextBoxClick = (e: MouseEvent) => {
 
     // 核心：执行选中逻辑（单击的核心需求）
     if (!isSelected.value) {
-      store.activeElementIds = new Set([props.node.id]);
+      store.setActive([props.node.id]);
     }
 
     // 关键3：强制让文本框失焦（兜底，避免意外聚焦）
