@@ -112,27 +112,41 @@
           <div class="section-title">外观</div>
 
           <!-- Fill -->
-          <div class="prop-item" v-if="!isImage">
+          <div class="prop-item" v-if="canEditShapeStyle">
             <span class="label">填充</span>
-            <a-color-picker v-model="fillColor" size="small" />
+            <div class="flex-row">
+              <a-color-picker v-model="fillColorTemp" size="small" @change="applyFillColor" />
+            </div>
           </div>
 
           <!-- Stroke -->
-          <div class="prop-item">
+          <div class="prop-item" v-if="canEditShapeStyle">
             <span class="label">描边</span>
             <div class="flex-row">
-              <a-color-picker v-model="strokeColor" size="small" />
-              <a-input-number v-model="strokeWidth" size="small" style="width: 80px" :min="0">
+              <a-color-picker
+                v-model="strokeColorTemp"
+                size="small"
+                @change="handleStrokeColorChange"
+              />
+              <a-input-number
+                v-model="strokeWidthTemp"
+                size="small"
+                style="width: 80px"
+                :min="0"
+                @change="handleStrokeWidthChange"
+              >
                 <template #suffix>px</template>
               </a-input-number>
             </div>
           </div>
 
-          <!-- Opacity -->
+          <!-- Opacity: 对所有节点显示 -->
           <div class="prop-item">
             <span class="label">不透明度</span>
             <a-slider v-model="opacity" :min="0" :max="1" :step="0.01" show-input size="small" />
           </div>
+
+          <!-- 圆角: 仅对形状节点显示 -->
           <template v-if="isShape">
             <div class="prop-item">
               <span class="label">圆角 (%)</span>
@@ -151,19 +165,22 @@
         <a-divider style="margin: 12px 0" />
 
         <!-- Section 3: 特有属性 (Specific) -->
-        <div class="panel-section" v-if="isText || isShape || isImage">
+        <div class="panel-section" v-if="isText || isShape || isImage || isGroup">
           <div class="section-title">属性</div>
-            <div class="common">
-              <span class="label">z-Index</span>
-              <a-input-number v-model="zIndex" size="small" :min="1" mode="button" />
-            </div>
-            <br/>
+          <div class="common">
+            <span class="label">z-Index</span>
+            <a-input-number v-model="zIndex" size="small" :min="1" mode="button" />
+          </div>
+          <br />
           <!-- Text Specific -->
           <template v-if="isText">
             <div class="prop-item">
               <span class="label">内容</span>
               <a-textarea v-model="textContent" :auto-size="{ minRows: 2, maxRows: 5 }" />
             </div>
+          </template>
+
+          <template v-if="canEditText">
             <div class="prop-item">
               <span class="label">字号</span>
               <a-input-number v-model="fontSize" size="small" :min="1" />
@@ -248,10 +265,17 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
 import { useUIStore } from '@/store/uiStore';
-import { NodeType, type ImageState, type ShapeState, type TextState } from '@/types/state';
+import {
+  NodeType,
+  type GroupState,
+  type ImageState,
+  type NodeState,
+  type ShapeState,
+  type TextState,
+} from '@/types/state';
 import { DEFAULT_CANVAS_THEMES, DEFAULT_IMAGE_FILTERS, DEFAULT_IMAGE_URL } from '@/config/defaults';
 
 const store = useCanvasStore();
@@ -293,12 +317,54 @@ const isShape = computed(
   () => activeNode.value?.type === NodeType.RECT || activeNode.value?.type === NodeType.CIRCLE
 );
 const isText = computed(() => activeNode.value?.type === NodeType.TEXT);
-// const isRect = computed(
-//   () => isShape.value && (activeNode.value as ShapeState)?.shapeType === 'rect'
-// );
 const isImage = computed(() => activeNode.value?.type === NodeType.IMAGE);
-// const hasFill = computed(() => isShape.value);
-// const hasStroke = computed(() => isShape.value);
+const isGroup = computed(() => activeNode.value?.type === NodeType.GROUP);
+
+function collectGroupDescendants(group: GroupState): NodeState[] {
+  const result: NodeState[] = [];
+  const traverse = (childIds: string[]) => {
+    childIds.forEach((childId) => {
+      const child = store.nodes[childId];
+      if (!child) return;
+      result.push(child);
+      if (child.type === NodeType.GROUP) {
+        traverse((child as GroupState).children);
+      }
+    });
+  };
+  traverse(group.children);
+  return result;
+}
+
+const groupDescendants = computed(() => {
+  if (!isGroup.value || !activeNode.value) return [];
+  return collectGroupDescendants(activeNode.value as GroupState);
+});
+
+const groupTextNodes = computed(() =>
+  groupDescendants.value.filter((node): node is TextState => node.type === NodeType.TEXT)
+);
+
+const canEditShapeStyle = computed(() => isShape.value || isGroup.value);
+
+const textTargets = computed<TextState[]>(() => {
+  if (isText.value && activeNode.value?.type === NodeType.TEXT) {
+    return [activeNode.value as TextState];
+  }
+  if (isGroup.value) {
+    return groupTextNodes.value;
+  }
+  return [];
+});
+
+const primaryTextNode = computed(() => textTargets.value[0] ?? null);
+const canEditText = computed(() => textTargets.value.length > 0);
+
+function applyTextProps(propsPatch: Partial<TextState['props']>) {
+  textTargets.value.forEach((node) => {
+    store.updateNode(node.id, { props: propsPatch } as Partial<TextState>);
+  });
+}
 
 // --- Transform Bindings ---
 const transformX = computed({
@@ -343,30 +409,115 @@ const transformRotation = computed({
 });
 
 // --- Appearance Bindings ---
-const fillColor = computed({
-  get: () => (activeNode.value as ShapeState)?.style.backgroundColor || '#ffffff',
-  set: (val) =>
-    activeNode.value &&
-    store.updateNode(activeNode.value.id, {
-      style: { ...activeNode.value.style, backgroundColor: val },
-    }),
-});
-const strokeColor = computed({
-  get: () => (activeNode.value as ShapeState)?.style.borderColor || '#000000',
-  set: (val) =>
-    activeNode.value &&
-    store.updateNode(activeNode.value.id, {
-      style: { ...activeNode.value.style, borderColor: val },
-    }),
-});
-const strokeWidth = computed({
-  get: () => (activeNode.value as ShapeState)?.style.borderWidth || 0,
-  set: (val) =>
-    activeNode.value &&
-    store.updateNode(activeNode.value.id, {
-      style: { ...activeNode.value.style, borderWidth: val as number },
-    }),
-});
+const fillColorTemp = ref('#ffffff');
+const strokeColorTemp = ref('#000000');
+const strokeWidthTemp = ref(0);
+const isSyncingShapeStyle = ref(false);
+
+const extractColorValue = (input: unknown, fallback: string) => {
+  if (typeof input === 'string') return input;
+  if (typeof input === 'object' && input) {
+    if ('hex' in input && typeof (input as { hex?: string }).hex === 'string') {
+      return (input as { hex: string }).hex;
+    }
+    if ('value' in input && typeof (input as { value?: string }).value === 'string') {
+      return (input as { value: string }).value;
+    }
+  }
+  return fallback;
+};
+
+const extractNumericValue = (input: unknown, fallback: number) => {
+  if (typeof input === 'number' && !Number.isNaN(input)) return input;
+  if (typeof input === 'string' && input.trim() !== '' && !Number.isNaN(Number(input))) {
+    return Number(input);
+  }
+  if (typeof input === 'object' && input) {
+    if ('value' in input) {
+      const candidate = (input as { value?: number | string }).value;
+      if (typeof candidate === 'number' && !Number.isNaN(candidate)) return candidate;
+      if (
+        typeof candidate === 'string' &&
+        candidate.trim() !== '' &&
+        !Number.isNaN(Number(candidate))
+      ) {
+        return Number(candidate);
+      }
+    }
+  }
+  return fallback;
+};
+
+const syncShapeStyleTemps = () => {
+  if (!activeNode.value || !canEditShapeStyle.value) return;
+  isSyncingShapeStyle.value = true;
+  fillColorTemp.value = activeNode.value.style.backgroundColor || '#ffffff';
+  strokeColorTemp.value = activeNode.value.style.borderColor || '#000000';
+  strokeWidthTemp.value = activeNode.value.style.borderWidth || 0;
+  isSyncingShapeStyle.value = false;
+};
+
+watch(
+  () => ({
+    id: activeNode.value?.id,
+    bg: activeNode.value?.style.backgroundColor,
+    borderColor: activeNode.value?.style.borderColor,
+    borderWidth: activeNode.value?.style.borderWidth,
+    canEdit: canEditShapeStyle.value,
+  }),
+  () => {
+    syncShapeStyleTemps();
+  },
+  { immediate: true }
+);
+
+const applyFillColor = (newColor?: unknown) => {
+  if (!activeNode.value || !canEditShapeStyle.value) return;
+  if (isSyncingShapeStyle.value && newColor !== undefined) return;
+  const color = extractColorValue(newColor, fillColorTemp.value);
+  fillColorTemp.value = color;
+  if (activeNode.value.style.backgroundColor === color) return;
+  store.updateNode(activeNode.value.id, {
+    style: { ...activeNode.value.style, backgroundColor: color },
+  });
+};
+
+const applyStrokeStyle = (options?: { color?: unknown; width?: number }) => {
+  if (!activeNode.value || !canEditShapeStyle.value) return;
+  if (isSyncingShapeStyle.value && options?.color !== undefined) return;
+  if (options?.color !== undefined) {
+    strokeColorTemp.value = extractColorValue(options.color, strokeColorTemp.value);
+  }
+  if (typeof options?.width === 'number') {
+    strokeWidthTemp.value = options.width;
+  }
+
+  const nextColor = strokeColorTemp.value;
+  const nextWidth = strokeWidthTemp.value;
+
+  const colorChanged = activeNode.value.style.borderColor !== nextColor;
+  const widthChanged = activeNode.value.style.borderWidth !== nextWidth;
+
+  if (!colorChanged && !widthChanged) return;
+
+  store.updateNode(activeNode.value.id, {
+    style: {
+      ...activeNode.value.style,
+      borderColor: nextColor,
+      borderWidth: nextWidth,
+    },
+  });
+};
+
+const handleStrokeColorChange = (value: unknown) => {
+  applyStrokeStyle({ color: value });
+};
+
+const handleStrokeWidthChange = (value: unknown) => {
+  if (isSyncingShapeStyle.value) return;
+  const width = extractNumericValue(value, strokeWidthTemp.value);
+  applyStrokeStyle({ width });
+};
 const opacity = computed({
   get: () => activeNode.value?.style.opacity ?? 1,
   set: (val) =>
@@ -377,47 +528,43 @@ const opacity = computed({
 });
 
 const zIndex = computed({
-  get:() => activeNode.value?.style.zIndex ?? 1,
-  set:(val) =>
-    activeNode.value&&
-    store.updateNode(activeNode.value.id,{
-      style:{ ...activeNode.value.style,zIndex:val as number}
-    })
-})
+  get: () => activeNode.value?.style.zIndex ?? 1,
+  set: (val) =>
+    activeNode.value &&
+    store.updateNode(activeNode.value.id, {
+      style: { ...activeNode.value.style, zIndex: val as number },
+    }),
+});
 
 // --- Specific Bindings ---
 // Text
 const textContent = computed({
-  get: () => (activeNode.value as TextState)?.props.content || '',
-
-  set: (val) =>
-    activeNode.value &&
-    store.updateNode(activeNode.value.id, { props: { content: val } } as Partial<TextState>),
+  get: () => primaryTextNode.value?.props.content || '',
+  set: (val) => {
+    if (!isText.value || !activeNode.value || activeNode.value.type !== NodeType.TEXT) return;
+    store.updateNode(activeNode.value.id, { props: { content: val } } as Partial<TextState>);
+  },
 });
 const fontSize = computed({
-  get: () => (activeNode.value as TextState)?.props.fontSize || 12,
-
-  set: (val) =>
-    activeNode.value &&
-    store.updateNode(activeNode.value.id, {
-      props: { fontSize: val as number },
-    } as Partial<TextState>),
+  get: () => primaryTextNode.value?.props.fontSize || 12,
+  set: (val) => {
+    if (!canEditText.value) return;
+    applyTextProps({ fontSize: val as number });
+  },
 });
 const fontWeight = computed({
-  get: () => (activeNode.value as TextState)?.props.fontWeight || 400,
-
-  set: (val) =>
-    activeNode.value &&
-    store.updateNode(activeNode.value.id, {
-      props: { fontWeight: val as number },
-    } as Partial<TextState>),
+  get: () => primaryTextNode.value?.props.fontWeight || 400,
+  set: (val) => {
+    if (!canEditText.value) return;
+    applyTextProps({ fontWeight: val as number });
+  },
 });
 const textColor = computed({
-  get: () => (activeNode.value as TextState)?.props.color || '#000000',
-
-  set: (val) =>
-    activeNode.value &&
-    store.updateNode(activeNode.value.id, { props: { color: val } } as Partial<TextState>),
+  get: () => primaryTextNode.value?.props.color || '#000000',
+  set: (val) => {
+    if (!canEditText.value) return;
+    applyTextProps({ color: val });
+  },
 });
 
 // Shape

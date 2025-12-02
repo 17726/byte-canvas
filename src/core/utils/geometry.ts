@@ -4,6 +4,78 @@
 // 辅助计算：生成 UUID、深拷贝数据、计算两点距离等。
 import type { BaseNodeState, ViewportState } from '@/types/state';
 
+/**
+ * 边界框类型
+ */
+export interface BoundsRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * 计算一组节点的边界框（考虑旋转）
+ * @param nodes 节点映射表
+ * @param nodeIds 节点ID列表
+ * @returns 边界框信息
+ */
+export function calculateBounds(
+  nodes: Record<string, BaseNodeState>,
+  nodeIds: string[]
+): BoundsRect {
+  let minX = Infinity,
+    minY = Infinity,
+    maxX = -Infinity,
+    maxY = -Infinity;
+
+  nodeIds.forEach((id) => {
+    const node = nodes[id];
+    if (!node) return;
+    const { x, y, width, height, rotation } = node.transform;
+
+    // 计算旋转后的边界框
+    if (rotation === 0) {
+      minX = Math.min(minX, x);
+      minY = Math.min(minY, y);
+      maxX = Math.max(maxX, x + width);
+      maxY = Math.max(maxY, y + height);
+    } else {
+      // 计算旋转后四角的位置
+      const cx = x + width / 2;
+      const cy = y + height / 2;
+      const rad = (rotation * Math.PI) / 180;
+      const cos = Math.cos(rad);
+      const sin = Math.sin(rad);
+
+      const corners = [
+        { x: x, y: y },
+        { x: x + width, y: y },
+        { x: x + width, y: y + height },
+        { x: x, y: y + height },
+      ];
+
+      corners.forEach((corner) => {
+        const dx = corner.x - cx;
+        const dy = corner.y - cy;
+        const rx = cx + dx * cos - dy * sin;
+        const ry = cy + dx * sin + dy * cos;
+        minX = Math.min(minX, rx);
+        maxX = Math.max(maxX, rx);
+        minY = Math.min(minY, ry);
+        maxY = Math.max(maxY, ry);
+      });
+    }
+  });
+
+  return {
+    x: minX,
+    y: minY,
+    width: maxX - minX,
+    height: maxY - minY,
+  };
+}
+
 // 屏幕坐标 → 画布世界坐标（考虑视口偏移和缩放）
 export function clientToWorld(
   viewport: ViewportState,
@@ -62,7 +134,8 @@ export function isNodeInRect(
     case 'rect':
     case 'image':
     case 'text':
-      // 矩形类节点：包围盒交集即判定为命中
+    case 'group':
+      // 矩形类节点（包括组合）：包围盒交集即判定为命中
       return true;
 
     case 'circle':
