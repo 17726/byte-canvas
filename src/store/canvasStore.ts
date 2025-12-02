@@ -123,6 +123,8 @@ export const useCanvasStore = defineStore('canvas', () => {
       }
 
       // 处理组合的 style 变更：同步更新子节点的相应样式
+      // 注意：只有在非编辑模式下，且样式值真正发生变化时，才同步到子节点。
+      // 编辑模式下，用户直接修改子节点，组合的样式同步由 expandGroupToFitChildren 单独处理（见第75行的注释）。
       if ('style' in patch && patch.style) {
         const stylePatch = patch.style;
         const currentStyle = node.style;
@@ -142,6 +144,7 @@ export const useCanvasStore = defineStore('canvas', () => {
         const shouldSyncChildren =
           opacityChanged || backgroundChanged || borderColorChanged || borderWidthChanged;
 
+        // 只有在样式值真正发生变化时才同步，避免在退出编辑模式时触发不必要的同步
         if (shouldSyncChildren) {
           const updateChildrenStyle = (childIds: string[]) => {
             childIds.forEach((childId) => {

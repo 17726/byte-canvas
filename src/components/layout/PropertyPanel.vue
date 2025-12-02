@@ -450,8 +450,74 @@ const extractNumericValue = (input: unknown, fallback: number) => {
   return fallback;
 };
 
+// 记录最后选中的子节点ID（用于退出编辑模式时读取正确的样式）
+const lastSelectedChildId = ref<string | null>(null);
+
+// Reset lastSelectedChildId when active node changes to a different group, to null, or to a non-shape/non-group node
+watch(
+  () => activeNode.value?.id,
+  (newId, oldId) => {
+    if (newId !== oldId) {
+      const node = activeNode.value;
+      // Reset if switching groups or to non-shape/non-group nodes
+      if (
+        !node ||
+        (node.type !== NodeType.RECT &&
+          node.type !== NodeType.CIRCLE &&
+          node.type !== NodeType.GROUP)
+      ) {
+        lastSelectedChildId.value = null;
+      }
+    }
+  }
+);
 const syncShapeStyleTemps = () => {
   if (!activeNode.value || !canEditShapeStyle.value) return;
+  // 对于组合节点，不读取组合节点本身的 style，而是读取最后选中的形状子节点的 style
+  // 如果没有最后选中的子节点，则读取第一个形状子节点的 style
+  // 这样可以避免在退出编辑模式时触发样式同步
+  if (isGroup.value) {
+    const groupNode = activeNode.value as GroupState;
+    // 优先使用最后选中的子节点
+    let targetChild: NodeState | null = null;
+    if (lastSelectedChildId.value) {
+      const child = store.nodes[lastSelectedChildId.value];
+      if (
+        child &&
+        (child.type === NodeType.RECT || child.type === NodeType.CIRCLE) &&
+        groupNode.children.includes(child.id)
+      ) {
+        targetChild = child;
+      }
+    }
+    // 如果没有最后选中的子节点，或者最后选中的子节点不是形状节点，则使用第一个形状子节点
+    if (!targetChild) {
+      targetChild =
+        groupNode.children
+          .map((id) => store.nodes[id])
+          .find(
+            (child) => child && (child.type === NodeType.RECT || child.type === NodeType.CIRCLE)
+          ) || null;
+    }
+
+    if (targetChild) {
+      isSyncingShapeStyle.value = true;
+      fillColorTemp.value = targetChild.style.backgroundColor || '#ffffff';
+      strokeColorTemp.value = targetChild.style.borderColor || '#000000';
+      strokeWidthTemp.value = targetChild.style.borderWidth || 0;
+      isSyncingShapeStyle.value = false;
+    } else {
+      // 如果没有形状子节点，使用默认值
+      fillColorTemp.value = '#ffffff';
+      strokeColorTemp.value = '#000000';
+      strokeWidthTemp.value = 0;
+    }
+    return;
+  }
+  // 对于非组合节点，记录当前节点ID（可能是子节点）
+  if (activeNode.value.type === NodeType.RECT || activeNode.value.type === NodeType.CIRCLE) {
+    lastSelectedChildId.value = activeNode.value.id;
+  }
   isSyncingShapeStyle.value = true;
   fillColorTemp.value = activeNode.value.style.backgroundColor || '#ffffff';
   strokeColorTemp.value = activeNode.value.style.borderColor || '#000000';
