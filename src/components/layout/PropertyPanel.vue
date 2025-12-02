@@ -451,6 +451,24 @@ const extractNumericValue = (input: unknown, fallback: number) => {
 // 记录最后选中的子节点ID（用于退出编辑模式时读取正确的样式）
 const lastSelectedChildId = ref<string | null>(null);
 
+// Reset lastSelectedChildId when active node changes to a different group, to null, or to a non-shape/non-group node
+watch(
+  () => activeNode.value?.id,
+  (newId, oldId) => {
+    if (newId !== oldId) {
+      const node = activeNode.value;
+      // Reset if switching groups or to non-shape/non-group nodes
+      if (
+        !node ||
+        (node.type !== NodeType.RECT &&
+          node.type !== NodeType.CIRCLE &&
+          node.type !== NodeType.GROUP)
+      ) {
+        lastSelectedChildId.value = null;
+      }
+    }
+  }
+);
 const syncShapeStyleTemps = () => {
   if (!activeNode.value || !canEditShapeStyle.value) return;
   // 对于组合节点，不读取组合节点本身的 style，而是读取最后选中的形状子节点的 style
