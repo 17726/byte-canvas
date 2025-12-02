@@ -517,6 +517,20 @@ export const useCanvasStore = defineStore('canvas', () => {
     return true;
   }
 
+  // ==================== 选中部分文本编辑属性功能 ====================
+
+  // 关键修改：用 ref 包裹，创建响应式状态（组合式API核心）
+  // ref(null) 表示初始值为 null，泛型指定类型
+  const globalTextSelection = ref<{ start: number; end: number } | null>(null);
+
+   // 新增：更新全局选区（供文本组件调用）
+   function updateGlobalTextSelection(
+    selection: { start: number; end: number } | null
+  ) {
+    // 响应式 ref 需通过 .value 赋值
+    globalTextSelection.value = selection;
+    //console.log('Pinia 全局选区更新：', selection); // 调试日志（可选）
+  }
   // ==================== 组合相关状态（只读计算属性）====================
 
   /**
@@ -613,6 +627,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     isInteracting,
     renderList,
     activeElements,
+    globalTextSelection,
     updateNode,
     addNode,
     deleteNode,
@@ -635,5 +650,6 @@ export const useCanvasStore = defineStore('canvas', () => {
     getSelectionBounds,
     getAbsoluteTransform,
     // UI 状态请使用 uiStore 中的 activePanel 和 isPanelExpanded
+    updateGlobalTextSelection
   };
 });
