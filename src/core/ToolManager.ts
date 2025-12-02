@@ -58,8 +58,9 @@
 import { useCanvasStore } from '@/store/canvasStore';
 import { useUIStore } from '@/store/uiStore';
 import { NodeType, type BaseNodeState } from '@/types/state';
+import type { ResizeHandle } from '@/types/editor';
 import { ViewportHandler } from './handlers/ViewportHandler';
-import { TransformHandler, type ResizeHandle } from './handlers/TransformHandler';
+import { TransformHandler } from './handlers/TransformHandler';
 import { SelectionHandler } from './handlers/SelectionHandler';
 import { GroupService } from './services/GroupService';
 

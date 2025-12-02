@@ -42,15 +42,13 @@
 import { useCanvasStore } from '@/store/canvasStore';
 import type { GroupState, BaseNodeState } from '@/types/state';
 import { NodeType } from '@/types/state';
+import type { ResizeHandle } from '@/types/editor';
 
 /** 最小节点尺寸限制 */
 const MIN_NODE_SIZE = 10;
 
 /** 拖拽类型 */
 type DragType = 'node' | 'area';
-
-/** 缩放控制点类型 */
-export type ResizeHandle = 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w' | 'nw';
 
 /** 拖拽状态 */
 interface InternalDragState {
