@@ -425,11 +425,7 @@ private getFirstTextNode(root: HTMLElement): Node | null {
       // 场景1：切换样式（有则移除，无则添加）
       if (targetStyleIndex > -1) {
         // 存在目标样式：移除该属性（不删除整个样式对象，保留其他属性）
-        const targetStyle = updatedStyles[targetStyleIndex]as {
-          start: number;
-          end: number;
-          styles: InlineStyleProps;
-        };;
+        const targetStyle = updatedStyles[targetStyleIndex];
         const { [styleKey]: _, ...remainingStyles } = targetStyle!.styles;
 
         if (Object.keys(remainingStyles).length > 0) {
