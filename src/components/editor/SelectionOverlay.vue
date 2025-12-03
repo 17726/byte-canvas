@@ -24,6 +24,27 @@
         :style="getHandleStyle(handle)"
         @mousedown.stop.prevent="onHandleDown($event, handle)"
       ></div>
+
+      <!-- 旋转控制点（下边下方一段距离中间） -->
+      <div
+        class="rotate-handle"
+        :style="rotateHandleStyle"
+        @mousedown.stop.prevent="onRotateHandleDown"
+        title="拖拽旋转（绕自身中心）"
+      >
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="#1890ff"
+          stroke-width="2"
+        >
+          <path
+            d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"
+          />
+        </svg>
+      </div>
     </div>
   </div>
 </template>
@@ -202,6 +223,23 @@ const getHandleStyle = (handle: ResizeHandle) => {
   };
 };
 
+// 旋转控制点样式（下边下方一段距离中间，跟随选中框旋转）
+const rotateHandleStyle = computed(() => {
+  const bounds = selectionBounds.value;
+  if (!bounds) return {};
+
+  const scale = 1 / store.viewport.zoom;
+  if (!selectedNodes.value[0]) return {};
+  const rotation = selectedNodes.value.length === 1 ? selectedNodes.value[0].transform.rotation : 0;
+
+  // 定位在下边下方35px处（距离选中框底部外侧35px），水平居中
+  // 可根据需求调整 bottom 值（负值越大，距离越远）
+  return {
+    transform: `translateX(-50%) rotate(${-rotation}deg) scale(${scale})`, // 水平居中 + 反向旋转（保持正立） + 缩放
+    bottom: '-35px', // 核心修改：距离选中框底部外侧35px（默认-10px，改为-30px即向下移动20px）
+    left: '50%', // 水平居中基准点
+  };
+});
 // 5. 触发多选缩放
 const onHandleDown = (e: MouseEvent, handle: ResizeHandle) => {
   const bounds = selectionBounds.value;
@@ -219,6 +257,12 @@ const onHandleDown = (e: MouseEvent, handle: ResizeHandle) => {
     // 多选时，调用多选缩放初始化方法
     toolManagerRef.value.handleMultiResizeDown(e, handle, bounds, nodeIds);
   }
+};
+
+// 旋转控制点鼠标按下事件
+const onRotateHandleDown = (e: MouseEvent) => {
+  if (!toolManagerRef?.value) return;
+  toolManagerRef.value.handleRotateHandleDown(e);
 };
 </script>
 
@@ -317,4 +361,26 @@ const onHandleDown = (e: MouseEvent, handle: ResizeHandle) => {
   transform: translateY(-50%);
   cursor: w-resize;
 }
+
+/* 旋转控制点样式 */
+.rotate-handle {
+  position: absolute;
+  width: 21px;
+  height: 21px;
+  background-color: #fff;
+  border: 1px solid #1890ff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  z-index: 1001; /* 高于缩放控制点 */
+  cursor: grab;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.rotate-handle:active {
+  cursor: grabbing;
+}
 </style>
+给出修改后的代码

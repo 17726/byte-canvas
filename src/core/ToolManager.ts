@@ -54,13 +54,13 @@
  * // 组合操作直接调用 Service（不经过 ToolManager）
  * GroupService.groupSelected(store)
  */
-
 import { useCanvasStore } from '@/store/canvasStore';
 import { useUIStore } from '@/store/uiStore';
 import { NodeType, type BaseNodeState } from '@/types/state';
 import type { ResizeHandle } from '@/types/editor';
 import { ViewportHandler } from './handlers/ViewportHandler';
 import { TransformHandler } from './handlers/TransformHandler';
+import { RotationHandler } from './handlers/RotationHandler';
 import { SelectionHandler } from './handlers/SelectionHandler';
 import { GroupService } from './services/GroupService';
 
@@ -79,26 +79,30 @@ export class ToolManager {
   private viewportHandler: ViewportHandler;
   private transformHandler: TransformHandler;
   private selectionHandler: SelectionHandler;
+  private rotationHandler: RotationHandler;
 
   // 改为从外部获取空格键状态（不再内部维护）
   private getIsSpacePressed: () => boolean;
 
+  // 交互锁定标记（抵御外部干扰）
+  private isCanvasInteracting = false;
+
   /**
    * 构造工具管理器
-   *
-   * @param stageEl - 画布根 DOM 元素，用于计算坐标转换
-   * @param getIsSpacePressed - 获取空格键状态的函数，用于判断是否启用平移模式
+   * @param stageEl - 画布根 DOM 元素
+   * @param getIsSpacePressed - 获取空格键状态的函数
    */
   constructor(stageEl: HTMLElement | null, getIsSpacePressed: () => boolean) {
     this.store = useCanvasStore();
     this.ui = useUIStore();
-    this.stageEl = stageEl; // 保存画布根元素引用
-    this.getIsSpacePressed = getIsSpacePressed; // 接收外部状态
+    this.stageEl = stageEl;
+    this.getIsSpacePressed = getIsSpacePressed;
 
     // 初始化处理器
     this.viewportHandler = new ViewportHandler(this.store);
     this.transformHandler = new TransformHandler(this.store);
     this.selectionHandler = new SelectionHandler(this.store, stageEl);
+    this.rotationHandler = new RotationHandler(); // 新增：初始化旋转处理器
   }
 
   /**
@@ -107,7 +111,7 @@ export class ToolManager {
    * 注意：键盘事件监听已迁移到 Vue 组件，此方法保留用于未来扩展
    */
   destroy() {
-    // 移除原键盘事件监听代码（已迁移到组件）
+    this.isCanvasInteracting = false; // 重置锁定状态
   }
 
   /**
@@ -120,12 +124,36 @@ export class ToolManager {
   getBoxSelectState() {
     return {
       isDragging: this.transformHandler.isDragging,
+      isRotating: this.rotationHandler.isRotating,
       ...this.selectionHandler.getBoxSelectState(),
     };
   }
 
-  // ==================== 画布事件处理 ====================
+  // 核心工具方法 - 强制事件防护（三重阻止+事件源校验）
+  private forceProtectEvent(e: MouseEvent | WheelEvent): boolean {
+    // 1. 校验画布元素存在性
+    if (!this.stageEl) return false;
 
+    // 2. 校验事件源：必须是画布内元素（过滤外部悬浮窗等干扰）
+    const isTargetInCanvas = this.stageEl.contains(e.target as Node);
+    if (!isTargetInCanvas) return false;
+
+    // 3. 三重阻止：彻底屏蔽外部拦截
+    e.stopImmediatePropagation(); // 阻止当前元素其他监听器（关键抵御外部注入）
+    e.stopPropagation(); // 阻止冒泡到父元素
+    e.preventDefault(); // 阻止浏览器默认行为+外部软件默认响应
+
+    // 4. 标记交互状态
+    this.isCanvasInteracting = true;
+    return true;
+  }
+
+  // 结束交互 - 重置锁定标记
+  private endCanvasInteraction() {
+    this.isCanvasInteracting = false;
+  }
+
+  // ==================== 画布事件处理（整合防护）====================
   /**
    * 处理画布滚轮事件
    *
@@ -134,8 +162,11 @@ export class ToolManager {
    * @param e - 滚轮事件
    */
   handleWheel(e: WheelEvent) {
-    // 委托给 ViewportHandler
+    // 强制防护：过滤外部干扰的滚轮事件
+    if (!this.forceProtectEvent(e)) return;
+
     this.viewportHandler.onWheel(e);
+    this.endCanvasInteraction(); // 滚轮事件无需长期锁定
   }
   /**
    * 处理画布鼠标按下事件
@@ -148,55 +179,61 @@ export class ToolManager {
    * @param e - 鼠标事件
    */
   handleMouseDown(e: MouseEvent) {
-    // 核心修改1：只要按下空格+左键，直接进入平移模式（最高优先级）
+    // 强制防护：不通过则直接忽略
+    if (!this.forceProtectEvent(e)) return;
+
+    // 原有业务逻辑：空格+左键平移（最高优先级）
     if (this.getIsSpacePressed() && e.button === 0) {
       this.viewportHandler.startPan(e);
-      // 空格平移时保留选中状态（不取消选中）
       return;
     }
 
-    // 互斥逻辑：如果正在拖拽节点，不触发画布平移
-    if (this.transformHandler.isDragging) return;
+    // 互斥逻辑：如果正在拖拽/旋转/缩放，不触发画布平移
+    if (
+      this.transformHandler.isDragging ||
+      this.transformHandler.isResizing ||
+      this.rotationHandler.isRotating
+    )
+      return;
 
-    // 中键直接平移（原有逻辑）
+    // 原有业务逻辑：中键平移
     if (e.button === 1) {
       this.viewportHandler.startPan(e);
-      this.store.setActive([]); // 中键平移取消选中
-      // 退出组合编辑模式
+      this.store.setActive([]);
       if (this.store.editingGroupId) {
         GroupService.exitGroupEdit(this.store);
       }
       return;
     }
 
-    // 仅当未按空格时，才执行原有框选/多选区域拖拽逻辑
+    // 原有业务逻辑：左键框选/多选拖拽
     if (e.button === 0 && !this.getIsSpacePressed()) {
-      // 判断是否点击在选中区域空白处 → 启动多选区域拖拽
       const hasActiveNodes = this.store.activeElementIds.size > 0;
       const isClickInArea = this.selectionHandler.isClickInSelectedArea(e);
 
       if (hasActiveNodes && isClickInArea) {
-        // 启动多选区域拖拽
         const activeIds = Array.from(this.store.activeElementIds).filter((id) => {
           const node = this.store.nodes[id];
           return node && !node.isLocked;
         });
-        if (activeIds.length === 0) return;
+        if (activeIds.length === 0) {
+          this.endCanvasInteraction();
+          return;
+        }
 
-        // 使用第一个节点 ID 启动拖拽（实际会拖拽所有选中节点）
         const firstNodeId = activeIds[0];
         if (firstNodeId) {
           this.transformHandler.startNodeDrag(e, firstNodeId, false);
         }
-        return; // 阻止后续框选逻辑
+        return;
       }
 
-      // 点击空白区域时，如果在组合编辑模式下，退出编辑模式
+      // 原有业务逻辑：退出组合编辑
       if (this.store.editingGroupId) {
         GroupService.exitGroupEdit(this.store);
       }
 
-      // 启动框选（仅未按空格时）
+      // 原有业务逻辑：启动框选
       this.selectionHandler.startBoxSelect(e);
     }
   }
@@ -210,6 +247,13 @@ export class ToolManager {
    * @param e - 鼠标事件
    */
   handleMouseMove(e: MouseEvent) {
+    // 防护逻辑：正在交互时强制防护，非交互时校验事件源
+    if (this.isCanvasInteracting) {
+      this.forceProtectEvent(e);
+    } else {
+      if (!this.stageEl?.contains(e.target as Node)) return;
+    }
+
     // 最高优先级：多选缩放
     if (this.transformHandler.isMultiResizing) {
       this.transformHandler.updateMultiResize(e);
@@ -219,6 +263,12 @@ export class ToolManager {
     // 其次：单选缩放
     if (this.transformHandler.isResizing) {
       this.transformHandler.updateResize(e);
+      return;
+    }
+
+    // 新增：旋转操作（优先级高于拖拽）
+    if (this.rotationHandler.isRotating) {
+      this.rotationHandler.updateRotate(e);
       return;
     }
 
@@ -239,18 +289,23 @@ export class ToolManager {
       this.selectionHandler.updateBoxSelect(e);
     }
   }
-
   /**
    * 处理全局鼠标松开事件
    *
    * 结束所有交互状态，并在组合编辑模式下自动调整边界
    */
   handleMouseUp() {
-    // 在重置状态之前，检查是否需要扩展组合边界
-    const hadDragOrResize = this.transformHandler.isTransforming;
+    // 防护逻辑：用mock事件强制防护，避免外部up事件干扰
+    const mockEvent = new MouseEvent('mouseup');
+    this.forceProtectEvent(mockEvent);
+    // 在重置状态之前，检查是否需要扩展组合边界（包含旋转状态）
+    const hadDragOrResize = this.transformHandler.isTransforming || this.rotationHandler.isRotating;
 
     // 重置画布平移状态
     this.viewportHandler.endPan();
+
+    // 重置旋转状态
+    this.rotationHandler.endRotate();
 
     // 重置所有变换状态
     this.transformHandler.reset();
@@ -260,14 +315,13 @@ export class ToolManager {
       this.selectionHandler.finishBoxSelect();
     }
 
-    // 如果在组合编辑模式下有拖拽或缩放操作，检查并扩展组合边界
+    // 如果在组合编辑模式下有拖拽/缩放/旋转操作，检查并扩展组合边界
     if (hadDragOrResize && this.store.editingGroupId) {
       GroupService.expandGroupToFitChildren(this.store);
     }
   }
 
-  // ==================== 节点事件处理 ====================
-
+  // ==================== 节点事件处理（整合防护）====================
   /**
    * 处理节点鼠标按下事件
    *
@@ -277,106 +331,138 @@ export class ToolManager {
    * @param id - 节点 ID
    */
   handleNodeDown(e: MouseEvent, id: string) {
-    // 核心修改2：按下空格时，不阻止事件冒泡，让画布的handleMouseDown接管（触发平移）
+    // 强制防护：过滤外部干扰
+    if (!this.forceProtectEvent(e)) return;
+
+    // 原有业务逻辑：空格时触发画布平移
     if (this.getIsSpacePressed()) {
-      return; // 不处理任何节点逻辑，直接冒泡到画布
+      this.endCanvasInteraction();
+      return;
     }
 
-    // 1.阻止事件冒泡，避免触发画布的 handleMouseDown (导致取消选中)
-    e.stopPropagation();
-    // 如果正在缩放，不处理节点拖拽
-    if (this.transformHandler.isResizing) return;
+    // 原有业务逻辑：缩放中不处理拖拽
+    if (this.transformHandler.isResizing) {
+      this.endCanvasInteraction();
+      return;
+    }
 
-    // 2. 多选逻辑核心修改：框选后点击已选中节点不取消多选
+    // 原有业务逻辑：阻止冒泡（避免画布事件取消选中）
+    e.stopPropagation();
+
+    // 原有业务逻辑：多选逻辑
     if (e.ctrlKey || e.shiftKey) {
-      // Ctrl/Shift + 点击：切换选中状态（多选模式）
       this.store.toggleSelection(id);
     } else {
-      // 无快捷键时：
-      // - 点击已选中的节点 → 保留现有多选
-      // - 点击未选中的节点 → 重置为单选
-      if (this.store.activeElementIds.has(id)) {
-        // 点击已选中的节点，不修改选中状态（保留多选）
-      } else {
-        // 点击未选中的节点，重置为单选
+      if (!this.store.activeElementIds.has(id)) {
         this.store.setActive([id]);
       }
     }
 
-    // 3. 获取节点数据，校验有效性
+    // 原有业务逻辑：节点有效性校验
     const node = this.store.nodes[id] as BaseNodeState;
-    if (!node || node.isLocked) return;
+    if (!node || node.isLocked) {
+      this.endCanvasInteraction();
+      return;
+    }
 
-    // 4. 展示右侧属性面板并切换为节点模式
+    // 原有业务逻辑：显示属性面板
     this.ui.setActivePanel('node');
     this.ui.setPanelExpanded(true);
 
-    // 5. 委托给 TransformHandler 处理拖拽
+    // 原有业务逻辑：启动拖拽
     this.transformHandler.startNodeDrag(e, id, this.getIsSpacePressed());
   }
 
-  /**
-   * 处理节点双击事件
-   *
-   * 双击组合节点进入编辑模式
-   *
-   * @param e - 鼠标事件
-   * @param id - 节点 ID
-   */
   handleNodeDoubleClick(e: MouseEvent, id: string) {
+    // 强制防护：过滤外部双击事件
+    if (!this.forceProtectEvent(e)) return;
+
+    // 原有业务逻辑：阻止冒泡
     e.stopPropagation();
 
+    // 原有业务逻辑：节点有效性校验
     const node = this.store.nodes[id];
-    if (!node) return;
+    if (!node) {
+      this.endCanvasInteraction();
+      return;
+    }
 
-    // 如果双击的是组合节点，进入编辑模式
+    // 原有业务逻辑：进入组合编辑
     if (node.type === NodeType.GROUP) {
       GroupService.enterGroupEdit(this.store, id);
     }
     this.store.isInteracting = false;
+    this.endCanvasInteraction();
   }
 
-  // ==================== 单选缩放处理 ====================
-
-  /**
-   * 处理单个节点缩放控制点按下事件
-   *
-   * 委托给 TransformHandler.startResize
-   *
-   * @param e - 鼠标事件
-   * @param nodeId - 节点 ID
-   * @param handle - 缩放控制点位置（n/ne/e/se/s/sw/w/nw）
-   */
+  // ==================== 缩放控制点事件处理（整合防护）====================
   handleResizeHandleDown(e: MouseEvent, nodeId: string, handle: ResizeHandle) {
-    e.stopPropagation();
-    e.preventDefault(); // 阻止默认行为
+    // 强制防护：三重阻止+事件源校验
+    if (!this.forceProtectEvent(e)) return;
 
-    // 委托给 TransformHandler
+    // 原有业务逻辑：额外加固阻止
+    e.stopPropagation();
+    e.preventDefault();
+    e.stopImmediatePropagation();
+
+    // 新增：节点有效性校验
+    const node = this.store.nodes[nodeId] as BaseNodeState;
+    if (!node || node.isLocked) {
+      this.endCanvasInteraction();
+      return;
+    }
+
+    // 原有业务逻辑：启动单选缩放
     this.transformHandler.startResize(e, nodeId, handle);
   }
 
-  /**
-   * 处理选中多个节点时，调整大小控制点上的鼠标按下事件。
-   * 【核心修改】按下空格时，禁用多选缩放操作
-   */
   handleMultiResizeDown(
     e: MouseEvent,
     handle: ResizeHandle,
     startBounds: { x: number; y: number; width: number; height: number },
     nodeIds: string[]
   ) {
+    // 强制防护：三重阻止+事件源校验
+    if (!this.forceProtectEvent(e)) return;
+
+    // 原有业务逻辑：额外加固阻止
     e.stopPropagation();
     e.preventDefault();
+    e.stopImmediatePropagation();
 
-    // 委托给 TransformHandler
+    // 新增：过滤锁定节点
+    const validNodeIds = nodeIds.filter((id) => {
+      const node = this.store.nodes[id];
+      return node && !node.isLocked;
+    });
+    if (validNodeIds.length === 0) {
+      this.endCanvasInteraction();
+      return;
+    }
+
+    // 原有业务逻辑：启动多选缩放
     this.transformHandler.startMultiResize(
       e,
       handle,
       startBounds,
-      nodeIds,
+      validNodeIds,
       this.getIsSpacePressed()
     );
   }
+
+  // ==================== 旋转控制点事件（新增）====================
+  /**
+   * 处理旋转控制点按下事件
+   * @param e 鼠标事件
+   */
+  handleRotateHandleDown(e: MouseEvent): void {
+    if (!this.forceProtectEvent(e)) return;
+    e.stopPropagation();
+    e.preventDefault();
+    e.stopImmediatePropagation();
+    this.rotationHandler.startRotate(e);
+  }
+
   // ==================== 组合/解组合功能（已迁移至 GroupService）====================
 
   // ==================== 节点拖拽/缩放方法（已迁移到 TransformHandler） ====================
