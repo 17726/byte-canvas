@@ -25,7 +25,7 @@
  * - reset: 重置所有框选状态
  */
 
-import { isNodeInRect, clientToWorld } from '@/core/utils/geometry';
+import { isNodeHitRectSAT, clientToWorld } from '@/core/utils/geometry';
 import type { ViewportState, BaseNodeState } from '@/types/state';
 import type { useCanvasStore } from '@/store/canvasStore';
 
@@ -170,7 +170,7 @@ export class SelectionHandler {
         transform: absTransform,
       };
 
-      if (isNodeInRect(worldMax.x, worldMax.y, worldMin.x, worldMin.y, nodeForHitTest)) {
+      if (isNodeHitRectSAT(worldMax.x, worldMax.y, worldMin.x, worldMin.y, nodeForHitTest)) {
         selectedIds.push(id);
       }
     });
