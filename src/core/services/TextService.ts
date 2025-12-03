@@ -4,8 +4,8 @@ import { NodeType, type TextState } from '@/types/state'; // 导入节点类型�
 type CanvasStore = ReturnType<typeof useCanvasStore>;
 
 /**
- * 文本业务服务（无状态）
- * 处理文本相关的原子业务指令，无状态，纯函数操作。
+ * 文本业务服务（静态工具类，纯函数操作）
+ * 处理文本相关的原子业务指令，所有方法均为静态纯函数，无实例状态。
  * 所有节点相关传参统一为 id，内部通过 store 获取节点。
  */
 export class TextService {
