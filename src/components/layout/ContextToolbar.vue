@@ -59,12 +59,12 @@
       <div class="divider"></div>
       <div class="tool-item">
         <span style="width: 50px;">边框：</span>
-        <a-input-number 
+        <a-input-number
           size="mini"
-          v-model="strokeWidth" 
-          style="width: 50px" 
+          v-model="strokeWidth"
+          style="width: 50px"
           class="input-demo"
-          :min="0" 
+          :min="0"
           :max="100"/>
       </div>
     </template>
@@ -73,12 +73,12 @@
     <template v-if="isText">
       <div class="tool-item" style="width: 85px">
         字号:
-        <a-input-number 
+        <a-input-number
           size="mini"
-          v-model="fontSize" 
-          style="width: 50px;margin-left: 2px;" 
+          v-model="fontSize"
+          style="width: 50px;margin-left: 2px;"
           class="input-demo"
-          :min="12" 
+          :min="12"
           :max="100"/>
       </div>
       <div class="divider"></div>
@@ -141,7 +141,7 @@
 </template>
 
   <script setup lang="ts">
-  import { computed} from 'vue';
+  import { computed, inject, type Ref} from 'vue';
   import { useCanvasStore } from '@/store/canvasStore';
   import { NodeType,type ShapeState, type TextState } from '@/types/state';
   import { worldToClient } from '@/core/utils/geometry';
@@ -157,8 +157,10 @@
     Layers as IconLayers, // 新增图标
   Text as IconText,     // 新增图标
   } from '@icon-park/vue-next';
+import { ToolManager } from '@/core/ToolManager';
 
   const store = useCanvasStore();
+  const toolManagerRef = inject<Ref<ToolManager>>('toolManager');
 
   // 获取当前选中的第一个节点（ContextToolbar 仅在单选时显示）
   const activeNode = computed(() => {
@@ -171,7 +173,7 @@
   // 显示条件：有且仅有一个选中节点，并且不在其他交互中（如拖拽）
   const isVisible = computed(() => !!activeNode.value && !store.isInteracting && !isGroup.value);
 
-  // 计算属性工具栏在屏幕中的位置，用 worldToClient 将世界坐标转换为 DOM 客户端坐标 
+  // 计算属性工具栏在屏幕中的位置，用 worldToClient 将世界坐标转换为 DOM 客户端坐标
   // 说明：由于 ContextToolbar 本身放在视口外层 (不受 viewport transform)，因此需要将节点的世界坐标映射到 client 坐标
   // 计算工具栏在页面中的绝对位置：以节点的中心为锚点向上偏移
   const positionStyle = computed(() => {
@@ -304,40 +306,94 @@
 
   // --- 样式开关 (Toggle) ---
 
-  const isBold = computed(() => {
-    const fw = activeTextNode.value?.props.fontWeight || 400;
-    return fw >= 700;
+  //粗体
+  const isBold  = computed(() => {
+    const activeId = Array.from(store.activeElementIds)[0];
+    if (!activeId) return false;
+
+    const node = store.nodes[activeId] as TextState;
+    const selection = toolManagerRef?.value.getCurrentSelection();
+    if (!node?.props.inlineStyles || !selection) return false;
+
+    const { start, end } = selection;
+    return node.props.inlineStyles.some(style =>
+      style.start <= start && style.end >= end && style.styles.fontWeight === 'bold'
+    );
   });
+
   const toggleBold = () => {
-    // 如果当前是粗体，设为 400，否则设为 700
-    if (!activeTextNode.value) return;
-    store.updateNode(activeTextNode.value.id, {
-      props: { fontWeight: isBold.value ? 400 : 700 },
-    } as Partial<TextState>);
+    const activeId = Array.from(store.activeElementIds)[0];
+    if (activeId) {
+      toolManagerRef?.value.handleToggleBold(activeId);
+    }
   };
 
-  const isItalic = computed(() => activeTextNode.value?.props.fontStyle === 'italic');
+  //斜体
+  const isItalic = computed(() => {
+    const activeId = Array.from(store.activeElementIds)[0];
+    if (!activeId) return false;
+
+    const node = store.nodes[activeId] as TextState;
+    const selection = toolManagerRef?.value.getCurrentSelection();
+    if (!node?.props.inlineStyles || !selection) return false;
+
+    const { start, end } = selection;
+    // 检查是否存在包含当前选区的斜体样式
+    return node.props.inlineStyles.some(style =>
+      style.start <= start && style.end >= end && style.styles.fontStyle === 'italic'
+    );
+  });
+
   const toggleItalic = () => {
-    if (!activeTextNode.value) return;
-    store.updateNode(activeTextNode.value.id, {
-      props: { fontStyle: isItalic.value ? 'normal' : 'italic' },
-    } as Partial<TextState>);
+    const activeId = Array.from(store.activeElementIds)[0];
+    if (activeId) {
+      toolManagerRef?.value.handleToggleItalic(activeId);
+    }
   };
 
-  const isUnderline = computed(() => activeTextNode.value?.props.underline || false);
+  //下划线
+  const isUnderline  = computed(() => {
+    const activeId = Array.from(store.activeElementIds)[0];
+    if (!activeId) return false;
+
+    const node = store.nodes[activeId] as TextState;
+    const selection = toolManagerRef?.value.getCurrentSelection();
+    if (!node?.props.inlineStyles || !selection) return false;
+
+    const { start, end } = selection;
+    return node.props.inlineStyles.some(style =>
+      style.start <= start && style.end >= end &&
+      style.styles.textDecoration?.includes('underline')
+    );
+  });
   const toggleUnderline = () => {
-    if (!activeTextNode.value) return;
-    store.updateNode(activeTextNode.value.id, {
-      props: { underline: !isUnderline.value },
-    } as Partial<TextState>);
+    const activeId = Array.from(store.activeElementIds)[0];
+    if (activeId) {
+      toolManagerRef?.value.handleToggleUnderline(activeId);
+    }
   };
 
-  const isStrikethrough = computed(() => activeTextNode.value?.props.strikethrough || false);
+  //删除线
+  const isStrikethrough = computed(() => {
+    const activeId = Array.from(store.activeElementIds)[0];
+    if (!activeId) return false;
+
+    const node = store.nodes[activeId] as TextState;
+    const selection = toolManagerRef?.value.getCurrentSelection();
+    if (!node?.props.inlineStyles || !selection) return false;
+
+    const { start, end } = selection;
+  // 检查是否存在包含当前选区的删除线样式（支持同时有下划线+删除线）
+    return node.props.inlineStyles.some(style =>
+      style.start <= start && style.end >= end &&
+      style.styles.textDecoration?.includes('line-through')
+    );
+  });
   const toggleStrikethrough = () => {
-    if (!activeTextNode.value) return;
-    store.updateNode(activeTextNode.value.id, {
-      props: { strikethrough: !isStrikethrough.value },
-    } as Partial<TextState>);
+    const activeId = Array.from(store.activeElementIds)[0];
+    if (activeId) {
+      toolManagerRef?.value.handleToggleStrikethrough(activeId);
+    }
   };
 
   const handleDelete = () => {

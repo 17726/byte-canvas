@@ -339,10 +339,11 @@ export class ToolManager {
     const node = this.store.nodes[id] as BaseNodeState;
     if (!node || node.isLocked) return;
 
-    // 文本节点专属逻辑：编辑态下阻止拖拽
-    if (node.type === NodeType.TEXT && this.textSelectionHandler.isEditing) {
+    // 文本节点专属逻辑：
+    if (node.type === NodeType.TEXT ) {
       this.textSelectionHandler.handleMouseDown(e);
-      return;
+      //编辑态下阻止继续向后执行拖拽逻辑
+      if(this.textSelectionHandler.isEditing) return;
     }
 
     // 4. 展示右侧属性面板并切换为节点模式
@@ -372,9 +373,10 @@ export class ToolManager {
       GroupService.enterGroupEdit(this.store, id);
     }
 
-    // 文本节点：进入编辑态（嵌入现有函数，不新增）
+    // 文本节点：进入编辑态
     if (node.type === NodeType.TEXT) {
-      this.textSelectionHandler.enterEditing(e, id); // 传 id 而非 node
+      this.textSelectionHandler.enterEditing(e, id);
+      console.log("进入编辑态")
     }
 
     this.store.isInteracting = false;
@@ -465,7 +467,7 @@ export class ToolManager {
     const node = this.store.nodes[id];
     if (!node || node.type !== NodeType.TEXT) return;
 
-    // 🔥 调用 TextService 时，传递 id 而非 node
+    // 调用 TextService 时，传递 id 而非 node
     TextService.handleContentChange(
       e,
       id, // 传递节点 ID
@@ -484,6 +486,7 @@ export class ToolManager {
       const node = this.store.nodes[id];
       if (!node || node.type !== NodeType.TEXT) return;
       this.textSelectionHandler.handleSelectionChange(id);
+      console.log("触发handleTextSelectionChange")
     }
 
   /**
@@ -514,8 +517,49 @@ export class ToolManager {
     if (!this.store.activeElementIds.has(id)) {
       this.store.setActive([id]);
     }
+    console.log("触发handleTextClick");
   }
 
+  //处理文本样式
+  handleToggleBold(id: string){
+    this.textSelectionHandler.updatePartialInlineStyle(
+      id,
+      this.store,
+      'fontWeight',
+      'bold', // 样式值（支持 'bold' 或 700）
+      true // toggle：有则移除，无则添加
+    );
+  }
+
+  handleToggleItalic(id: string){
+    this.textSelectionHandler.updatePartialInlineStyle(
+      id,
+      this.store,
+      'fontStyle', // 对应 InlineStyleProps 中的 fontStyle
+      'italic',    // 目标样式值（切换为斜体）
+      true         // toggle 模式：有则移除，无则添加
+    );
+  }
+
+  handleToggleUnderline(id: string){
+    this.textSelectionHandler.updatePartialInlineStyle(
+      id,
+      this.store,
+      'textDecoration', // 对应 InlineStyleProps 中的 textDecoration
+      'underline',   // 目标样式值（切换为删除线）
+      true              // toggle 模式：有则移除，无则添加
+    );
+  }
+
+  handleToggleStrikethrough(id: string){
+    this.textSelectionHandler.updatePartialInlineStyle(
+      id,
+      this.store,
+      'textDecoration',
+      'line-through',
+      true
+    );
+  }
   /**
    * 处理文本节点鼠标抬起（供文本组件调用，内部转发给 TextSelectionHandler）
    * @param e - 鼠标事件
@@ -526,10 +570,15 @@ export class ToolManager {
     const node = this.store.nodes[id];
     if (!node || node.type !== NodeType.TEXT) return;
     this.textSelectionHandler.handleMouseUpAndSelection(e, id);
+    console.log("触发handleTextMouseUp");
   }
 
   getTextEditingState():boolean{
     return this.textSelectionHandler.isEditing;
+  }
+
+  getCurrentSelection(){
+    return this.textSelectionHandler.currentSelection;
   }
   // ==================== 组合/解组合功能（已迁移至 GroupService）====================
 

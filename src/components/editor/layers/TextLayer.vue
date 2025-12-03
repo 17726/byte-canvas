@@ -136,6 +136,7 @@ const handleMouseMove = (e: MouseEvent) => {
   toolManagerRef?.value?.handleMouseMove(e); // 调用 ToolManager 全局鼠标移动事件（内部含文本选区更新）
 };
 
+//编辑态下同步选区到全局
 const handleMouseUpAndSelection = (e: MouseEvent, id: string) => {
   toolManagerRef?.value?.handleMouseUp(); // 调用 ToolManager 全局鼠标抬起事件
   toolManagerRef?.value?.handleTextMouseUp(e, id); // 调用 ToolManager 文本鼠标抬起处理
