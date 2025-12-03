@@ -77,52 +77,64 @@
         </div>
       </template>
 
-    <!-- Text Controls -->
-    <template v-if="isText">
-      <div class="tool-item" style="width: 85px">
-        字号:
-        <a-input-number
+      <!-- Text Controls -->
+      <template v-if="isText">
+        <div class="tool-item" style="width: 85px">
+          字号:
+          <!-- <a-input-number
+            size="mini"
+            v-model="fontSize"
+            :min="12"
+            :max="100"
+            style="width: 50px;margin-left: 2px;"
+            hide-button
+            mode="button" 
+          /> -->
+          <a-input-number 
           size="mini"
-          v-model="fontSize"
-          :min="12"
-          :max="100"
-          style="width: 50px;margin-left: 2px;"
-          hide-button
-          @change="handleFontSizeChange"
-        />
-      </div>
-      <div class="tool-item">
-        <a-tooltip placement="top" content="加粗">
-          <a-button size="mini" :type="isBold ? 'primary' : 'text'" @click="handleToggleBold">
-            <icon-text-bold />
-          </a-button>
-        </a-tooltip>
-      </div>
-      <div class="tool-item">
-        <a-tooltip placement="top" content="倾斜">
-          <a-button size="mini" :type="isItalic ? 'primary' : 'text'" @click="handleToggleItalic">
-            <icon-text-italic />
-          </a-button>
-        </a-tooltip>
-      </div>
-      <div class="tool-item">
-        <a-tooltip placement="top" content="下划线">
-            <a-button size="mini" :type="isUnderline ? 'primary' : 'text'" @click="handleToggleUnderline">
-              <icon-text-underline />
+          v-model="fontSize" 
+          style="width: 50px;margin-left: 2px;" 
+          class="input-demo"
+          :min="12" 
+          :max="100"/>
+        </div>
+        <div class="tool-item">
+        <a-popover trigger="click" position="bottom" content-class="toolbar-popover-content">
+            <a-tooltip placement="top" content="文本样式">
+            <a-button size="mini" type="text">
+              <icon-text />
             </a-button>
-        </a-tooltip>
+          </a-tooltip>
+          <template #content>
+            <div class="popover-grid">
+               <a-tooltip content="加粗" :mouse-enter-delay="0.5">
+                <a-button size="mini" :type="isBold ? 'primary' : 'text'" @click="toggleBold">
+                  <icon-text-bold />
+                </a-button>
+              </a-tooltip>
+              <a-tooltip content="倾斜" :mouse-enter-delay="0.5">
+                <a-button size="mini" :type="isItalic ? 'primary' : 'text'" @click="toggleItalic">
+                  <icon-text-italic />
+                </a-button>
+              </a-tooltip>
+              <a-tooltip content="下划线" :mouse-enter-delay="0.5">
+                <a-button size="mini" :type="isUnderline ? 'primary' : 'text'" @click="toggleUnderline">
+                  <icon-text-underline />
+                </a-button>
+              </a-tooltip>
+              <a-tooltip content="删除线" :mouse-enter-delay="0.5">
+                <a-button size="mini" :type="isStrikethrough ? 'primary' : 'text'" @click="toggleStrikethrough">
+                  <icon-strikethrough />
+                </a-button>
+              </a-tooltip>
+            </div>
+          </template>
+        </a-popover>
       </div>
-      <div class="tool-item">
-        <a-tooltip placement="top" content="删除线">
-          <a-button size="mini" :type="isStrikethrough ? 'primary' : 'text'" @click="handleToggleStrikeThrough">
-            <icon-strikethrough />
-          </a-button>
-        </a-tooltip>
-      </div>
-      <div class="tool-item">
-        <a-color-picker size="mini" v-model="textColor" trigger="hover" @input="handleColorChange" />
-      </div>
-    </template>
+        <div class="tool-item">
+          <a-color-picker size="mini" v-model="textColor" trigger="hover" />
+        </div>
+      </template>
 
       <template v-if="isImage">
         <!-- <div class="tool-item">
@@ -194,20 +206,23 @@
     </div>
   </template>
 
-<script setup lang="ts">
-import { computed,} from 'vue';
-import { useCanvasStore } from '@/store/canvasStore';
-import { NodeType,type InlineStyleProps,type ShapeState, type TextDecorationValue, type TextState } from '@/types/state';
-import { worldToClient } from '@/core/utils/geometry';
-import {
-  Delete as IconDelete,
-  TextBold as IconTextBold,
-  TextItalic as IconTextItalic,
-  TextUnderline as IconTextUnderline,
-  Strikethrough as IconStrikethrough,
-  BringToFrontOne as IconBringToFront,
-  SentToBack as IconSendToBack,
-} from '@icon-park/vue-next';
+  <script setup lang="ts">
+  import { computed} from 'vue';
+  import { useCanvasStore } from '@/store/canvasStore';
+  import { NodeType,type ShapeState, type TextState } from '@/types/state';
+  import { worldToClient } from '@/core/utils/geometry';
+  // import { DEFAULT_IMAGE_FILTERS, DEFAULT_IMAGE_URL } from '@/config/defaults';
+  import {
+    Delete as IconDelete,
+    TextBold as IconTextBold,
+    TextItalic as IconTextItalic,
+    TextUnderline as IconTextUnderline,
+    Strikethrough as IconStrikethrough,
+    BringToFrontOne as IconBringToFront,
+    SentToBack as IconSendToBack,
+    Layers as IconLayers, // 新增图标
+  Text as IconText,     // 新增图标
+  } from '@icon-park/vue-next';
 
   const store = useCanvasStore();
 
@@ -322,23 +337,16 @@ import {
       }),
   });
 
-// --- Text Actions ---
-// 1. 安全获取当前文本节点 (Computed)
-// 这样后面就不用每次都写 (activeNode.value as TextState) 了
-const activeTextNode = computed(() => {
-  const node = store.activeElements[0];
-  if (node?.type === NodeType.TEXT) {
-    return node as TextState;
-  }
-  return null;
-});
-
-// 2. 从 Pinia 获取全局选区（与激活节点对应）
-const globalTextSelection = computed(() => {
-  console.log('工具栏获取全局选区：', store.globalTextSelection);
-  return store.globalTextSelection;
-});
-
+  // --- Text Actions ---
+  // 1. 安全获取当前文本节点 (Computed)
+  // 这样后面就不用每次都写 (activeNode.value as TextState) 了
+  const activeTextNode = computed(() => {
+    const node = store.activeElements[0];
+    if (node?.type === NodeType.TEXT) {
+      return node as TextState;
+    }
+    return null;
+  });
 
   // --- 具体的属性绑定 ---
 
@@ -362,191 +370,41 @@ const globalTextSelection = computed(() => {
 
   // --- 样式开关 (Toggle) ---
 
-const isBold = computed(() => {
-  const fw = activeTextNode.value?.props.fontWeight || 400;
-  return fw >= 700;
-});
-const isItalic = computed(() => activeTextNode.value?.props.fontStyle === 'italic');
-const isUnderline = computed(() => activeTextNode.value?.props.textDecoration?.includes('underline') || false);
-const isStrikethrough = computed(() => activeTextNode.value?.props.textDecoration?.includes('line-through') || false);
-
-// 工具函数：添加/移除部分文本样式（修改依赖为全局状态）
-// 工具栏组件：优化 toggleInlineStyle 函数
-const toggleInlineStyle = (
-  styleKey: keyof InlineStyleProps,
-  value: InlineStyleProps[keyof InlineStyleProps]
-) => {
-  if (!activeTextNode.value || !globalTextSelection.value) {
-    console.warn('请先选中需要格式化的文本');
-    return;
-  }
-
-  const { start, end } = globalTextSelection.value;
-  const newInlineStyles = [...(activeTextNode.value.props.inlineStyles || [])];
-
-  // 关键：按选区+样式Key查找（而非全量匹配），支持同一选区添加多个样式
-  const existingIndex = newInlineStyles.findIndex(
-    s => s.start === start && s.end === end && s.styles.hasOwnProperty(styleKey)
-  );
-
-  if (existingIndex !== -1) {
-    // 情况1：已存在该样式 → 仅移除该样式属性
-    const styleEntry = newInlineStyles[existingIndex];
-    if (styleEntry && styleEntry.styles && styleEntry.styles.hasOwnProperty(styleKey)) {
-      delete styleEntry.styles[styleKey];
-      // 如果该选区已无样式，则移除整个 entry
-      if (Object.keys(styleEntry.styles).length === 0) {
-        newInlineStyles.splice(existingIndex, 1);
-      }
-    }
-  } else {
-    // 情况2：不存在该样式 → 添加（合并到同一选区）
-    newInlineStyles.push({ start, end, styles: { [styleKey]: value } });
-  }
-
-  store.updateNode(activeTextNode.value.id, {
-    props: { ...activeTextNode.value.props, inlineStyles: newInlineStyles }
+  const isBold = computed(() => {
+    const fw = activeTextNode.value?.props.fontWeight || 400;
+    return fw >= 700;
   });
-};
+  const toggleBold = () => {
+    // 如果当前是粗体，设为 400，否则设为 700
+    if (!activeTextNode.value) return;
+    store.updateNode(activeTextNode.value.id, {
+      props: { fontWeight: isBold.value ? 400 : 700 },
+    } as Partial<TextState>);
+  };
 
-// 加粗切换
-const handleToggleBold = () => {
-  if (!activeTextNode.value) return;
-  const currentWeight = activeTextNode.value.props.fontWeight;
-  toggleInlineStyle('fontWeight', currentWeight === 700 ? 400 : 700);
-};
+  const isItalic = computed(() => activeTextNode.value?.props.fontStyle === 'italic');
+  const toggleItalic = () => {
+    if (!activeTextNode.value) return;
+    store.updateNode(activeTextNode.value.id, {
+      props: { fontStyle: isItalic.value ? 'normal' : 'italic' },
+    } as Partial<TextState>);
+  };
 
-// 斜体切换
-const handleToggleItalic = () => {
-  if (!activeTextNode.value) return;
-  const currentStyle = activeTextNode.value.props.fontStyle;
-  toggleInlineStyle('fontStyle', currentStyle === 'italic' ? 'normal' : 'italic');
-};
+  const isUnderline = computed(() => activeTextNode.value?.props.underline || false);
+  const toggleUnderline = () => {
+    if (!activeTextNode.value) return;
+    store.updateNode(activeTextNode.value.id, {
+      props: { underline: !isUnderline.value },
+    } as Partial<TextState>);
+  };
 
-// 下划线切换（核心：通过值组合/移除实现单独切换）
-const handleToggleUnderline = () => {
-  if (!activeTextNode.value || !store.globalTextSelection) return;
-
-  const currentDecoration = getCurrentTextDecoration();
-  let newDecoration: TextDecorationValue = 'none';
-
-  if (currentDecoration.includes('underline')) {
-    // 情况1：已有下划线 → 移除（保留其他装饰）
-    newDecoration = currentDecoration
-      .split(' ')
-      .filter(part => part !== 'underline')
-      .join(' ') as TextDecorationValue;
-    // 若移除后为空，设为 'none'
-    newDecoration = newDecoration || 'none';
-  } else {
-    // 情况2：无下划线 → 添加（叠加其他装饰）
-    newDecoration = currentDecoration === 'none'
-      ? 'underline'
-      : `${currentDecoration} underline` as TextDecorationValue;
-  }
-
-  // 调用 toggleInlineStyle，styleKey 为 'textDecoration'，值为新的组合
-  toggleInlineStyle('textDecoration', newDecoration);
-};
-
-// 删除线切换（逻辑与下划线一致）
-const handleToggleStrikeThrough = () => {
-  if (!activeTextNode.value || !store.globalTextSelection) return;
-
-  const currentDecoration = getCurrentTextDecoration();
-  let newDecoration: TextDecorationValue = 'none';
-
-  if (currentDecoration.includes('line-through')) {
-    // 移除删除线
-    newDecoration = currentDecoration
-      .split(' ')
-      .filter(part => part !== 'line-through')
-      .join(' ') as TextDecorationValue;
-    newDecoration = newDecoration || 'none';
-  } else {
-    // 添加删除线
-    newDecoration = currentDecoration === 'none'
-      ? 'line-through'
-      : `${currentDecoration} line-through` as TextDecorationValue;
-  }
-
-  toggleInlineStyle('textDecoration', newDecoration);
-};
-
-
-
-// 字体选择(稍后实现)
-// const handleFontFamilyChange = (e: Event) => {
-//   const target = e.target as HTMLSelectElement;
-//   const fontFamily = target.value.trim(); // 去除空格，避免空字符串
-
-//   // 校验：有激活节点 + 有选区 + 字体值有效
-//   if (!activeTextNode.value || !globalTextSelection.value || !fontFamily) {
-//     target.value = ''; // 重置下拉框
-//     return;
-//   }
-
-//   // 调用工具函数添加/移除字体样式
-//   toggleInlineStyle('fontFamily', fontFamily);
-//   target.value = ''; // 重置下拉框，提升用户体验
-// };
-
-// 字号选择
-const handleFontSizeChange = (e: Event) => {
-  const target = e.target as HTMLSelectElement;
-  const fontSize = Number(target.value);
-
-  // 校验：有激活节点 + 有选区 + 字号是有效数字（8-48px 范围）
-  if (
-    !activeTextNode.value ||
-    !globalTextSelection.value ||
-    isNaN(fontSize) ||
-    fontSize < 8 ||
-    fontSize > 48
-  ) {
-    target.value = ''; // 重置下拉框
-    return;
-  }
-
-  // 调用工具函数添加/移除字号样式
-  toggleInlineStyle('fontSize', fontSize);
-  target.value = ''; // 重置下拉框
-};
-
-// 颜色选择
-const handleColorChange = (color: string) => {
-  // 无激活文本节点 → 直接返回
-  if (!activeTextNode.value) {
-    console.warn('请先选中文本节点再设置颜色');
-    return;
-  }
-
-  // 更新文本节点的全局 color 属性（同步到 store）
-  store.updateNode(activeTextNode.value.id, {
-    props: {
-      ...activeTextNode.value.props,
-      color: color // 直接赋值验证后的有效颜色
-    }
-  });
-};
-
-// 辅助函数：获取选中文本的当前 textDecoration 状态（行内样式优先，无则取全局）
-const getCurrentTextDecoration = (): TextDecorationValue => {
-  const { globalTextSelection } = store;
-  if (!activeTextNode.value || !globalTextSelection) return 'none';
-
-  const { start, end } = globalTextSelection;
-  const { inlineStyles, textDecoration: globalDecoration } = activeTextNode.value.props;
-
-  // 1. 先找行内样式（选中范围的 textDecoration）
-  const targetInlineStyle = inlineStyles?.find(s => s.start === start && s.end === end);
-  if (targetInlineStyle?.styles.textDecoration) {
-    return targetInlineStyle.styles.textDecoration;
-  }
-
-  // 2. 无行内样式则取全局样式
-  return globalDecoration || 'none';
-};
+  const isStrikethrough = computed(() => activeTextNode.value?.props.strikethrough || false);
+  const toggleStrikethrough = () => {
+    if (!activeTextNode.value) return;
+    store.updateNode(activeTextNode.value.id, {
+      props: { strikethrough: !isStrikethrough.value },
+    } as Partial<TextState>);
+  };
 
   const handleDelete = () => {
     if (activeNode.value) {
