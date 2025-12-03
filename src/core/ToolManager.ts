@@ -57,13 +57,14 @@
 
 import { useCanvasStore } from '@/store/canvasStore';
 import { useUIStore } from '@/store/uiStore';
-import { NodeType, type BaseNodeState } from '@/types/state';
+import { NodeType, type BaseNodeState, type TextState } from '@/types/state';
 import type { ResizeHandle } from '@/types/editor';
 import { ViewportHandler } from './handlers/ViewportHandler';
 import { TransformHandler } from './handlers/TransformHandler';
 import { SelectionHandler } from './handlers/SelectionHandler';
 import { GroupService } from './services/GroupService';
 import { TextSelectionHandler } from './handlers/TextSeletionHandler';
+import { TextService } from './services/TextService';
 
 /**
  * 工具管理器类
@@ -101,7 +102,11 @@ export class ToolManager {
     this.viewportHandler = new ViewportHandler(this.store);
     this.transformHandler = new TransformHandler(this.store);
     this.selectionHandler = new SelectionHandler(this.store, stageEl);
-    this.textSelectionHandler = new TextSelectionHandler(this.store);
+    this.textSelectionHandler = new TextSelectionHandler(
+      this.store,
+      this.transformHandler,
+      this.viewportHandler
+    );
   }
 
   /**
@@ -169,6 +174,8 @@ export class ToolManager {
       if (this.store.editingGroupId) {
         GroupService.exitGroupEdit(this.store);
       }
+      // 文本处理器：结束编辑态
+      this.textSelectionHandler.exitEditing();
       return;
     }
 
@@ -199,6 +206,11 @@ export class ToolManager {
         GroupService.exitGroupEdit(this.store);
       }
 
+      // 文本处理器：点击空白处结束编辑态
+      if (this.textSelectionHandler.isEditing){
+        this.textSelectionHandler.exitEditing();
+      }
+
       // 启动框选（仅未按空格时）
       this.selectionHandler.startBoxSelect(e);
     }
@@ -208,7 +220,7 @@ export class ToolManager {
    * 处理全局鼠标移动事件
    *
    * 根据当前交互状态更新对应操作：
-   * - 多选缩放 > 单选缩放 > 节点拖拽 > 画布平移 > 框选
+   * - 多选缩放 > 单选缩放 > 文本选区 > 节点拖拽 > 画布平移 > 框选
    *
    * @param e - 鼠标事件
    */
@@ -223,6 +235,11 @@ export class ToolManager {
     if (this.transformHandler.isResizing) {
       this.transformHandler.updateResize(e);
       return;
+    }
+
+    // 再次：文本处理器：编辑态下更新选区
+    if (this.textSelectionHandler.isEditing) {
+      this.textSelectionHandler.handleMouseMove(e);
     }
 
     // 然后：节点拖拽（包含多选区域拖拽）
@@ -261,6 +278,18 @@ export class ToolManager {
     // 仅未按空格时处理框选结束
     if (!this.getIsSpacePressed()) {
       this.selectionHandler.finishBoxSelect();
+    }
+
+    // 文本处理器：编辑态下同步选区到全局
+    if (this.textSelectionHandler.isEditing) {
+      // 获取当前激活的文本节点ID
+      const activeTextNodeId = Array.from(this.store.activeElementIds).find((id) => {
+        const node = this.store.nodes[id];
+        return node?.type === NodeType.TEXT;
+      });
+      if (activeTextNodeId) {
+        this.textSelectionHandler.handleSelectionChange(activeTextNodeId);
+      }
     }
 
     // 如果在组合编辑模式下有拖拽或缩放操作，检查并扩展组合边界
@@ -310,6 +339,12 @@ export class ToolManager {
     const node = this.store.nodes[id] as BaseNodeState;
     if (!node || node.isLocked) return;
 
+    // 文本节点专属逻辑：编辑态下阻止拖拽
+    if (node.type === NodeType.TEXT && this.textSelectionHandler.isEditing) {
+      this.textSelectionHandler.handleMouseDown(e);
+      return;
+    }
+
     // 4. 展示右侧属性面板并切换为节点模式
     this.ui.setActivePanel('node');
     this.ui.setPanelExpanded(true);
@@ -335,9 +370,13 @@ export class ToolManager {
     // 如果双击的是组合节点，进入编辑模式
     if (node.type === NodeType.GROUP) {
       GroupService.enterGroupEdit(this.store, id);
-    }else if(node.type === NodeType.TEXT){
-      this.textSelectionHandler.startEditting();
     }
+
+    // 文本节点：进入编辑态（嵌入现有函数，不新增）
+    if (node.type === NodeType.TEXT) {
+      this.textSelectionHandler.enterEditing(e, id); // 传 id 而非 node
+    }
+
     this.store.isInteracting = false;
   }
 
@@ -356,6 +395,13 @@ export class ToolManager {
     e.stopPropagation();
     e.preventDefault(); // 阻止默认行为
 
+    // 文本节点：缩放时结束编辑态
+    const node = this.store.nodes[nodeId];
+    if (node?.type === NodeType.TEXT) {
+      this.textSelectionHandler.isEditing = false;
+      this.store.updateGlobalTextSelection(null);
+    }
+
     // 委托给 TransformHandler
     this.transformHandler.startResize(e, nodeId, handle);
   }
@@ -373,6 +419,16 @@ export class ToolManager {
     e.stopPropagation();
     e.preventDefault();
 
+    // 文本节点：缩放时结束编辑态
+    const hasTextNode = nodeIds.some((id) => {
+      const node = this.store.nodes[id];
+      return node?.type === NodeType.TEXT;
+    });
+    if (hasTextNode) {
+      this.textSelectionHandler.isEditing = false;
+      this.store.updateGlobalTextSelection(null);
+    }
+
     // 委托给 TransformHandler
     this.transformHandler.startMultiResize(
       e,
@@ -381,6 +437,92 @@ export class ToolManager {
       nodeIds,
       this.getIsSpacePressed()
     );
+  }
+    // ==================== 文本节点专属辅助方法 ====================
+  /**
+   * 初始化文本编辑器（供文本组件调用，复用现有逻辑）
+   * @param editor - 文本编辑器 DOM 引用
+   */
+  initTextEditor(editor: HTMLElement | null) {
+    this.textSelectionHandler.init(editor);
+    // 注册全局事件
+    document.addEventListener(
+      'mousedown',
+      this.textSelectionHandler.handleGlobalMousedown,
+      true
+    );
+  }
+
+  /**
+   * 处理文本节点输入事件（供文本组件调用）
+   * @param e - 输入事件
+   * @param id - 文本节点 ID
+   */
+  handleTextInput(e: Event, id: string) {
+    if (this.transformHandler.isTransforming) return;
+
+    const node = this.store.nodes[id] as TextState;
+    if (!node || node.type !== NodeType.TEXT) return;
+
+    TextService.handleContentChange(
+      e,
+      node,
+      () => this.textSelectionHandler.saveCursorPosition(),
+      (pos) => this.textSelectionHandler.restoreCursorPosition(pos)
+    );
+  }
+
+    /**
+   * 处理文本节点选区变化（供文本组件调用，内部转发给 TextSelectionHandler）
+   * @param id - 文本节点 ID
+   */
+    handleTextSelectionChange(id: string) {
+      if (this.transformHandler.isTransforming) return;
+      const node = this.store.nodes[id];
+      if (!node || node.type !== NodeType.TEXT) return;
+      this.textSelectionHandler.handleSelectionChange(id);
+    }
+
+  /**
+   * 处理文本节点失焦事件（供文本组件调用）
+   * @param id - 文本节点 ID
+   */
+  handleTextBlur(id: string) {
+    const node = this.store.nodes[id];
+    if (!node || node.type !== NodeType.TEXT) return;
+
+    this.textSelectionHandler.handleBlur(id);
+  }
+
+  /**
+   * 处理文本节点点击事件（供文本组件调用）
+   * @param e - 鼠标事件
+   * @param id - 文本节点 ID
+   */
+  handleTextClick(e: MouseEvent, id: string) {
+    if (this.getIsSpacePressed()) return;
+
+    const node = this.store.nodes[id];
+    if (!node || node.type !== NodeType.TEXT) return;
+
+    e.stopPropagation();
+    this.textSelectionHandler.handleTextBoxClick(e, id);
+
+    if (!this.store.activeElementIds.has(id)) {
+      this.store.setActive([id]);
+    }
+  }
+
+  /**
+   * 处理文本节点鼠标抬起（供文本组件调用，内部转发给 TextSelectionHandler）
+   * @param e - 鼠标事件
+   * @param id - 文本节点 ID
+   */
+  handleTextMouseUp(e: MouseEvent, id: string) {
+    if (this.transformHandler.isTransforming) return;
+    const node = this.store.nodes[id];
+    if (!node || node.type !== NodeType.TEXT) return;
+    this.textSelectionHandler.handleMouseUpAndSelection(e, id);
   }
   // ==================== 组合/解组合功能（已迁移至 GroupService）====================
 

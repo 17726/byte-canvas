@@ -5,194 +5,168 @@
     <div
       ref="editor"
       class="textBox"
-      :class="{ 'is-editing': textSelectionHandler.isEditing }"
+      :class="{ 'is-editing': isEditing }"
       contenteditable="true"
-
       v-html="HTMLstring"
-      @input="handleContentChange"
-      @keyup="handleSelectionChange"
-      @mouseup="handleMouseUpAndSelection($event, props.node)"
+      @input="(e) => handleContentChange(e, props.node.id)"
+      @keyup="() => handleSelectionChange(props.node.id)"
+      @mouseup="(e) => handleMouseUpAndSelection(e, props.node.id)"
       @mousemove="handleMouseMove"
-      @mousedown="handleMouseDown"
-      @dblclick="enterEditing"
-      @blur="handleBlur"
-      @click="handleTextBoxClick"
+      @mousedown="(e) => handleMouseDown(e, props.node.id)"
+      @dblclick="(e) => enterEditing(e, props.node.id)"
+      @blur="() => handleBlur(props.node.id)"
+      @click="(e) => handleTextBoxClick(e, props.node.id)"
     ></div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, type CSSProperties, onMounted, onUnmounted } from 'vue';
+import { computed, ref, watch, type CSSProperties, onMounted, onUnmounted, inject } from 'vue';
 import type { TextState } from '@/types/state';
 import { getDomStyle } from '@/core/renderers/dom';
-import { textSelectionHandler } from '@/core/handlers/TextSeletionHandler';
-import { TextService } from '@/core/services/TextService';
+import type { ToolManager } from '@/core/ToolManager';
+import { useCanvasStore } from '@/store/canvasStore';
 
 const props = defineProps<{
   node: TextState;
 }>();
 
+// 1. 注入全局 ToolManager 实例（唯一依赖，不直接接触任何 Handler）
+const toolManager = inject<ToolManager>('toolManager');
+if (!toolManager) {
+  throw new Error('文本组件必须在 ToolManager 提供的上下文下使用（需在 Stage 组件内渲染）');
+}
+
+const store = useCanvasStore();
 const editor = ref<HTMLElement | null>(null);
 
-// 计算属性：文本HTML渲染
+// 计算属性：文本HTML渲染（不变）
 const HTMLstring = computed(() => getDomStyle(props.node));
 
-// 计算属性：组件样式
+// 计算属性：组件样式（不变）
 const style = computed((): CSSProperties => {
-  // 类型断言 + 容错：确保 transform 和 style 存在（避免 undefined 报错）
   const text = props.node as TextState & {
     transform: NonNullable<TextState['transform']>;
     style: NonNullable<TextState['style']>;
   };
 
-  // 解构属性 + 默认值兜底（双重保障，避免 undefined）
-  const { transform, style: nodeStyle } = text; // 重命名 style 为 nodeStyle，避免重名
+  const { transform, style: nodeStyle } = text;
+  const { x = 0, y = 0, width = 200, height = 80, rotation = 0 } = transform;
   const {
-    x = 0,
-    y = 0,
-    width = 200,
-    height = 80,
-    rotation = 0
-  } = transform;
-  const {
-    backgroundColor = 'transparent', // 默认透明
-    borderWidth = 0, // 默认无边框
-    borderStyle = 'none', // 默认无边框样式
-    borderColor = 'transparent', // 默认透明边框
-    opacity = 1, // 默认不透明
-    zIndex = 1 // 默认层级
+    backgroundColor = 'transparent',
+    borderWidth = 0,
+    borderStyle = 'none',
+    borderColor = 'transparent',
+    opacity = 1,
+    zIndex = 1
   } = nodeStyle;
 
-  // 样式映射（补充去除边框的关键样式）
   return {
-    // --- 布局属性---
     position: 'absolute',
     left: `${x}px`,
     top: `${y}px`,
     width: `${width}px`,
     height: `${height}px`,
     transform: `rotate(${rotation}deg)`,
-    transformOrigin: 'center center', // 优化：旋转中心点默认居中（更合理）
-    boxSizing: 'border-box', // 优化：确保 border 不影响宽高计算
-
-    // --- 外观属性（补充默认值 + 去除边框）---
+    transformOrigin: 'center center',
+    boxSizing: 'border-box',
     backgroundColor,
     borderWidth: `${borderWidth}px`,
     borderStyle,
     borderColor,
     opacity,
     zIndex,
-    outline: 'none !important', // 关键：去除浏览器默认聚焦边框
-    outlineOffset: '0', // 优化：确保无偏移轮廓
-    boxShadow: 'none !important', // 优化：避免阴影被误认为边框
-
-    // --- 额外优化：文本容器交互体验 ---
-    overflow: 'hidden', // 超出容器范围隐藏（避免文本溢出）
+    outline: 'none !important',
+    outlineOffset: '0',
+    boxShadow: 'none !important',
+    overflow: 'hidden',
   };
 });
 
-// 选中状态（从store派生）
-//const isSelected = computed(() => textSelectionHandler['store'].activeElementIds.has(props.node.id));
+// 计算属性：编辑态（通过 ToolManager 间接获取，不直接访问 Handler）
+const isEditing = computed(() => {
+  // 若需严格隔离，可在 ToolManager 暴露 getTextEditingState() 方法，此处调用
+  return toolManager['textSelectionHandler'].isEditing;
+  // 更规范的方式：ToolManager 新增 getTextEditingState() { return this.textSelectionHandler.isEditing; }
+  // 然后此处改为：return toolManager.getTextEditingState();
+});
 
-// 激活节点状态（从handler获取）
-const isActiveNode = computed(() => textSelectionHandler.isActiveNode(props.node));
+// 激活节点状态（从 Store 直接获取，不依赖 Handler）
+const isActiveNode = computed(() => {
+  return store.activeElementIds.has(props.node.id);
+});
 
-// 监听activeElementIds变化，强制保留编辑态节点激活
+// 监听activeElementIds变化，强制保留编辑态节点激活（通过 Store 操作，不依赖 Handler）
 watch(
-  () => Array.from(textSelectionHandler['store'].activeElementIds),
+  () => Array.from(store.activeElementIds),
   (newActiveIds) => {
-    if (textSelectionHandler.isEditing && !newActiveIds.includes(props.node.id)) {
-      textSelectionHandler['store'].setActive([props.node.id]); // 强制激活当前节点
+    if (isEditing.value && !newActiveIds.includes(props.node.id)) {
+      store.setActive([props.node.id]);
     }
   },
   { deep: true }
 );
 
-// 监听选区变化（同步到全局）
+// 监听选区变化（同步到全局，通过 ToolManager 转发）
 watch(
-  () => [textSelectionHandler.currentSelection, isActiveNode.value],
-  ([newSelection, isActive]) => {
-    // 类型守卫：确保 newSelection 是正确的选区对象（排除 boolean 和 null）
-    const isValidSelection = (
-      typeof newSelection === 'object' &&
-      newSelection !== null &&
-      'start' in newSelection &&
-      'end' in newSelection
-    );
-
-    if (isActive && isValidSelection) {
-      // 此时 TypeScript 能确定 newSelection 是正确类型
-      textSelectionHandler.updateGlobalSelection(newSelection);
+  () => [isActiveNode.value, isEditing.value],
+  ([isActive, editing]) => {
+    if (isActive && editing) {
+      toolManager.handleTextSelectionChange(props.node.id);
     } else {
-      textSelectionHandler.updateGlobalSelection(null);
+      // 若需清空全局选区，可在 ToolManager 新增 clearGlobalTextSelection() 方法
+      store.updateGlobalTextSelection(null);
     }
   },
   { immediate: true, deep: true }
 );
 
-// 事件代理：内容变化（调用无状态服务）
-const handleContentChange = (e: Event) => {
-  TextService.handleContentChange(
-    e,
-    props.node,
-    () => textSelectionHandler.saveCursorPosition(),
-    (pos) => textSelectionHandler.restoreCursorPosition(pos)
-  );
+// 2. 所有事件处理：只调用 ToolManager 方法，不直接接触 Handler
+const handleContentChange = (e: Event, id: string) => {
+  toolManager.handleTextInput(e, id); // 调用 ToolManager 文本输入处理
 };
 
-// 事件代理：选区变化（调用handler）
-const handleSelectionChange = () => {
-  textSelectionHandler.handleSelectionChange(props.node);
+const handleSelectionChange = (id: string) => {
+  toolManager.handleTextSelectionChange(id); // 调用 ToolManager 选区变化处理
 };
 
-// 事件代理：双击进入编辑（调用handler）
-const enterEditing = (event: MouseEvent) => {
-  textSelectionHandler.enterEditing(event, props.node);
+const enterEditing = (e: MouseEvent, id: string) => {
+  toolManager.handleNodeDoubleClick(e, id); // 调用 ToolManager 节点双击事件（内部路由到文本编辑）
 };
 
-// 事件代理：鼠标按下（调用handler）
-const handleMouseDown = (e: MouseEvent) => {
-  textSelectionHandler.handleMouseDown(e);
+const handleMouseDown = (e: MouseEvent, id: string) => {
+  toolManager.handleNodeDown(e, id); // 调用 ToolManager 节点按下事件（内部含文本编辑态判断）
 };
 
-// 事件代理：鼠标移动（调用handler）
 const handleMouseMove = (e: MouseEvent) => {
-  textSelectionHandler.handleMouseMove(e);
+  toolManager.handleMouseMove(e); // 调用 ToolManager 全局鼠标移动事件（内部含文本选区更新）
 };
 
-// 事件代理：鼠标抬起（调用handler）
-const handleMouseUpAndSelection = (e: MouseEvent, node: TextState) => {
-  textSelectionHandler.handleMouseUpAndSelection(e, node);
+const handleMouseUpAndSelection = (e: MouseEvent, id: string) => {
+  toolManager.handleMouseUp(); // 调用 ToolManager 全局鼠标抬起事件
+  toolManager.handleTextMouseUp(e, id); // 调用 ToolManager 文本鼠标抬起处理
 };
 
-// 事件代理：失焦处理（调用handler）
-const handleBlur = () => {
-  textSelectionHandler.handleBlur(props.node);
+const handleBlur = (id: string) => {
+  toolManager.handleTextBlur(id); // 调用 ToolManager 文本失焦处理
 };
 
-// 事件代理：文本框点击（调用handler）
-const handleTextBoxClick = (e: MouseEvent) => {
-  textSelectionHandler.handleTextBoxClick(e, props.node);
+const handleTextBoxClick = (e: MouseEvent, id: string) => {
+  toolManager.handleTextClick(e, id); // 调用 ToolManager 文本点击处理
 };
 
-// 组件挂载初始化
+// 3. 组件生命周期：只调用 ToolManager 方法
 onMounted(() => {
-  // 初始化编辑器引用
-  textSelectionHandler.init(editor.value);
-  // 注册全局鼠标按下事件
-  document.addEventListener('mousedown', textSelectionHandler.handleGlobalMousedown, true);
+  toolManager.initTextEditor(editor.value); // 调用 ToolManager 初始化文本编辑器
 });
 
-// 组件卸载清理
 onUnmounted(() => {
-  // 移除全局事件监听
-  document.removeEventListener('mousedown', textSelectionHandler.handleGlobalMousedown, true);
-  // 清理handler状态
-  textSelectionHandler.destroy();
+  toolManager.destroy(); // 调用 ToolManager 销毁文本编辑器资源
 });
 </script>
 
 <style scoped>
+/* 样式部分保持不变 */
 .textBox {
   width: 100%;
   height: 100%;
@@ -215,11 +189,9 @@ onUnmounted(() => {
   -webkit-user-select: auto;
   -moz-user-select: auto;
   -ms-user-select: auto;
-  /* 编辑态保留 auto，正常响应事件 */
   pointer-events: auto;
 }
 
-/* 文本选中样式（兼容不同浏览器） */
 .textBox::selection,
 .textBox *::selection {
   background-color: rgba(0, 122, 255, 0.1) !important;

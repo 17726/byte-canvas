@@ -3,31 +3,47 @@
    处理文本选区相关的交互细节，维护编辑状态和选区状态，响应连续 DOM 事件流。
  */
 
-import type { TextState } from '@/types/state';
+import { NodeType, type TextState } from '@/types/state';
 import { useCanvasStore } from '@/store/canvasStore';
 import { nextTick } from 'vue';
+import type { TransformHandler } from './TransformHandler';
+import type { ViewportHandler } from './ViewportHandler';
 
 type CanvasStore = ReturnType<typeof useCanvasStore>;
 
 // 有状态处理器：维护交互过程中的中间状态
 export class TextSelectionHandler {
-  private store = useCanvasStore();
-  // 编辑状态（有状态）
-  isEditing = false;
-  // 选中状态（有状态）
-  currentSelection: { start: number; end: number } | null = null;
-  // 标记是否正在点击工具栏（有状态）
-  isClickingToolbar = false;
-  // 编辑器DOM引用
+  // 私有属性：存储构造函数传入的依赖（供内部方法使用）
+  private store: CanvasStore;
+  private transformHandler: TransformHandler; // 用于互斥判断（拖拽/缩放状态）
+  private viewportHandler: ViewportHandler; // 用于互斥判断（平移状态）
+
+  // 公开状态：供 ToolManager/组件访问
+  public isEditing = false;
+  public currentSelection: { start: number; end: number } | null = null;
+
+  // 私有状态：内部使用
+  private isClickingToolbar = false;
   private editor: HTMLElement | null = null;
 
   /**
-   * 初始化编辑器引用
-   * @param editor 文本编辑器DOM元素
+   * 构造函数（适配 ToolManager 实例化参数）
+   * @param store - CanvasStore 实例（用于获取节点数据、更新全局状态）
+   * @param transformHandler - TransformHandler 实例（用于互斥判断：拖拽/缩放状态）
+   * @param viewportHandler - ViewportHandler 实例（用于互斥判断：平移状态）
    */
-  // 构造函数接收 store 参数，默认值为 useCanvasStore()（保持兼容性）
-  constructor(store: CanvasStore = useCanvasStore()) {
-    this.store = store; // 注入 store 实例
+  constructor(
+    store: CanvasStore,
+    transformHandler: TransformHandler,
+    viewportHandler: ViewportHandler
+  ) {
+    // 赋值依赖到私有属性（供内部方法使用）
+    this.store = store;
+    this.transformHandler = transformHandler;
+    this.viewportHandler = viewportHandler;
+
+    // 关键：绑定事件方法的 this 指向（避免事件触发时丢失实例上下文）
+    this.handleGlobalMousedown = this.handleGlobalMousedown.bind(this);
   }
 
   init(editor: HTMLElement | null) {
@@ -40,17 +56,24 @@ export class TextSelectionHandler {
   }
 
   /**
-   * 双击进入编辑状态
-   * @param event 鼠标事件
-   * @param node 文本节点数据
+   * 进入文本编辑态（接收 id 参数）
+   * @param e 鼠标事件
+   * @param id 文本节点 ID
    */
-  enterEditing(event: MouseEvent, node: TextState) {
+  public enterEditing(event: MouseEvent, id: string) {
+    if (this.transformHandler.isTransforming || this.viewportHandler.isPanning) {
+      return;
+    }
+
+    // 通过 id 获取节点
+    const node = this.store.nodes[id] as TextState;
+    if (!node || node.type !== NodeType.TEXT) return;
+
     event.stopPropagation();
-    const isSelected = this.store.activeElementIds.has(node.id);
+    const isSelected = this.store.activeElementIds.has(id);
     if (!isSelected) return;
 
     this.isEditing = true;
-
     nextTick(() => {
       if (this.editor) {
         this.editor.focus();
@@ -61,6 +84,11 @@ export class TextSelectionHandler {
         selection?.addRange(range);
       }
     });
+  }
+
+  exitEditing(){
+    this.isEditing = false;
+    this.updateGlobalSelection(null);
   }
 
   /**
@@ -90,18 +118,19 @@ export class TextSelectionHandler {
    * 处理鼠标抬起并计算选区
    * @param e 鼠标事件
    */
-  handleMouseUpAndSelection(e: MouseEvent, node: TextState) {
+  handleMouseUpAndSelection(e: MouseEvent, id:string) {
     if (this.isEditing) {
       e.stopPropagation();
-      this.handleSelectionChange(node); // 传入 node 参数
+      this.handleSelectionChange(id); // 传入 node 参数
     }
   }
 
-  /**
-   * 处理文本选区变化
-   * @param node 文本节点数据
+   /**
+   * 处理文本选区变化（接收 id 参数）
+   * @param id 文本节点 ID
    */
-  handleSelectionChange(node: TextState) {
+   public handleSelectionChange(id: string) {
+    const node = this.store.nodes[id] as TextState;
     if (!this.isEditing || !this.editor) {
       this.currentSelection = null;
       return;
@@ -164,7 +193,8 @@ export class TextSelectionHandler {
    * @param e 鼠标事件
    * @param node 文本节点数据
    */
-  handleTextBoxClick(e: MouseEvent, node: TextState) {
+  handleTextBoxClick(e: MouseEvent, id: string) {
+    const node = this.store.nodes[id] as TextState;
     if (!this.isEditing) {
       // 阻止文本框聚焦（避免单击时光标出现，不进入编辑态）
       e.preventDefault();
@@ -263,18 +293,19 @@ export class TextSelectionHandler {
   }
 
   /**
-   * 处理失焦事件
-   * @param node 文本节点数据
+   * 处理文本节点失焦（接收 id 参数）
+   * @param id 文本节点 ID
    */
-  handleBlur(node: TextState) {
+  public handleBlur(id: string) {
+    const node = this.store.nodes[id];
+    if (!node) return;
+
     if (this.isClickingToolbar) {
-      // 点击工具栏 → 保留编辑态+重新聚焦
       this.editor?.focus();
     } else {
-      // 点击其他区域 → 正常退出
       this.isEditing = false;
-      if (!this.store.activeElementIds.has(node.id)) {
-        this.store.updateGlobalTextSelection(null);
+      if (!this.store.activeElementIds.has(id)) {
+        this.updateGlobalSelection(null);
       }
     }
   }
@@ -284,9 +315,10 @@ export class TextSelectionHandler {
    * @param node 文本节点数据
    * @returns 是否为激活节点
    */
-  isActiveNode(node: TextState): boolean {
+  isActiveNode(id: string): boolean {
+    const node = this.store.nodes[id];
     const activeNode = this.store.activeElements[0];
-    const baseActive = activeNode?.id === node.id;
+    const baseActive = activeNode?.id === node!.id;
     // 编辑态时，强制返回true（锁定激活状态）
     return this.isEditing ? true : baseActive;
   }
@@ -301,6 +333,3 @@ export class TextSelectionHandler {
     this.editor = null;
   }
 }
-
-// 单例导出（确保全局唯一实例）
-export const textSelectionHandler = new TextSelectionHandler();
