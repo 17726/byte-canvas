@@ -420,9 +420,7 @@ export class TransformHandler {
     if (shouldEnforceRatio) {
       // 确定等比基准（图片用原比例，其他用当前初始比例）
       const safeStartHeight = Math.abs(startHeight) < 1e-6 ? MIN_NODE_SIZE : startHeight;
-      const baseRatio = isImageOriginalRatio
-        ? startWidth / safeStartHeight
-        : startWidth / safeStartHeight;
+      const baseRatio = startWidth / safeStartHeight;
 
       let ratioBasedWidth = newWidth;
       let ratioBasedHeight = newHeight;
@@ -450,7 +448,7 @@ export class TransformHandler {
       }
 
       // 圆形特殊规则：Shift强制正圆（宽高相等）
-      if (nodeType === NodeType.CIRCLE && shouldEnforceRatio) {
+      if (nodeType === NodeType.CIRCLE) {
         const avgSize = (Math.abs(ratioBasedWidth) + Math.abs(ratioBasedHeight)) / 2;
         ratioBasedWidth = avgSize * Math.sign(ratioBasedWidth || 1);
         ratioBasedHeight = avgSize * Math.sign(ratioBasedHeight || 1);
@@ -808,7 +806,8 @@ export class TransformHandler {
       if (nodeType === NodeType.IMAGE) {
         // 图片：四角拖拽=原比例等比，Shift无效果，Alt=中心点等比
         if (isCorner) {
-          const originalImgRatio = startState.width / startState.height;
+          const safeHeight = Math.abs(startState.height) < 1e-6 ? MIN_NODE_SIZE : startState.height;
+          const originalImgRatio = startState.width / safeHeight;
           newNodeHeight = newNodeWidth / originalImgRatio;
         }
         if (isAltPressed) {

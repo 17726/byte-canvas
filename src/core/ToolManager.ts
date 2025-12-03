@@ -456,8 +456,10 @@ export class ToolManager {
    * @param e 鼠标事件
    */
   handleRotateHandleDown(e: MouseEvent): void {
+    if (!this.forceProtectEvent(e)) return;
     e.stopPropagation();
     e.preventDefault();
+    e.stopImmediatePropagation();
     this.rotationHandler.startRotate(e);
   }
 

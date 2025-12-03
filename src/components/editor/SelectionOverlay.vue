@@ -232,11 +232,11 @@ const rotateHandleStyle = computed(() => {
   if (!selectedNodes.value[0]) return {};
   const rotation = selectedNodes.value.length === 1 ? selectedNodes.value[0].transform.rotation : 0;
 
-  // 定位在下边下方30px处（距离选中框底部外侧30px），水平居中
+  // 定位在下边下方35px处（距离选中框底部外侧35px），水平居中
   // 可根据需求调整 bottom 值（负值越大，距离越远）
   return {
     transform: `translateX(-50%) rotate(${-rotation}deg) scale(${scale})`, // 水平居中 + 反向旋转（保持正立） + 缩放
-    bottom: '-34px', // 核心修改：距离选中框底部外侧35px（默认-10px，改为-30px即向下移动20px）
+    bottom: '-35px', // 核心修改：距离选中框底部外侧35px（默认-10px，改为-30px即向下移动20px）
     left: '50%', // 水平居中基准点
   };
 });

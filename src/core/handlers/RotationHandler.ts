@@ -47,6 +47,7 @@ export class RotationHandler {
     const firstNodeId = selectedNodeIds[0];
     if (!firstNodeId) return;
     const firstNode = this.store.nodes[firstNodeId] as BaseNodeState;
+    if (!firstNode) return; // 新增：空值校验，避免后续错误
     const firstNodeAbsTransform =
       this.store.getAbsoluteTransform(firstNodeId) || firstNode.transform;
     const nodeCenter = {
