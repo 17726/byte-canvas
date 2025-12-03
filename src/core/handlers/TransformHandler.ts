@@ -165,8 +165,6 @@ export class TransformHandler {
     const node = this.store.nodes[nodeId];
     if (!node || node.isLocked) return;
 
-    // 如果当前节点不在选中列表中，则单独选中它
-
     // 标记交互中
     this.store.isInteracting = true;
 
@@ -309,7 +307,7 @@ export class TransformHandler {
   }
 
   /**
-   * 更新单节点缩放
+   * 更新单节点缩放（适配表格规则）
    * @param e 鼠标事件
    */
   updateResize(e: MouseEvent) {
@@ -334,59 +332,95 @@ export class TransformHandler {
     const dx = (e.clientX - startX) / this.store.viewport.zoom;
     const dy = (e.clientY - startY) / this.store.viewport.zoom;
 
-    // 根据控制点计算新尺寸和位置
+    // 初始默认值（自由缩放）
     let newWidth = startWidth;
     let newHeight = startHeight;
     let newX = startNodeX;
     let newY = startNodeY;
 
+    // 区分“四角拖拽”/“四边拖拽”
+    const isCorner = handle === 'nw' || handle === 'ne' || handle === 'se' || handle === 'sw';
+    const nodeType = node.type;
+
+    // 步骤1：根据handle计算基础的尺寸/位置（自由缩放）
     switch (handle) {
-      case 'nw': // 左上
+      case 'nw': // 左上（四角）
         newX = startNodeX + dx;
         newY = startNodeY + dy;
         newWidth = startWidth - dx;
         newHeight = startHeight - dy;
         break;
-      case 'n': // 上
+      case 'n': // 上（四边）
         newY = startNodeY + dy;
         newHeight = startHeight - dy;
         break;
-      case 'ne': // 右上
+      case 'ne': // 右上（四角）
         newY = startNodeY + dy;
         newWidth = startWidth + dx;
         newHeight = startHeight - dy;
         break;
-      case 'e': // 右
+      case 'e': // 右（四边）
         newWidth = startWidth + dx;
         break;
-      case 'se': // 右下
+      case 'se': // 右下（四角）
         newWidth = startWidth + dx;
         newHeight = startHeight + dy;
         break;
-      case 's': // 下
+      case 's': // 下（四边）
         newHeight = startHeight + dy;
         break;
-      case 'sw': // 左下
+      case 'sw': // 左下（四角）
         newX = startNodeX + dx;
         newWidth = startWidth - dx;
         newHeight = startHeight + dy;
         break;
-      case 'w': // 左
+      case 'w': // 左（四边）
         newX = startNodeX + dx;
         newWidth = startWidth - dx;
         break;
     }
 
-    // 等比缩放处理：
-    // - 普通图形（矩形/文本）：四角默认自由，Shift/Ctrl 强制等比
-    // - 图片/圆形：四角默认等比，Shift/Ctrl 也保持等比
-    const isCorner = handle === 'nw' || handle === 'ne' || handle === 'se' || handle === 'sw';
-    const isImageOrCircle = node.type === NodeType.IMAGE || node.type === NodeType.CIRCLE;
-    const shouldEnforceRatio = isImageOrCircle ? (isCorner || e.shiftKey || e.ctrlKey) : (e.shiftKey || e.ctrlKey);
+    // 步骤2：根据“图形类型+拖拽类型+Shift键”确定是否等比缩放
+    let shouldEnforceRatio = false;
+    let isImageOriginalRatio = false; // 图片是否用“原比例”等比
+    const isShiftPressed = e.shiftKey;
 
+    // 基础规则：图形类型+拖拽类型的默认等比
+    switch (nodeType) {
+      case NodeType.IMAGE:
+        // 图片：四角拖拽 → 原比例等比缩放
+        shouldEnforceRatio = isCorner;
+        isImageOriginalRatio = isCorner;
+        break;
+      case NodeType.RECT:
+      case NodeType.TEXT:
+      case NodeType.CIRCLE:
+        // 矩形/文本/圆形：默认自由缩放
+        shouldEnforceRatio = false;
+        break;
+    }
+
+    // 叠加Shift键规则
+    switch (nodeType) {
+      case NodeType.RECT:
+      case NodeType.TEXT:
+        // 矩形/文本：Shift → 当前比例等比缩放
+        if (isShiftPressed) shouldEnforceRatio = true;
+        break;
+      case NodeType.CIRCLE:
+        // 圆形：Shift → 强制正圆（等比）
+        if (isShiftPressed) shouldEnforceRatio = true;
+        break;
+      case NodeType.IMAGE:
+        // 图片：Shift无效果
+        break;
+    }
+
+    // 步骤3：执行等比缩放计算
     if (shouldEnforceRatio) {
+      // 确定等比基准（图片用原比例，其他用当前初始比例）
       const safeStartHeight = Math.abs(startHeight) < 1e-6 ? MIN_NODE_SIZE : startHeight;
-      const originalRatio = startWidth / safeStartHeight;
+      const baseRatio = startWidth / safeStartHeight;
 
       let ratioBasedWidth = newWidth;
       let ratioBasedHeight = newHeight;
@@ -394,8 +428,9 @@ export class TransformHandler {
       const isHorizontal = handle.includes('e') || handle.includes('w');
       const isVertical = handle.includes('n') || handle.includes('s');
 
+      // 计算等比后的尺寸
       if (isHorizontal && isVertical) {
-        // 角点缩放：保持原始比例
+        // 角点缩放：按缩放比例最大的维度对齐
         const widthRatio = newWidth / startWidth;
         const heightRatio = newHeight / safeStartHeight;
         const scaleRatio =
@@ -406,13 +441,20 @@ export class TransformHandler {
         ratioBasedHeight = startHeight * scaleRatio;
       } else if (isHorizontal) {
         // 水平缩放：按宽度等比调整高度
-        ratioBasedHeight = ratioBasedWidth / originalRatio;
+        ratioBasedHeight = ratioBasedWidth / baseRatio;
       } else if (isVertical) {
         // 垂直缩放：按高度等比调整宽度
-        ratioBasedWidth = ratioBasedHeight * originalRatio;
+        ratioBasedWidth = ratioBasedHeight * baseRatio;
       }
 
-      // 调整位置以保持缩放中心
+      // 圆形特殊规则：Shift强制正圆（宽高相等）
+      if (nodeType === NodeType.CIRCLE) {
+        const avgSize = (Math.abs(ratioBasedWidth) + Math.abs(ratioBasedHeight)) / 2;
+        ratioBasedWidth = avgSize * Math.sign(ratioBasedWidth || 1);
+        ratioBasedHeight = avgSize * Math.sign(ratioBasedHeight || 1);
+      }
+
+      // 调整位置（适配等比后的尺寸）
       if (handle === 'nw') {
         newX = startNodeX + startWidth - ratioBasedWidth;
         newY = startNodeY + startHeight - ratioBasedHeight;
@@ -422,32 +464,35 @@ export class TransformHandler {
         newX = startNodeX + startWidth - ratioBasedWidth;
       }
 
+      // 覆盖为等比后的尺寸
       newWidth = ratioBasedWidth;
       newHeight = ratioBasedHeight;
     }
 
-    // 圆形：强制等比时保持正圆
-    if (node.type === NodeType.CIRCLE && shouldEnforceRatio) {
-      const avgSize = (Math.abs(newWidth) + Math.abs(newHeight)) / 2;
-      newWidth = avgSize * Math.sign(newWidth || 1);
-      newHeight = avgSize * Math.sign(newHeight || 1);
+    // 步骤4：处理Alt键的“中心点缩放”
+    const isAltPressed = e.altKey;
+    if (isAltPressed) {
+      // 计算初始中心点
+      const startCenterX = startNodeX + startWidth / 2;
+      const startCenterY = startNodeY + startHeight / 2;
 
-      // 调整位置以保持缩放中心
-      if (handle === 'nw') {
-        newX = startNodeX + startWidth - avgSize;
-        newY = startNodeY + startHeight - avgSize;
-      } else if (handle === 'ne') {
-        newY = startNodeY + startHeight - avgSize;
-      } else if (handle === 'sw') {
-        newX = startNodeX + startWidth - avgSize;
+      // 图片Alt规则：中心点+等比缩放
+      if (nodeType === NodeType.IMAGE) {
+        const originalRatio =
+          startWidth / (Math.abs(startHeight) < 1e-6 ? MIN_NODE_SIZE : startHeight);
+        newHeight = newWidth / originalRatio;
       }
+
+      // 重置位置为“中心点对齐”
+      newX = startCenterX - newWidth / 2;
+      newY = startCenterY - newHeight / 2;
     }
 
-    // 限制最小尺寸
+    // 步骤5：最小尺寸限制
     const clampedWidth = Math.max(MIN_NODE_SIZE, Math.abs(newWidth)) * Math.sign(newWidth || 1);
     const clampedHeight = Math.max(MIN_NODE_SIZE, Math.abs(newHeight)) * Math.sign(newHeight || 1);
 
-    // 如果发生了clamp，且handle影响位置，则调整x/y
+    // 尺寸 clamp 后调整位置（仅影响拖拽侧）
     if (Math.abs(newWidth) < MIN_NODE_SIZE) {
       switch (handle) {
         case 'nw':
@@ -467,7 +512,7 @@ export class TransformHandler {
       }
     }
 
-    // 文本节点仅调整容器尺寸，不缩放字体
+    // 步骤6：应用缩放（文本仅调整容器）
     if (node.type === NodeType.TEXT) {
       this.store.updateNode(nodeId, {
         transform: {
@@ -616,7 +661,7 @@ export class TransformHandler {
   }
 
   /**
-   * 更新多选缩放
+   * 更新多选缩放（适配表格规则）
    * @param e 鼠标事件
    */
   updateMultiResize(e: MouseEvent) {
@@ -636,7 +681,7 @@ export class TransformHandler {
     const dx = (e.clientX - startMouseX) / this.store.viewport.zoom;
     const dy = (e.clientY - startMouseY) / this.store.viewport.zoom;
 
-    // 计算缩放后的大框尺寸和位置
+    // 步骤1：计算大框的基础尺寸/位置（自由缩放）
     const newBounds = { ...startBounds };
     switch (handle) {
       case 'nw': // 左上
@@ -675,8 +720,23 @@ export class TransformHandler {
         break;
     }
 
-    // Shift/Ctrl 键等比缩放处理
-    if (e.shiftKey || e.ctrlKey) {
+    // 步骤2：根据“Shift键+图形类型”确定等比规则
+    const isShiftPressed = e.shiftKey;
+    const isAltPressed = e.altKey;
+    const isCorner = handle === 'nw' || handle === 'ne' || handle === 'se' || handle === 'sw';
+
+    // 大框等比规则（仅影响非图片节点，图片单独处理）
+    let shouldEnforceBoundsRatio = false;
+    if (isShiftPressed) {
+      // 多选时Shift：非图片节点等比，图片忽略
+      shouldEnforceBoundsRatio = nodeIds.some((id) => {
+        const node = this.store.nodes[id];
+        return node?.type !== NodeType.IMAGE;
+      });
+    }
+
+    // 步骤3：大框等比缩放计算
+    if (shouldEnforceBoundsRatio) {
       const safeStartHeight =
         Math.abs(startBounds.height) < 1e-6 ? MIN_NODE_SIZE : startBounds.height;
       const originalRatio = startBounds.width / safeStartHeight;
@@ -688,7 +748,6 @@ export class TransformHandler {
       const isVertical = handle.includes('n') || handle.includes('s');
 
       if (isHorizontal && isVertical) {
-        // 角点缩放：保持原始比例
         const widthRatio = newBounds.width / startBounds.width;
         const heightRatio = newBounds.height / safeStartHeight;
         const scaleRatio =
@@ -698,14 +757,12 @@ export class TransformHandler {
         ratioBasedWidth = startBounds.width * scaleRatio;
         ratioBasedHeight = startBounds.height * scaleRatio;
       } else if (isHorizontal) {
-        // 水平缩放：按宽度等比调整高度
         ratioBasedHeight = ratioBasedWidth / originalRatio;
       } else if (isVertical) {
-        // 垂直缩放：按高度等比调整宽度
         ratioBasedWidth = ratioBasedHeight * originalRatio;
       }
 
-      // 调整位置以保持缩放中心
+      // 调整大框位置
       if (handle === 'nw') {
         newBounds.x = startBounds.x + startBounds.width - ratioBasedWidth;
         newBounds.y = startBounds.y + startBounds.height - ratioBasedHeight;
@@ -713,78 +770,74 @@ export class TransformHandler {
         newBounds.y = startBounds.y + startBounds.height - ratioBasedHeight;
       } else if (handle === 'sw') {
         newBounds.x = startBounds.x + startBounds.width - ratioBasedWidth;
-      } else if (handle === 'se') {
-        newBounds.x = startBounds.x;
-        newBounds.y = startBounds.y;
-      } else if (handle === 'n') {
-        newBounds.y = startBounds.y + startBounds.height - ratioBasedHeight;
-        newBounds.x = startBounds.x + (startBounds.width - ratioBasedWidth) / 2;
-      } else if (handle === 's') {
-        newBounds.x = startBounds.x + (startBounds.width - ratioBasedWidth) / 2;
-      } else if (handle === 'e') {
-        newBounds.y = startBounds.y + (startBounds.height - ratioBasedHeight) / 2;
-      } else if (handle === 'w') {
-        newBounds.x = startBounds.x + startBounds.width - ratioBasedWidth;
-        newBounds.y = startBounds.y + (startBounds.height - ratioBasedHeight) / 2;
       }
 
       newBounds.width = ratioBasedWidth;
       newBounds.height = ratioBasedHeight;
     }
 
-    // 限制最小尺寸
-    const clampedWidth = Math.max(MIN_NODE_SIZE, newBounds.width);
-    const clampedHeight = Math.max(MIN_NODE_SIZE, newBounds.height);
-
-    // 如果发生了clamp，且handle影响位置，则调整x/y
-    if (clampedWidth !== newBounds.width) {
-      switch (handle) {
-        case 'nw':
-        case 'w':
-        case 'sw':
-          newBounds.x = startBounds.x + startBounds.width - MIN_NODE_SIZE;
-          break;
-      }
+    // 步骤4：Alt中心点缩放（大框中心点）
+    if (isAltPressed) {
+      const startBoundsCenterX = startBounds.x + startBounds.width / 2;
+      const startBoundsCenterY = startBounds.y + startBounds.height / 2;
+      newBounds.x = startBoundsCenterX - newBounds.width / 2;
+      newBounds.y = startBoundsCenterY - newBounds.height / 2;
     }
-    if (clampedHeight !== newBounds.height) {
-      switch (handle) {
-        case 'nw':
-        case 'n':
-        case 'ne':
-          newBounds.y = startBounds.y + startBounds.height - MIN_NODE_SIZE;
-          break;
-      }
-    }
-    newBounds.width = clampedWidth;
-    newBounds.height = clampedHeight;
 
-    // 遍历所有节点同步更新
+    // 步骤5：最小尺寸限制
+    newBounds.width = Math.max(MIN_NODE_SIZE, newBounds.width);
+    newBounds.height = Math.max(MIN_NODE_SIZE, newBounds.height);
+
+    // 步骤6：遍历节点应用缩放（适配各图形规则）
     nodeIds.forEach((id) => {
       const startState = nodeStartStates[id];
       const node = this.store.nodes[id] as BaseNodeState;
       if (!node || !startState) return;
 
-      // 按比例计算新尺寸和位置
-      const scaleX = newBounds.width / startBounds.width;
-      const scaleY = newBounds.height / startBounds.height;
+      const nodeType = node.type;
+      let finalScaleX = newBounds.width / startBounds.width;
+      let finalScaleY = newBounds.height / startBounds.height;
+      let newNodeWidth = startState.width * finalScaleX;
+      let newNodeHeight = startState.height * finalScaleY;
+      let newNodeX = newBounds.x + startState.offsetX * newBounds.width;
+      let newNodeY = newBounds.y + startState.offsetY * newBounds.height;
 
-      // Shift/Ctrl 键等比缩放时使用统一缩放比例
-      let finalScaleX = scaleX;
-      let finalScaleY = scaleY;
-      if (e.shiftKey || e.ctrlKey) {
-        const uniformScale = Math.max(Math.abs(scaleX), Math.abs(scaleY));
-        finalScaleX = uniformScale;
-        finalScaleY = uniformScale;
+      // 单独处理图片规则
+      if (nodeType === NodeType.IMAGE) {
+        // 图片：四角拖拽=原比例等比，Shift无效果，Alt=中心点等比
+        if (isCorner) {
+          const safeHeight = Math.abs(startState.height) < 1e-6 ? MIN_NODE_SIZE : startState.height;
+          const originalImgRatio = startState.width / safeHeight;
+          newNodeHeight = newNodeWidth / originalImgRatio;
+        }
+        if (isAltPressed) {
+          const startNodeCenterX = startState.x + startState.width / 2;
+          const startNodeCenterY = startState.y + startState.height / 2;
+          newNodeX = startNodeCenterX - newNodeWidth / 2;
+          newNodeY = startNodeCenterY - newNodeHeight / 2;
+        }
       }
 
-      const newWidth = Math.max(MIN_NODE_SIZE, startState.width * finalScaleX);
-      const newHeight = Math.max(MIN_NODE_SIZE, startState.height * finalScaleY);
-      const newX = newBounds.x + startState.offsetX * newBounds.width;
-      const newY = newBounds.y + startState.offsetY * newBounds.height;
+      // 圆形规则：强制正圆
+      if (nodeType === NodeType.CIRCLE) {
+        const avgSize = (Math.abs(newNodeWidth) + Math.abs(newNodeHeight)) / 2;
+        newNodeWidth = avgSize * Math.sign(newNodeWidth || 1);
+        newNodeHeight = avgSize * Math.sign(newNodeHeight || 1);
+      }
+
+      // 最小尺寸限制
+      newNodeWidth = Math.max(MIN_NODE_SIZE, newNodeWidth);
+      newNodeHeight = Math.max(MIN_NODE_SIZE, newNodeHeight);
 
       // 更新节点
       this.store.updateNode(id, {
-        transform: { ...node.transform, x: newX, y: newY, width: newWidth, height: newHeight },
+        transform: {
+          ...node.transform,
+          x: newNodeX,
+          y: newNodeY,
+          width: newNodeWidth,
+          height: newNodeHeight,
+        },
       });
     });
   }

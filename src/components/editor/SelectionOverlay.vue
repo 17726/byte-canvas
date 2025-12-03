@@ -1,7 +1,7 @@
 <template>
   <div v-if="hasSelectedNodes && !allNodesLocked" class="selection-container">
-    <!-- 多选时：显示每个元素的单独选中框 -->
-    <template v-if="selectedNodes.length > 1">
+    <!-- 组合编辑模式下：为选中的子元素始终显示单独选中框（包括单选） -->
+    <template v-if="isEditingGroup && selectedNodes.length > 0">
       <div
         v-for="node in selectedNodes"
         :key="node.id"
@@ -24,6 +24,27 @@
         :style="getHandleStyle(handle)"
         @mousedown.stop.prevent="onHandleDown($event, handle)"
       ></div>
+
+      <!-- 旋转控制点（下边下方一段距离中间） -->
+      <div
+        class="rotate-handle"
+        :style="rotateHandleStyle"
+        @mousedown.stop.prevent="onRotateHandleDown"
+        title="拖拽旋转（绕自身中心）"
+      >
+        <svg
+          width="16"
+          height="16"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="#1890ff"
+          stroke-width="2"
+        >
+          <path
+            d="M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15"
+          />
+        </svg>
+      </div>
     </div>
   </div>
 </template>
@@ -33,7 +54,7 @@ import { computed, inject, type Ref } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
 import type { ToolManager } from '@/core/ToolManager';
 import type { ResizeHandle } from '@/types/editor';
-import type { BaseNodeState } from '@/types/state';
+import { NodeType, type BaseNodeState, type NodeState } from '@/types/state';
 
 const store = useCanvasStore();
 const toolManagerRef = inject<Ref<ToolManager | null>>('toolManager');
@@ -44,13 +65,33 @@ if (!toolManagerRef) {
 
 const handles: ResizeHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
 
-// 1. 多选判断：选中节点数 ≥ 1 且未全部锁定
-const hasSelectedNodes = computed(() => store.activeElements.length > 0);
+// 是否处于组合编辑模式
+const isEditingGroup = computed(() => !!store.editingGroupId);
+
+// 1. 可见性判断：
+// - 普通模式：有选中节点时显示
+// - 组合编辑模式：即使没有选中子节点，也始终显示组合外框
+const hasSelectedNodes = computed(() => store.activeElements.length > 0 || !!store.editingGroupId);
+
+// 当前用于计算“大框”的目标节点：
+// - 若处于组合编辑模式：固定使用正在编辑的组合节点
+// - 否则：使用当前选中的节点列表
+const overlayNodes = computed<BaseNodeState[]>(() => {
+  const editingId = store.editingGroupId;
+  if (editingId) {
+    const node = store.nodes[editingId];
+    if (node) {
+      return [node as BaseNodeState];
+    }
+  }
+  return store.activeElements as BaseNodeState[];
+});
+
 const allNodesLocked = computed(() =>
-  store.activeElements.every((node) => (node as BaseNodeState).isLocked)
+  overlayNodes.value.every((node) => (node as BaseNodeState).isLocked)
 );
 
-// 选中的节点列表
+// 选中的节点列表（仅用于绘制每个子元素的单独虚线框）
 const selectedNodes = computed(() => store.activeElements as BaseNodeState[]);
 
 // 单个元素选中框样式（使用绝对坐标，考虑父组合位置）
@@ -120,10 +161,50 @@ const getRotatedBounds = (node: BaseNodeState) => {
   return { minX, maxX, minY, maxY };
 };
 
+// 组合编辑模式下：实时计算当前组合子元素的包围盒
+const editingGroupBounds = computed(() => {
+  const editingId = store.editingGroupId;
+  if (!editingId) return null;
+
+  const group = store.nodes[editingId];
+  if (!group || group.type !== NodeType.GROUP) return null;
+
+  const childNodes = group.children
+    .map((id) => store.nodes[id])
+    .filter((node): node is NodeState => Boolean(node));
+
+  if (childNodes.length === 0) return null;
+
+  let minX = Infinity,
+    maxX = -Infinity,
+    minY = Infinity,
+    maxY = -Infinity;
+
+  childNodes.forEach((child) => {
+    const bounds = getRotatedBounds(child as BaseNodeState);
+    minX = Math.min(minX, bounds.minX);
+    maxX = Math.max(maxX, bounds.maxX);
+    minY = Math.min(minY, bounds.minY);
+    maxY = Math.max(maxY, bounds.maxY);
+  });
+
+  return {
+    x: minX,
+    y: minY,
+    width: maxX - minX,
+    height: maxY - minY,
+    rotation: group.transform.rotation || 0,
+  };
+});
+
 // 2. 计算多选大框的包围盒（核心：包裹所有选中节点的最小矩形，考虑旋转）
 // 使用绝对坐标，支持组合内子节点的正确显示
 const selectionBounds = computed(() => {
-  const nodes = store.activeElements as BaseNodeState[];
+  if (editingGroupBounds.value) {
+    return editingGroupBounds.value;
+  }
+
+  const nodes = overlayNodes.value;
   if (nodes.length === 0) return null;
   if (!nodes[0]) return null;
 
@@ -137,6 +218,7 @@ const selectionBounds = computed(() => {
       y: transform.y,
       width: transform.width,
       height: transform.height,
+      rotation: node.transform.rotation || 0,
     };
   }
 
@@ -159,6 +241,7 @@ const selectionBounds = computed(() => {
     y: minY,
     width: maxX - minX,
     height: maxY - minY,
+    rotation: 0,
   };
 });
 
@@ -167,9 +250,7 @@ const overlayStyle = computed(() => {
   const bounds = selectionBounds.value;
   if (!bounds) return {};
 
-  const nodes = store.activeElements as BaseNodeState[];
-  // 单选时，选中框跟随节点旋转
-  const rotation = nodes.length === 1 && nodes[0] ? nodes[0].transform.rotation : 0;
+  const rotation = 'rotation' in bounds ? bounds.rotation || 0 : 0;
 
   return {
     transform: `translate(${bounds.x}px, ${bounds.y}px) rotate(${rotation}deg)`,
@@ -202,6 +283,23 @@ const getHandleStyle = (handle: ResizeHandle) => {
   };
 };
 
+// 旋转控制点样式（下边下方一段距离中间，跟随选中框旋转）
+const rotateHandleStyle = computed(() => {
+  const bounds = selectionBounds.value;
+  if (!bounds) return {};
+
+  const scale = 1 / store.viewport.zoom;
+  if (!selectedNodes.value[0]) return {};
+  const rotation = selectedNodes.value.length === 1 ? selectedNodes.value[0].transform.rotation : 0;
+
+  // 定位在下边下方35px处（距离选中框底部外侧35px），水平居中
+  // 可根据需求调整 bottom 值（负值越大，距离越远）
+  return {
+    transform: `translateX(-50%) rotate(${-rotation}deg) scale(${scale})`, // 水平居中 + 反向旋转（保持正立） + 缩放
+    bottom: '-35px', // 核心修改：距离选中框底部外侧35px（默认-10px，改为-30px即向下移动20px）
+    left: '50%', // 水平居中基准点
+  };
+});
 // 5. 触发多选缩放
 const onHandleDown = (e: MouseEvent, handle: ResizeHandle) => {
   const bounds = selectionBounds.value;
@@ -219,6 +317,12 @@ const onHandleDown = (e: MouseEvent, handle: ResizeHandle) => {
     // 多选时，调用多选缩放初始化方法
     toolManagerRef.value.handleMultiResizeDown(e, handle, bounds, nodeIds);
   }
+};
+
+// 旋转控制点鼠标按下事件
+const onRotateHandleDown = (e: MouseEvent) => {
+  if (!toolManagerRef?.value) return;
+  toolManagerRef.value.handleRotateHandleDown(e);
 };
 </script>
 
@@ -317,4 +421,26 @@ const onHandleDown = (e: MouseEvent, handle: ResizeHandle) => {
   transform: translateY(-50%);
   cursor: w-resize;
 }
+
+/* 旋转控制点样式 */
+.rotate-handle {
+  position: absolute;
+  width: 21px;
+  height: 21px;
+  background-color: #fff;
+  border: 1px solid #1890ff;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  z-index: 1001; /* 高于缩放控制点 */
+  cursor: grab;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.rotate-handle:active {
+  cursor: grabbing;
+}
 </style>
+给出修改后的代码

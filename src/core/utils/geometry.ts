@@ -19,7 +19,7 @@
  * - calculateTextResize: 计算文本缩放后的位置和尺寸
  */
 
-import type { BaseNodeState, ViewportState } from '@/types/state';
+import type { BaseNodeState, ViewportState, NodeType } from '@/types/state';
 import type { ResizeHandle } from '@/types/editor';
 import { MIN_NODE_SIZE } from '@/config/defaults';
 
@@ -145,131 +145,206 @@ export function worldToClient(
  * @param baseNode 待检测的节点
  * @returns 是否相交
  */
-export function isNodeInRect(
+
+/**
+ * 判断旋转后的节点是否与目标矩形相交（基于周长采样）
+ * @param maxRectWorldX 目标矩形世界坐标系最大X
+ * @param maxRectWorldY 目标矩形世界坐标系最大Y
+ * @param minRectWorldX 目标矩形世界坐标系最小X
+ * @param minRectWorldY 目标矩形世界坐标系最小Y
+ * @param baseNode 待判断的节点（支持旋转）
+ * @param sampleDensity 采样密度（默认36个点，值越大越精准但性能略降，建议18-72）
+ * @returns 是否相交
+ */
+
+/**
+ * 精确 SAT 相交检测（接触不计为相交）
+ * 支持：矩形（旋转）、圆、椭圆（旋转）
+ */
+
+/**
+ * SAT算法：轴对齐选框 与 任意旋转矩形/任意旋转椭圆 的碰撞检测
+ * 支持双方任意旋转角度，只要有相交（哪怕边缘接触）就返回true
+ * @param maxRectWorldX 选框世界坐标最大X
+ * @param maxRectWorldY 选框世界坐标最大Y
+ * @param minRectWorldX 选框世界坐标最小X
+ * @param minRectWorldY 选框世界坐标最小Y
+ * @param baseNode 待判断节点（任意旋转的rect/image/text/group 或 任意旋转的circle/椭圆）
+ * @returns 是否碰撞（相交/边缘接触）
+ */
+
+export function isNodeHitRectSAT(
   maxRectWorldX: number,
   maxRectWorldY: number,
   minRectWorldX: number,
   minRectWorldY: number,
   baseNode: BaseNodeState
-) {
-  // 1. 计算节点包围盒（基础：无旋转场景）
-  const nodeX = baseNode.transform.x;
-  const nodeY = baseNode.transform.y;
-  const nodeW = baseNode.transform.width;
-  const nodeH = baseNode.transform.height;
-  const nodeMinX = nodeX;
-  const nodeMaxX = nodeX + nodeW;
-  const nodeMinY = nodeY;
-  const nodeMaxY = nodeY + nodeH;
+): boolean {
+  const { transform } = baseNode;
+  const epsilon = 1e-9;
 
-  // 2. 基础矩形交集判断（快速排斥：无交集直接返回false）
-  const isOverlap =
-    nodeMinX <= maxRectWorldX &&
-    nodeMaxX >= minRectWorldX &&
-    nodeMinY <= maxRectWorldY &&
-    nodeMaxY >= minRectWorldY;
+  // 1. 基础数据准备
+  const rad = (transform.rotation * Math.PI) / 180;
+  const rx = transform.width / 2;
+  const ry = transform.height / 2;
+  const centerB = { x: transform.x + rx, y: transform.y + ry };
 
-  if (!isOverlap) return false;
+  // AABB（选框）的四个世界坐标顶点
+  const rectA = [
+    { x: minRectWorldX, y: minRectWorldY },
+    { x: maxRectWorldX, y: minRectWorldY },
+    { x: maxRectWorldX, y: maxRectWorldY },
+    { x: minRectWorldX, y: maxRectWorldY },
+  ];
 
-  // 3. 按节点类型细化判断
-  switch (baseNode.type) {
-    case 'rect':
-    case 'image':
-    case 'text':
-    case 'group':
-      // 矩形类节点（包括组合）：包围盒交集即判定为命中
-      return true;
+  const isEllipse = baseNode.type === 'circle';
 
-    case 'circle':
-      // 区分正圆（圆）和非正圆（椭圆）处理
-      if (baseNode.transform.width === baseNode.transform.height) {
-        // 正圆：圆心+半径判断
-        const cx = nodeX + nodeW / 2; // 圆心X
-        const cy = nodeY + nodeH / 2; // 圆心Y
-        const r = nodeW / 2; // 正圆半径（宽高相等，直接取一半）
+  // ========================================================================
+  // 分支 1：椭圆/圆形处理 (使用逆变换 + 单位圆检测)
+  // ========================================================================
+  if (isEllipse) {
+    // 核心思路：将选框(RectA)变换到椭圆的"局部归一化空间"。
+    // 在这个空间里，椭圆变成了圆心(0,0)、半径为1的单位圆。
+    // 我们只需判断变换后的四边形是否与单位圆相交。
 
-        // 找到矩形上离圆心最近的点
-        const closestX = Math.max(minRectWorldX, Math.min(cx, maxRectWorldX));
-        const closestY = Math.max(minRectWorldY, Math.min(cy, maxRectWorldY));
+    const cos = Math.cos(-rad); // 逆旋转
+    const sin = Math.sin(-rad);
+    const safeRx = Math.abs(rx) < epsilon ? epsilon : rx;
+    const safeRy = Math.abs(ry) < epsilon ? epsilon : ry;
 
-        // 计算圆心到最近点的距离平方（避免开方提升性能）
-        const dx = cx - closestX;
-        const dy = cy - closestY;
-        const distanceSq = dx * dx + dy * dy;
+    // 1. 变换顶点
+    const localPoints = rectA.map((p) => {
+      // 平移：相对于椭圆中心
+      const tx = p.x - centerB.x;
+      const ty = p.y - centerB.y;
 
-        // 距离≤半径平方 → 圆与矩形交集
-        return distanceSq <= r * r;
-      } else {
-        // 椭圆：基于椭圆标准方程的精准判断
-        const cx = nodeX + nodeW / 2; // 椭圆中心X
-        const cy = nodeY + nodeH / 2; // 椭圆中心Y
-        const rx = nodeW / 2; // 椭圆水平半轴（长/短轴）
-        const ry = nodeH / 2; // 椭圆垂直半轴（长/短轴）
+      // 旋转：抵消椭圆的旋转
+      const rotatedX = tx * cos - ty * sin;
+      const rotatedY = tx * sin + ty * cos;
 
-        // 步骤1：判断矩形内是否有点在椭圆内（取矩形关键点校验）
-        // 矩形的四个顶点
-        const rectPoints = [
-          { x: minRectWorldX, y: minRectWorldY }, // 左上
-          { x: maxRectWorldX, y: minRectWorldY }, // 右上
-          { x: maxRectWorldX, y: maxRectWorldY }, // 右下
-          { x: minRectWorldX, y: maxRectWorldY }, // 左下
-          { x: (minRectWorldX + maxRectWorldX) / 2, y: minRectWorldY }, // 上中
-          { x: (minRectWorldX + maxRectWorldX) / 2, y: maxRectWorldY }, // 下中
-          { x: minRectWorldX, y: (minRectWorldY + maxRectWorldY) / 2 }, // 左中
-          { x: maxRectWorldX, y: (minRectWorldY + maxRectWorldY) / 2 }, // 右中
-        ];
+      // 缩放：归一化 (除以半轴长)
+      return { x: rotatedX / safeRx, y: rotatedY / safeRy };
+    });
 
-        // 检查矩形关键点是否在椭圆内（满足椭圆方程则相交）
-        const hasPointInEllipse = rectPoints.some((point) => {
-          const dx = (point.x - cx) / rx;
-          const dy = (point.y - cy) / ry;
-          return dx * dx + dy * dy <= 1.001; // 加微小容差，避免浮点精度问题
-        });
-        if (hasPointInEllipse) return true;
+    // 2. 检测 "变形后的四边形" vs "单位圆(0,0, r=1)"
 
-        // 步骤2：判断椭圆边界是否与矩形边相交（补充校验，避免漏判）
-        // 椭圆上下左右四个顶点是否在矩形内
-        const ellipsePoints = [
-          { x: cx, y: cy - ry }, // 上顶点
-          { x: cx, y: cy + ry }, // 下顶点
-          { x: cx - rx, y: cy }, // 左顶点
-          { x: cx + rx, y: cy }, // 右顶点
-        ];
-        const hasEllipsePointInRect = ellipsePoints.some((point) => {
-          return (
-            point.x >= minRectWorldX &&
-            point.x <= maxRectWorldX &&
-            point.y >= minRectWorldY &&
-            point.y <= maxRectWorldY
-          );
-        });
-        if (hasEllipsePointInRect) return true;
+    // 情况 A: 圆心 (0,0) 在四边形内部？(使用射线法/Winding Number)
+    // 简单的交叉数算法
+    let inside = false;
+    for (let i = 0, j = localPoints.length - 1; i < localPoints.length; j = i++) {
+      const pi = localPoints[i];
+      const pj = localPoints[j];
+      if (!pi || !pj) continue;
+      const intersect =
+        pi.y > 0 !== pj.y > 0 && 0 < ((pj.x - pi.x) * (0 - pi.y)) / (pj.y - pi.y) + pi.x;
+      if (intersect) inside = !inside;
+    }
+    if (inside) return true;
 
-        // 步骤3：采样椭圆边界点，检查是否有点落在矩形内（补充更全面的交集判定）
-        const ellipseSampleCount = 36; // 每10度采样一个点
-        for (let i = 0; i < ellipseSampleCount; i++) {
-          const theta = (2 * Math.PI * i) / ellipseSampleCount;
-          const ex = cx + rx * Math.cos(theta);
-          const ey = cy + ry * Math.sin(theta);
-          if (
-            ex >= minRectWorldX &&
-            ex <= maxRectWorldX &&
-            ey >= minRectWorldY &&
-            ey <= maxRectWorldY
-          ) {
-            return true;
-          }
-        }
+    // 情况 B: 四边形的任意边是否穿过或接触单位圆？
+    // 即：线段到原点的最短距离是否 <= 1
+    for (let i = 0, j = localPoints.length - 1; i < localPoints.length; j = i++) {
+      const p1 = localPoints[i];
+      const p2 = localPoints[j];
+      if (!p1 || !p2) continue;
 
-        // 步骤4：最后检查椭圆中心是否在矩形内（兜底）
-        return (
-          cx >= minRectWorldX && cx <= maxRectWorldX && cy >= minRectWorldY && cy <= maxRectWorldY
-        );
+      const dx = p2.x - p1.x;
+      const dy = p2.y - p1.y;
+
+      // 线段长度平方
+      const len2 = dx * dx + dy * dy;
+
+      // 如果点重合(len2=0)，直接算点到原点距离
+      if (len2 < epsilon) {
+        if (p1.x * p1.x + p1.y * p1.y <= 1 + epsilon) return true;
+        continue;
       }
 
-    default:
-      // 未定义类型默认返回false
-      return false;
+      // 计算投影参数 t，寻找线段上离原点最近的点 Q
+      // 向量公式: t = - (P1 . (P2-P1)) / |P2-P1|^2
+      let t = -(p1.x * dx + p1.y * dy) / len2;
+
+      // 限制 t 在 [0, 1] 之间，确保点 Q 在线段上
+      t = Math.max(0, Math.min(1, t));
+
+      const closestX = p1.x + t * dx;
+      const closestY = p1.y + t * dy;
+
+      // 距离平方 <= 1 (半径平方)
+      if (closestX * closestX + closestY * closestY <= 1 + epsilon) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  // ========================================================================
+  // 分支 2：多边形处理 (使用 SAT 分离轴定理)
+  // ========================================================================
+  else {
+    // 仅支持以下类型，其他类型直接返回 false
+    const isPolygon =
+      baseNode.type === 'rect' || baseNode.type === 'image' || baseNode.type === 'text';
+
+    if (!isPolygon) return false;
+
+    const axes: { x: number; y: number }[] = [];
+
+    // 轴1-2：选框 (RectA) 的轴 (0° 和 90°)
+    axes.push({ x: 1, y: 0 });
+    axes.push({ x: 0, y: 1 });
+
+    // 轴3-4：旋转矩形 (Node) 的轴
+    const cosRad = Math.cos(rad);
+    const sinRad = Math.sin(rad);
+    axes.push({ x: cosRad, y: sinRad });
+    axes.push({ x: -sinRad, y: cosRad });
+
+    // 辅助函数：投影
+    const projectPoints = (points: { x: number; y: number }[], axis: { x: number; y: number }) => {
+      let min = Number.MAX_VALUE;
+      let max = -Number.MAX_VALUE;
+      for (const p of points) {
+        const proj = p.x * axis.x + p.y * axis.y;
+        if (proj < min) min = proj;
+        if (proj > max) max = proj;
+      }
+      return { min, max };
+    };
+
+    // 辅助函数：计算旋转矩形的世界坐标顶点
+    const getRotatedRectWorld = () => {
+      // 本地坐标系下的4个角 (相对于中心)
+      const local = [
+        { x: -rx, y: -ry },
+        { x: rx, y: -ry },
+        { x: rx, y: ry },
+        { x: -rx, y: ry },
+      ];
+      return local.map((p) => ({
+        x: centerB.x + (p.x * cosRad - p.y * sinRad),
+        y: centerB.y + (p.x * sinRad + p.y * cosRad),
+      }));
+    };
+
+    const rectBWorld = getRotatedRectWorld();
+
+    // 遍历所有轴
+    for (const axis of axes) {
+      const projA = projectPoints(rectA, axis);
+      const projB = projectPoints(rectBWorld, axis);
+
+      // 判断投影重叠
+      // 使用 epsilon 宽松处理接触情况
+      const isSeparated = projA.max < projB.min - epsilon || projB.max < projA.min - epsilon;
+
+      if (isSeparated) {
+        return false; // 只要有一个轴分离，就不相交
+      }
+    }
+
+    return true; // 所有轴都重叠
   }
 }
 

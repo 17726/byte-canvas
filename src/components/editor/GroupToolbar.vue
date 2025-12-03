@@ -34,12 +34,19 @@ import { GroupService } from '@/core/services/GroupService';
 const store = useCanvasStore();
 
 // 显示条件：选中多个元素时显示组合按钮，选中组合时显示解组合按钮
-const isVisible = computed(() => {
-  return (store.canGroup || store.canUngroup) && !store.isInteracting;
+const hasChildSelection = computed(() => {
+  const ids = Array.from(store.activeElementIds);
+  return ids.some((id) => {
+    const node = store.nodes[id];
+    return node && node.parentId !== null;
+  });
 });
 
-// 是否可以组合
-const canGroup = computed(() => store.canGroup);
+const canGroup = computed(() => store.canGroup && !hasChildSelection.value);
+
+const isVisible = computed(() => {
+  return (canGroup.value || store.canUngroup) && !store.isInteracting;
+});
 
 // 是否可以解组合
 const canUngroup = computed(() => store.canUngroup);

@@ -61,6 +61,13 @@ export class GroupService {
       return null;
     }
 
+    // 组合编辑模式下完全禁止创建新的组合
+    const editingGroupId = store.editingGroupId;
+    if (editingGroupId) {
+      console.warn('[Group] 组合编辑模式下禁止创建新的组合，请先退出组合编辑');
+      return null;
+    }
+
     // 计算组合的边界框（使用绝对坐标）
     const bounds = store.getSelectionBounds(validIds);
 
@@ -91,15 +98,6 @@ export class GroupService {
       children: validIds,
     };
 
-    // 检查是否在组合编辑模式下
-    const editingGroupId = store.editingGroupId;
-    const isInEditMode = !!editingGroupId;
-
-    // 如果在编辑模式下，新组合应该继承父组合
-    if (isInEditMode) {
-      groupNode.parentId = editingGroupId;
-    }
-
     // 更新子节点的parentId，并将坐标转换为相对于新组合的坐标
     validIds.forEach((id) => {
       const node = store.nodes[id];
@@ -124,32 +122,19 @@ export class GroupService {
     // 添加组合节点到nodes
     store.nodes[groupId] = groupNode;
 
-    if (isInEditMode) {
-      // 在编辑模式下：更新父组合的children数组
-      const parentGroup = store.nodes[editingGroupId] as GroupState;
-      if (parentGroup && parentGroup.type === NodeType.GROUP) {
-        // 从父组合的children中移除被组合的节点，添加新组合
-        const newChildren = parentGroup.children.filter((id: string) => !validIds.includes(id));
-        newChildren.push(groupId);
-        parentGroup.children = newChildren;
-      }
-    } else {
-      // 正常模式：更新nodeOrder
-      const orderSet = new Set(validIds);
-      const insertIndex = Math.min(
-        ...validIds.map((id) => store.nodeOrder.indexOf(id)).filter((i) => i >= 0)
-      );
-      store.nodeOrder = store.nodeOrder.filter((id: string) => !orderSet.has(id));
-      store.nodeOrder.splice(insertIndex, 0, groupId);
-    }
+    // 正常模式：更新nodeOrder
+    const orderSet = new Set(validIds);
+    const insertIndex = Math.min(
+      ...validIds.map((id) => store.nodeOrder.indexOf(id)).filter((i) => i >= 0)
+    );
+    store.nodeOrder = store.nodeOrder.filter((id: string) => !orderSet.has(id));
+    store.nodeOrder.splice(insertIndex, 0, groupId);
 
     // 选中新创建的组合
     store.setActive([groupId]);
 
     store.version++;
-    console.log(
-      `[Group] 创建组合 ${groupId}，包含 ${validIds.length} 个元素，编辑模式: ${isInEditMode}`
-    );
+    console.log(`[Group] 创建组合 ${groupId}，包含 ${validIds.length} 个元素`);
     return groupId;
   }
 
@@ -386,7 +371,13 @@ export class GroupService {
   static canGroup(store: CanvasStore): boolean {
     const ids = Array.from(store.activeElementIds);
     if (ids.length < 2) return false;
-    return ids.every((id) => store.nodes[id]);
+    const nodesExist = ids.every((id) => store.nodes[id]);
+    if (!nodesExist) return false;
+
+    // 组合编辑模式下不允许进行新的组合
+    if (store.editingGroupId) return false;
+
+    return true;
   }
 
   /**
