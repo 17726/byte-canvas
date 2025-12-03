@@ -1,13 +1,12 @@
 <template>
   <!-- 外层容器：用于放置缩放控制点 -->
-  <div class="text-layer-wrapper" :style="style" >
+  <div class="text-layer-wrapper" :style="style">
     <!-- 透明矩形内部写文字，即文本框 -->
     <div
       ref="editor"
       class="textBox"
       :class="{ 'is-editing': isEditing }"
-      contenteditable="true"
-      
+      :contenteditable="isEditing ? 'true' : 'false'"
       v-html="HTMLstring"
       @input="handleContentChange"
       @keyup="handleSelectionChange"
@@ -26,6 +25,7 @@ import { computed, ref, watch, type CSSProperties, nextTick, onMounted, onUnmoun
 import type { TextState } from '@/types/state';
 import { useCanvasStore } from '@/store/canvasStore';
 import { getDomStyle } from '@/core/renderers/dom';
+import { GroupService } from '@/core/services/GroupService';
 
 const props = defineProps<{
   node: TextState;
@@ -42,20 +42,14 @@ const style = computed((): CSSProperties => {
 
   // 解构属性 + 默认值兜底（双重保障，避免 undefined）
   const { transform, style: nodeStyle } = text; // 重命名 style 为 nodeStyle，避免重名
-  const {
-    x = 0,
-    y = 0,
-    width = 200,
-    height = 80,
-    rotation = 0
-  } = transform;
+  const { x = 0, y = 0, width = 200, height = 80, rotation = 0 } = transform;
   const {
     backgroundColor = 'transparent', // 默认透明
     borderWidth = 0, // 默认无边框
     borderStyle = 'none', // 默认无边框样式
     borderColor = 'transparent', // 默认透明边框
     opacity = 1, // 默认不透明
-    zIndex = 1 // 默认层级
+    zIndex = 1, // 默认层级
   } = nodeStyle;
 
   // 样式映射（补充去除边框的关键样式）
@@ -107,17 +101,28 @@ const isActiveNode = computed(() => {
 // 文本组件内的局部状态，仅能在当前组件访问
 const currentSelection = ref<{ start: number; end: number } | null>(null);
 
+/**
+ * 判断当前文本节点是否可以直接进入编辑态
+ * - 顶层文本节点（没有 parentId）始终允许
+ * - 组合子节点只有在父组合已经处于编辑模式时才允许
+ */
+const canEnterEditingDirectly = () => {
+  const parentId = props.node.parentId;
+  if (!parentId) return true;
+  return store.editingGroupId === parentId;
+};
+
 // 处理内容变化（同步content到结构化数据）
 const handleContentChange = (e: Event) => {
   const target = e.target as HTMLElement;
   // 关键1：更新 content 前，先保存当前光标位置
   const savedCursorPos = saveCursorPosition();
 
-  const newContent=target.textContent;
+  const newContent = target.textContent;
   const textNode = props.node as TextState;
   // 关键2：更新 store 中的 content（会触发 v-html 重新渲染）
   store.updateNode(textNode.id, {
-    props: { ...textNode.props, content:newContent}
+    props: { ...textNode.props, content: newContent },
   });
 
   // 关键3：DOM 重新渲染后，恢复光标位置
@@ -145,28 +150,30 @@ const updateInlineStylesOnContentChange = (oldContent: string, newContent: strin
   const cursorPos = range.endOffset;
 
   // 调整所有样式范围的索引
-  const newInlineStyles = oldInlineStyles.map(style => {
-    let { start, end } = style;
+  const newInlineStyles = oldInlineStyles
+    .map((style) => {
+      let { start, end } = style;
 
-    // 场景1：文本插入（长度增加）—— 光标后的样式范围向后偏移
-    if (lengthDiff > 0 && end > cursorPos) {
-      start = start > cursorPos ? start + lengthDiff : start;
-      end += lengthDiff;
-    }
+      // 场景1：文本插入（长度增加）—— 光标后的样式范围向后偏移
+      if (lengthDiff > 0 && end > cursorPos) {
+        start = start > cursorPos ? start + lengthDiff : start;
+        end += lengthDiff;
+      }
 
-    // 场景2：文本删除（长度减少）—— 光标后的样式范围向前偏移
-    if (lengthDiff < 0 && end > cursorPos) {
-      const offset = Math.abs(lengthDiff);
-      start = start > cursorPos ? Math.max(0, start - offset) : start;
-      end = Math.max(start, end - offset); // 避免 end < start（空范围）
-    }
+      // 场景2：文本删除（长度减少）—— 光标后的样式范围向前偏移
+      if (lengthDiff < 0 && end > cursorPos) {
+        const offset = Math.abs(lengthDiff);
+        start = start > cursorPos ? Math.max(0, start - offset) : start;
+        end = Math.max(start, end - offset); // 避免 end < start（空范围）
+      }
 
-    return { ...style, start, end };
-  }).filter(style => style.start < style.end); // 过滤空范围（start >= end）
+      return { ...style, start, end };
+    })
+    .filter((style) => style.start < style.end); // 过滤空范围（start >= end）
 
   // 更新调整后的 inlineStyles
   store.updateNode(textNode.id, {
-    props: { ...textNode.props, inlineStyles: newInlineStyles }
+    props: { ...textNode.props, inlineStyles: newInlineStyles },
   });
 };
 
@@ -314,8 +321,20 @@ const handleSelectionChange = () => {
 
 // 双击进入编辑状态
 const enterEditing = (event: MouseEvent) => {
+  // 未处于组合编辑模式时，优先让父组合进入编辑模式
+  if (!canEnterEditingDirectly()) {
+    const parentId = props.node.parentId;
+    if (parentId) {
+      GroupService.enterGroupEdit(store, parentId);
+    }
+    return;
+  }
+
   event.stopPropagation();
-  if (!isSelected.value) return;
+
+  if (!isSelected.value) {
+    store.setActive([props.node.id]);
+  }
 
   isEditing.value = true;
 
@@ -334,7 +353,7 @@ const enterEditing = (event: MouseEvent) => {
 const handleMouseDown = (e: MouseEvent) => {
   if (isEditing.value) {
     e.stopPropagation(); // 阻止事件冒泡到上层节点
-  }else{
+  } else {
     // 阻止文本框聚焦（避免单击时光标出现，不进入编辑态）
     e.preventDefault();
   }
@@ -372,8 +391,6 @@ const handleGlobalMousedown = (e: MouseEvent) => {
   //console.log('全局 mousedown 捕获：是否点击工具栏', isClickingToolbar.value);
 };
 
-
-
 // 文本组件：修改 handleBlur 逻辑（核心修复）
 const handleBlur = () => {
   //console.log('文本组件失焦：', { isClickingToolbar: isClickingToolbar.value });
@@ -396,15 +413,12 @@ const handleTextBoxClick = (e: MouseEvent) => {
   if (!isEditing.value) {
     // 关键1：阻止文本框聚焦（避免单击时光标出现，不进入编辑态）
     e.preventDefault();
-    // 关键2：阻止文本框选中文字（非编辑态不需要选中文本）
-    // e.stopPropagation();
-
-    // 核心：执行选中逻辑（单击的核心需求）
-    if (!isSelected.value) {
+    // 对于可直接进入编辑的文本节点（顶层或父组合已在编辑），保持当前选中逻辑
+    if (canEnterEditingDirectly() && !isSelected.value) {
       store.setActive([props.node.id]);
     }
 
-    // 关键3：强制让文本框失焦（兜底，避免意外聚焦）
+    // 对于组合内且父组合未进入编辑的文本，交由父组合处理选中
     editor.value?.blur();
   } else {
     // 编辑状态下，正常响应点击（选中文本、输入等）
@@ -424,7 +438,6 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-
 .textBox {
   width: 100%;
   height: 100%;
@@ -441,7 +454,6 @@ onUnmounted(() => {
   padding: 2px 4px;
 }
 
-
 .textBox.is-editing {
   cursor: text;
   user-select: auto;
@@ -452,12 +464,10 @@ onUnmounted(() => {
   pointer-events: auto;
 }
 
-
 /* 文本选中样式（兼容不同浏览器） */
 .textBox::selection,
 .textBox *::selection {
   background-color: rgba(0, 122, 255, 0.1) !important;
-
 }
 
 .textBox::-moz-selection,
