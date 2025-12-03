@@ -265,7 +265,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue';
+import { ref, computed, watch, nextTick } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
 import { useUIStore } from '@/store/uiStore';
 import {
@@ -413,6 +413,8 @@ const fillColorTemp = ref('#ffffff');
 const strokeColorTemp = ref('#000000');
 const strokeWidthTemp = ref(0);
 const isSyncingShapeStyle = ref(false);
+const ignoreFillChange = ref(false);
+const ignoreStrokeColorChange = ref(false);
 
 const extractColorValue = (input: unknown, fallback: string) => {
   if (typeof input === 'string') return input;
@@ -500,15 +502,27 @@ const syncShapeStyleTemps = () => {
 
     if (targetChild) {
       isSyncingShapeStyle.value = true;
+      ignoreFillChange.value = true;
+      ignoreStrokeColorChange.value = true;
       fillColorTemp.value = targetChild.style.backgroundColor || '#ffffff';
       strokeColorTemp.value = targetChild.style.borderColor || '#000000';
       strokeWidthTemp.value = targetChild.style.borderWidth || 0;
-      isSyncingShapeStyle.value = false;
+      nextTick(() => {
+        ignoreFillChange.value = false;
+        ignoreStrokeColorChange.value = false;
+        isSyncingShapeStyle.value = false;
+      });
     } else {
       // 如果没有形状子节点，使用默认值
+      ignoreFillChange.value = true;
+      ignoreStrokeColorChange.value = true;
       fillColorTemp.value = '#ffffff';
       strokeColorTemp.value = '#000000';
       strokeWidthTemp.value = 0;
+      nextTick(() => {
+        ignoreFillChange.value = false;
+        ignoreStrokeColorChange.value = false;
+      });
     }
     return;
   }
@@ -517,10 +531,16 @@ const syncShapeStyleTemps = () => {
     lastSelectedChildId.value = activeNode.value.id;
   }
   isSyncingShapeStyle.value = true;
+  ignoreFillChange.value = true;
+  ignoreStrokeColorChange.value = true;
   fillColorTemp.value = activeNode.value.style.backgroundColor || '#ffffff';
   strokeColorTemp.value = activeNode.value.style.borderColor || '#000000';
   strokeWidthTemp.value = activeNode.value.style.borderWidth || 0;
-  isSyncingShapeStyle.value = false;
+  nextTick(() => {
+    ignoreFillChange.value = false;
+    ignoreStrokeColorChange.value = false;
+    isSyncingShapeStyle.value = false;
+  });
 };
 
 watch(
@@ -539,6 +559,10 @@ watch(
 
 const applyFillColor = (newColor?: unknown) => {
   if (!activeNode.value || !canEditShapeStyle.value) return;
+  if (newColor !== undefined && ignoreFillChange.value) {
+    ignoreFillChange.value = false;
+    return;
+  }
   if (isSyncingShapeStyle.value && newColor !== undefined) return;
   const color = extractColorValue(newColor, fillColorTemp.value);
   fillColorTemp.value = color;
@@ -550,9 +574,15 @@ const applyFillColor = (newColor?: unknown) => {
 
 const applyStrokeStyle = (options?: { color?: unknown; width?: number }) => {
   if (!activeNode.value || !canEditShapeStyle.value) return;
-  if (isSyncingShapeStyle.value && options?.color !== undefined) return;
   if (options?.color !== undefined) {
+    if (ignoreStrokeColorChange.value) {
+      ignoreStrokeColorChange.value = false;
+      return;
+    }
+    if (isSyncingShapeStyle.value) return;
     strokeColorTemp.value = extractColorValue(options.color, strokeColorTemp.value);
+  } else if (isSyncingShapeStyle.value) {
+    return;
   }
   if (typeof options?.width === 'number') {
     strokeWidthTemp.value = options.width;
