@@ -140,19 +140,25 @@ export class TextSelectionHandler {
       this.currentSelection = null;
       return;
     }
-    //选区范围校验：确保选中的内容「在当前编辑器内」
-    //避免用户选中编辑器外的内容（比如页面其他文字）时误触发
+    /**
+     * 选区范围校验：确保选中的内容「在当前编辑器内」
+     * 避免用户选中编辑器外的内容（比如页面其他文字）时误触发
+     */
     const range = selection.getRangeAt(0); // 获取第一个（也是唯一）选区的范围
     if (!this.editor.contains(range.commonAncestorContainer)) {
-      // commonAncestorContainer：选区内所有节点的共同父节点，判断是否在编辑器内
+      /**
+       * commonAncestorContainer：选区内所有节点的共同父节点，判断是否在编辑器内
+       */
       this.currentSelection = null;
       return;
     }
 
-    // 精准计算选中文本的 start 和 end
-    // 核心工具函数：计算「目标文本节点」在「整个编辑器文本」中的「绝对偏移量」
-    // 为什么需要？因为编辑器内的文本可能被多个标签包裹（比如 <span>文字1</span>文字2）
-    // 浏览器原生的 offset 是「相对当前节点」的，需要转换成「相对整个编辑器文本」的绝对索引
+    /**
+     * 精准计算选中文本的 start 和 end
+     * 核心工具函数：计算「目标文本节点」在「整个编辑器文本」中的「绝对偏移量」
+     * 为什么需要？因为编辑器内的文本可能被多个标签包裹（比如 <span>文字1</span>文字2）
+     * 浏览器原生的 offset 是「相对当前节点」的，需要转换成「相对整个编辑器文本」的绝对索引
+     */
     const getTextOffset = (node: Node, root: HTMLElement): number => {
       let offset = 0; // 累计偏移量（目标节点前面有多少个字符）
       // TreeWalker：浏览器提供的DOM遍历工具，这里只遍历「文本节点」（SHOW_TEXT）
@@ -413,11 +419,7 @@ export class TextSelectionHandler {
       // 场景1：切换样式（有则移除，无则添加）
       if (targetStyleIndex > -1) {
         // 存在目标样式：移除该属性（不删除整个样式对象，保留其他属性）
-        const targetStyle = updatedStyles[targetStyleIndex] as {
-          start: number;
-          end: number;
-          styles: InlineStyleProps;
-        };
+        const targetStyle = updatedStyles[targetStyleIndex];
         const { [styleKey]: _, ...remainingStyles } = targetStyle!.styles;
 
         if (Object.keys(remainingStyles).length > 0) {
