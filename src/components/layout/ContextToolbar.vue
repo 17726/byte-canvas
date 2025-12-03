@@ -383,7 +383,7 @@ import { ToolManager } from '@/core/ToolManager';
     if (!node?.props.inlineStyles || !selection) return false;
 
     const { start, end } = selection;
-  // 检查是否存在包含当前选区的删除线样式（支持同时有下划线+删除线）
+    // 检查是否存在包含当前选区的删除线样式（支持同时有下划线+删除线）
     return node.props.inlineStyles.some(style =>
       style.start <= start && style.end >= end &&
       style.styles.textDecoration?.includes('line-through')
