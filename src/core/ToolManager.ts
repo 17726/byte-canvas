@@ -1,15 +1,74 @@
+/**
+ * @file ToolManager.ts
+ * @description 工具管理器 - 纯粹的画布事件分发器（Pure Event Dispatcher）
+ *
+ * 核心职责：
+ * 1. 接收来自 Vue 组件的原始 DOM 事件（鼠标/键盘/滚轮）
+ * 2. 根据事件类型和当前上下文将事件路由到对应的 Handler
+ * 3. 管理全局交互状态（isInteracting）以优化渲染性能
+ * 4. 协调多个 Handler 之间的优先级和互斥关系
+ *
+ * 架构特点：
+ * - **纯事件路由器**：<300 行，零业务逻辑，零状态存储
+ * - **严格分层/调用链**：存在两条主要调用路径：
+ *   1. UI 层（Vue） → ToolManager（路由） → Handlers（交互逻辑） （有状态/交互）
+ *   2. UI 层（Vue） → Services（业务逻辑，无状态） （直接调用，不通过 ToolManager）
+ * - **单一职责**：仅负责"事件分发"，所有具体逻辑委托给专用模块
+ * - **无状态设计**：所有状态由 Store 和各 Handler 管理，ToolManager 不持有业务数据
+ *
+ * Handler 协调关系：
+ * - ViewportHandler：视口平移、缩放（滚轮、中键拖拽、空格+左键）
+ * - TransformHandler：节点拖拽、单选/多选缩放
+ * - SelectionHandler：框选、点选、选区边界计算
+ * - GroupService：组合/解组合业务逻辑（直接由 UI 调用，不经过 ToolManager）
+ *
+ * 包含方法列表：
+ *
+ * 生命周期：
+ * - constructor(store, stageEl): 初始化管理器及所有 Handlers
+ * - destroy(): 清理事件监听器和资源
+ *
+ * 状态查询：
+ * - getBoxSelectState(): 获取框选状态（供 SelectionOverlay 组件使用）
+ * - getIsSpacePressed(): 获取空格键状态（私有）
+ *
+ * 画布事件（Stage Events）：
+ * - handleWheel(e): 滚轮事件 → 路由到 ViewportHandler（缩放/平移）
+ * - handleMouseDown(e): 画布鼠标按下 → 根据按键决定平移/框选/退出编辑
+ * - handleMouseMove(e): 鼠标移动 → 按优先级更新多选缩放 > 单选缩放 > 拖拽 > 平移 > 框选
+ * - handleMouseUp(e): 鼠标松开 → 结束所有交互操作
+ *
+ * 节点事件（Node Events）：
+ * - handleNodeDown(e, nodeId): 节点鼠标按下 → 选中逻辑 + 拖拽准备
+ * - handleNodeDoubleClick(e, nodeId): 节点双击 → 进入组合编辑模式（调用 GroupService）
+ *
+ * 缩放控制点事件（Resize Handle Events）：
+ * - handleResizeHandleDown(e, direction): 单选缩放控制点按下 → TransformHandler
+ * - handleMultiResizeHandleDown(e, direction): 多选缩放控制点按下 → TransformHandler
+ *
+ * @example
+ * // Vue 组件中使用
+ * const toolManager = new ToolManager(store, stageRef.value)
+ * toolManager.handleMouseDown(e)  // 事件自动路由到正确的 Handler
+ *
+ * // 组合操作直接调用 Service（不经过 ToolManager）
+ * GroupService.groupSelected(store)
+ */
 import { useCanvasStore } from '@/store/canvasStore';
 import { useUIStore } from '@/store/uiStore';
 import { NodeType, type BaseNodeState } from '@/types/state';
 import type { ResizeHandle } from '@/types/editor';
 import { ViewportHandler } from './handlers/ViewportHandler';
 import { TransformHandler } from './handlers/TransformHandler';
+import { RotationHandler } from './handlers/RotationHandler';
 import { SelectionHandler } from './handlers/SelectionHandler';
 import { GroupService } from './services/GroupService';
 
 /**
- * 工具管理器类（整合强制事件锁定）
- * 核心：保留所有原有业务逻辑，添加事件防护层，确保画布交互优先级最高
+ * 工具管理器类
+ *
+ * 负责协调画布上的所有交互行为，是事件处理的中央枢纽。
+ * 将具体的业务逻辑委托给专用的处理器和服务。
  */
 export class ToolManager {
   private store: ReturnType<typeof useCanvasStore>;
@@ -20,8 +79,9 @@ export class ToolManager {
   private viewportHandler: ViewportHandler;
   private transformHandler: TransformHandler;
   private selectionHandler: SelectionHandler;
+  private rotationHandler: RotationHandler;
 
-  // 外部状态获取
+  // 改为从外部获取空格键状态（不再内部维护）
   private getIsSpacePressed: () => boolean;
 
   // 交互锁定标记（抵御外部干扰）
@@ -42,10 +102,13 @@ export class ToolManager {
     this.viewportHandler = new ViewportHandler(this.store);
     this.transformHandler = new TransformHandler(this.store);
     this.selectionHandler = new SelectionHandler(this.store, stageEl);
+    this.rotationHandler = new RotationHandler(); // 新增：初始化旋转处理器
   }
 
   /**
    * 销毁管理器，清理资源
+   *
+   * 注意：键盘事件监听已迁移到 Vue 组件，此方法保留用于未来扩展
    */
   destroy() {
     this.isCanvasInteracting = false; // 重置锁定状态
@@ -53,10 +116,15 @@ export class ToolManager {
 
   /**
    * 获取框选状态
+   *
+   * 用于 Vue 组件渲染框选矩形的可视化反馈
+   *
+   * @returns 包含 isDragging、isBoxSelecting、boxSelectStart、boxSelectEnd 的状态对象
    */
   getBoxSelectState() {
     return {
       isDragging: this.transformHandler.isDragging,
+      isRotating: this.rotationHandler.isRotating,
       ...this.selectionHandler.getBoxSelectState(),
     };
   }
@@ -86,6 +154,13 @@ export class ToolManager {
   }
 
   // ==================== 画布事件处理（整合防护）====================
+  /**
+   * 处理画布滚轮事件
+   *
+   * 委托给 ViewportHandler 处理缩放和触摸板平移
+   *
+   * @param e - 滚轮事件
+   */
   handleWheel(e: WheelEvent) {
     // 强制防护：过滤外部干扰的滚轮事件
     if (!this.forceProtectEvent(e)) return;
@@ -93,7 +168,16 @@ export class ToolManager {
     this.viewportHandler.onWheel(e);
     this.endCanvasInteraction(); // 滚轮事件无需长期锁定
   }
-
+  /**
+   * 处理画布鼠标按下事件
+   *
+   * 根据按键组合和点击位置决定行为：
+   * - 空格+左键：启动画布平移
+   * - 中键：启动画布平移并取消选中
+   * - 左键空白处：启动框选或退出组合编辑模式
+   *
+   * @param e - 鼠标事件
+   */
   handleMouseDown(e: MouseEvent) {
     // 强制防护：不通过则直接忽略
     if (!this.forceProtectEvent(e)) return;
@@ -104,8 +188,13 @@ export class ToolManager {
       return;
     }
 
-    // 原有业务逻辑：拖拽中不触发平移
-    if (this.transformHandler.isDragging) return;
+    // 互斥逻辑：如果正在拖拽/旋转/缩放，不触发画布平移
+    if (
+      this.transformHandler.isDragging ||
+      this.transformHandler.isResizing ||
+      this.rotationHandler.isRotating
+    )
+      return;
 
     // 原有业务逻辑：中键平移
     if (e.button === 1) {
@@ -149,6 +238,14 @@ export class ToolManager {
     }
   }
 
+  /**
+   * 处理全局鼠标移动事件
+   *
+   * 根据当前交互状态更新对应操作：
+   * - 多选缩放 > 单选缩放 > 节点拖拽 > 画布平移 > 框选
+   *
+   * @param e - 鼠标事件
+   */
   handleMouseMove(e: MouseEvent) {
     // 防护逻辑：正在交互时强制防护，非交互时校验事件源
     if (this.isCanvasInteracting) {
@@ -157,57 +254,82 @@ export class ToolManager {
       if (!this.stageEl?.contains(e.target as Node)) return;
     }
 
-    // 原有业务逻辑：优先级排序 - 多选缩放 > 单选缩放 > 拖拽 > 平移 > 框选
+    // 最高优先级：多选缩放
     if (this.transformHandler.isMultiResizing) {
       this.transformHandler.updateMultiResize(e);
       return;
     }
 
+    // 其次：单选缩放
     if (this.transformHandler.isResizing) {
       this.transformHandler.updateResize(e);
       return;
     }
 
+    // 新增：旋转操作（优先级高于拖拽）
+    if (this.rotationHandler.isRotating) {
+      this.rotationHandler.updateRotate(e);
+      return;
+    }
+
+    // 然后：节点拖拽（包含多选区域拖拽）
     if (this.transformHandler.isDragging) {
       this.transformHandler.updateDrag(e);
       return;
     }
 
+    // 最后：画布平移/框选
     if (this.viewportHandler.isPanning) {
       this.viewportHandler.updatePan(e);
       return;
     }
 
+    // 仅未按空格时更新框选状态
     if (!this.getIsSpacePressed()) {
       this.selectionHandler.updateBoxSelect(e);
     }
   }
-
+  /**
+   * 处理全局鼠标松开事件
+   *
+   * 结束所有交互状态，并在组合编辑模式下自动调整边界
+   */
   handleMouseUp() {
     // 防护逻辑：用mock事件强制防护，避免外部up事件干扰
     const mockEvent = new MouseEvent('mouseup');
     this.forceProtectEvent(mockEvent);
+    // 在重置状态之前，检查是否需要扩展组合边界（包含旋转状态）
+    const hadDragOrResize = this.transformHandler.isTransforming || this.rotationHandler.isRotating;
 
-    // 原有业务逻辑：扩展组合边界检查
-    const hadDragOrResize = this.transformHandler.isTransforming;
-
-    // 原有业务逻辑：重置状态
+    // 重置画布平移状态
     this.viewportHandler.endPan();
+
+    // 重置旋转状态
+    this.rotationHandler.endRotate();
+
+    // 重置所有变换状态
     this.transformHandler.reset();
 
+    // 仅未按空格时处理框选结束
     if (!this.getIsSpacePressed()) {
       this.selectionHandler.finishBoxSelect();
     }
 
+    // 如果在组合编辑模式下有拖拽/缩放/旋转操作，检查并扩展组合边界
     if (hadDragOrResize && this.store.editingGroupId) {
       GroupService.expandGroupToFitChildren(this.store);
     }
-
-    // 结束交互锁定
-    this.endCanvasInteraction();
   }
 
   // ==================== 节点事件处理（整合防护）====================
+  /**
+   * 处理节点鼠标按下事件
+   *
+   * 处理节点的选中逼辑（单选/Ctrl+多选）并准备拖拽
+   *
+   * @param e - 鼠标事件
+   * @param id - 节点 ID
+   */
   handleNodeDown(e: MouseEvent, id: string) {
     // 强制防护：过滤外部干扰
     if (!this.forceProtectEvent(e)) return;
@@ -327,4 +449,28 @@ export class ToolManager {
       this.getIsSpacePressed()
     );
   }
+
+  // ==================== 旋转控制点事件（新增）====================
+  /**
+   * 处理旋转控制点按下事件
+   * @param e 鼠标事件
+   */
+  handleRotateHandleDown(e: MouseEvent): void {
+    e.stopPropagation();
+    e.preventDefault();
+    this.rotationHandler.startRotate(e);
+  }
+
+  // ==================== 组合/解组合功能（已迁移至 GroupService）====================
+
+  // ==================== 节点拖拽/缩放方法（已迁移到 TransformHandler） ====================
+  // handleNodeMove(), handleNodeUp(), handleResizeMove(), handleMultiResizeMove()
+  // 已完全迁移到 src/core/tools/handlers/TransformHandler.ts
+
+  // ==================== 节点创建功能 ====================
+  // 已迁移至 UI 组件层（CanvasToolbar.vue / ImageMenu.vue）
+  // UI 组件直接使用 NodeFactory.create*() + store.addNode() + store.setActive()
+
+  // ==================== 缩放计算辅助方法 ====================
+  // 已迁移至 @/core/utils/geometry.ts
 }
