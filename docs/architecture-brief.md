@@ -23,6 +23,36 @@
 - **L4 渲染层 (View)**: 响应式映射到 DOM 样式；未来可替换为 Canvas/Pixi 实现的 `IRenderer`。
 - **单向数据流**: 用户事件 → 逻辑层计算 → State 变更 → 脏标记 → 渲染。
 
+## 3.1) 调用链（双通道）
+
+为避免混淆，明确重构后的两条主要调用链：
+
+1. 事件交互通道（有状态/交互）
+   - UI 组件（Vue）通过 `ToolManager` 将原始 DOM 事件（鼠标、键盘、滚轮）路由到对应 `Handler`（例如 `ViewportHandler`, `TransformHandler`, `SelectionHandler`）。
+   - Handlers 管理交互相关的临时状态，并通过 `store` 更新全局状态，随后触发渲染。
+   - 示例（Pan）:
+
+     ```ts
+     // CanvasStage.vue
+     toolManager.handleMouseDown(e);
+
+     // ToolManager -> ViewportHandler
+     viewportHandler.startPan(e);
+     ```
+
+2. 业务/服务通道（无状态/直连）
+   - 对于纯业务逻辑（如组合/解组合、批量节点操作、样式同步），UI 组件直接调用 `Service`（例如 `GroupService`、`NodeFactory`），不通过 `ToolManager`。
+   - Service 接受 `store` 作为参数，执行业务逻辑并更新 `store`，不依赖 DOM 或事件对象。
+   - 示例（组合）:
+     ```ts
+     // CanvasStage.vue 或 GroupToolbar.vue
+     if (store.canGroup) {
+       GroupService.groupSelected(store);
+     }
+     ```
+
+这两条通道共同保证了：事件/交互状态由 `ToolManager` 与 Handlers 管理，而业务变更则由无状态的 Services 执行，从而实现职责分离与易于测试的代码结构。
+
 ## 4) 核心数据结构 (State)
 
 - **NodeType**: `rect | circle | text | image | group`（阶段一主要用 rect/text）。

@@ -26,7 +26,8 @@
 import { computed, inject, defineAsyncComponent, type Ref } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
 import { NodeType, type GroupState, type NodeState } from '@/types/state';
-import type { ToolManager } from '@/core/tools/ToolManager';
+import type { ToolManager } from '@/core/ToolManager';
+import { GroupService } from '@/core/services/GroupService';
 import RectLayer from './RectLayer.vue';
 import CircleLayer from './CircleLayer.vue';
 import TextLayer from './TextLayer.vue';
@@ -114,7 +115,7 @@ const handleDoubleClick = (e: MouseEvent) => {
   if (!isSelectable.value) return;
 
   e.stopPropagation();
-  toolManagerRef?.value?.enterGroupEdit(props.node.id);
+  GroupService.enterGroupEdit(store, props.node.id);
 };
 
 // 编辑模式下，处理子元素的点击
