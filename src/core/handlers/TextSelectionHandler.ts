@@ -82,12 +82,12 @@ export class TextSelectionHandler {
         range.selectNodeContents(this.editor);
         selection?.removeAllRanges();
         selection?.addRange(range);
-        console.log("双击全选");
+        console.log('双击全选');
       }
     });
   }
 
-  exitEditing(){
+  exitEditing() {
     this.isEditing = false;
     this.updateGlobalSelection(null);
   }
@@ -97,7 +97,7 @@ export class TextSelectionHandler {
    * @param e 鼠标事件
    */
   handleMouseDown(e: MouseEvent) {
-    if (!this.isEditing){
+    if (!this.isEditing) {
       // 非编辑态阻止文本框单击聚焦（避免单击时光标出现，不进入编辑态）
       e.preventDefault();
     }
@@ -117,18 +117,18 @@ export class TextSelectionHandler {
    * 处理鼠标抬起并计算选区
    * @param e 鼠标事件
    */
-  handleMouseUpAndSelection(e: MouseEvent, id:string) {
+  handleMouseUpAndSelection(e: MouseEvent, id: string) {
     if (this.isEditing) {
       e.stopPropagation();
       this.handleSelectionChange(id); // 传入 node 参数
     }
   }
 
-   /**
+  /**
    * 处理文本选区变化（接收 id 参数）
    * @param id 文本节点 ID
    */
-   public handleSelectionChange(id: string) {
+  public handleSelectionChange(id: string) {
     const node = this.store.nodes[id] as TextState;
     if (!this.isEditing || !this.editor) {
       this.currentSelection = null;
@@ -169,7 +169,7 @@ export class TextSelectionHandler {
 
     // 计算选区的「绝对起始索引」（totalStart）
     const startNode = range.startContainer; // 选区开始的节点（比如某个文本节点）
-    const startOffset = range.startOffset;  // 相对startNode的偏移量（比如在startNode第2个字符后）
+    const startOffset = range.startOffset; // 相对startNode的偏移量（比如在startNode第2个字符后）
     const baseOffset = getTextOffset(startNode, this.editor);
     const totalStart = baseOffset + startOffset;
 
@@ -223,104 +223,92 @@ export class TextSelectionHandler {
     }
   }
 
-/**
- * 保存当前光标位置（修复：保存真实光标节点和结束偏移）
- * @returns 保存的位置信息（文本节点+偏移量）
- */
-saveCursorPosition(): {
-  parent: Node | null;
-  offset: number;
-  textContent: string; // 新增：保存节点文本内容，用于恢复时匹配
-} {
-  const selection = window.getSelection();
-  if (!selection || selection.rangeCount === 0) {
-    return { parent: null, offset: 0, textContent: '' };
-  }
-
-  const range = selection.getRangeAt(0);
-  // ✅ 关键1：保存光标所在的「最小文本节点」（startContainer）
-  // ✅ 关键2：保存 endOffset（输入后光标在末尾，更符合预期）
-  // ✅ 关键3：保存节点文本内容，用于恢复时精准匹配
-  return {
-    parent: range.startContainer,
-    offset: range.endOffset,
-    textContent: range.startContainer.textContent || '',
-  };
-}
-
-/**
- * 恢复光标位置（修复：精准匹配新DOM节点+边界校验）
- * @param savedPos 保存的位置信息
- */
-restoreCursorPosition(savedPos: {
-  parent: Node | null;
-  offset: number;
-  textContent: string;
-}) {
-  if (
-    !this.editor ||
-    !savedPos.parent ||
-    !this.isEditing ||
-    !savedPos.textContent
-  ) {
-    return;
-  }
-
-  const selection = window.getSelection();
-  if (!selection) return;
-
-  // 确保DOM完全更新（用nextTick确保渲染完成，避免早了找不到节点）
-  nextTick(() => {
-    // 在新DOM树中找到「和保存时文本内容一致」的文本节点
-    const targetNode = this.findTextNodeByContent(
-      this.editor!,
-      savedPos.textContent
-    );
-    if (!targetNode) return;
-
-    //偏移量边界校验（避免超出文本长度）
-    const textLength = targetNode.textContent?.length || 0;
-    const safeOffset = Math.min(savedPos.offset, textLength); // 最大不超过文本长度
-    const finalOffset = Math.max(0, safeOffset); // 最小不小于0
-
-    //恢复光标
-    const range = document.createRange();
-    range.setStart(targetNode, finalOffset); // 新DOM节点 + 安全偏移
-    range.collapse(true); // 光标折叠（只显示光标，不选中文字）
-
-    selection.removeAllRanges();
-    selection.addRange(range);
-  });
-}
-
-/**
- * 辅助方法：在编辑器DOM下，找到「文本内容完全匹配」的文本节点（核心修复）
- * @param root 编辑器根节点（this.editor）
- * @param targetText 保存时的节点文本内容
- */
-private findTextNodeByContent(root: HTMLElement, targetText: string): Node | null {
-  // 遍历编辑器下所有文本节点（递归）
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-  let currentNode: Node | null;
-
-  while ((currentNode = walker.nextNode())) {
-    // 找到文本内容完全匹配的节点（忽略空格差异，可选）
-    if (currentNode.textContent?.trim() === targetText.trim()) {
-      return currentNode;
+  /**
+   * 保存当前光标位置（修复：保存真实光标节点和结束偏移）
+   * @returns 保存的位置信息（文本节点+偏移量）
+   */
+  saveCursorPosition(): {
+    parent: Node | null;
+    offset: number;
+    textContent: string; // 新增：保存节点文本内容，用于恢复时匹配
+  } {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) {
+      return { parent: null, offset: 0, textContent: '' };
     }
+
+    const range = selection.getRangeAt(0);
+    // ✅ 关键1：保存光标所在的「最小文本节点」（startContainer）
+    // ✅ 关键2：保存 endOffset（输入后光标在末尾，更符合预期）
+    // ✅ 关键3：保存节点文本内容，用于恢复时精准匹配
+    return {
+      parent: range.startContainer,
+      offset: range.endOffset,
+      textContent: range.startContainer.textContent || '',
+    };
   }
 
-  // 找不到时，返回编辑器下第一个文本节点（兜底，避免光标丢了）
-  return this.getFirstTextNode(root);
-}
+  /**
+   * 恢复光标位置（修复：精准匹配新DOM节点+边界校验）
+   * @param savedPos 保存的位置信息
+   */
+  restoreCursorPosition(savedPos: { parent: Node | null; offset: number; textContent: string }) {
+    if (!this.editor || !savedPos.parent || !this.isEditing || !savedPos.textContent) {
+      return;
+    }
 
-/**
- * 辅助方法：获取编辑器下第一个文本节点（兜底用）
- */
-private getFirstTextNode(root: HTMLElement): Node | null {
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-  return walker.nextNode();
-}
+    const selection = window.getSelection();
+    if (!selection) return;
+
+    // 确保DOM完全更新（用nextTick确保渲染完成，避免早了找不到节点）
+    nextTick(() => {
+      // 在新DOM树中找到「和保存时文本内容一致」的文本节点
+      const targetNode = this.findTextNodeByContent(this.editor!, savedPos.textContent);
+      if (!targetNode) return;
+
+      //偏移量边界校验（避免超出文本长度）
+      const textLength = targetNode.textContent?.length || 0;
+      const safeOffset = Math.min(savedPos.offset, textLength); // 最大不超过文本长度
+      const finalOffset = Math.max(0, safeOffset); // 最小不小于0
+
+      //恢复光标
+      const range = document.createRange();
+      range.setStart(targetNode, finalOffset); // 新DOM节点 + 安全偏移
+      range.collapse(true); // 光标折叠（只显示光标，不选中文字）
+
+      selection.removeAllRanges();
+      selection.addRange(range);
+    });
+  }
+
+  /**
+   * 辅助方法：在编辑器DOM下，找到「文本内容完全匹配」的文本节点（核心修复）
+   * @param root 编辑器根节点（this.editor）
+   * @param targetText 保存时的节点文本内容
+   */
+  private findTextNodeByContent(root: HTMLElement, targetText: string): Node | null {
+    // 遍历编辑器下所有文本节点（递归）
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    let currentNode: Node | null;
+
+    while ((currentNode = walker.nextNode())) {
+      // 找到文本内容完全匹配的节点（忽略空格差异，可选）
+      if (currentNode.textContent?.trim() === targetText.trim()) {
+        return currentNode;
+      }
+    }
+
+    // 找不到时，返回编辑器下第一个文本节点（兜底，避免光标丢了）
+    return this.getFirstTextNode(root);
+  }
+
+  /**
+   * 辅助方法：获取编辑器下第一个文本节点（兜底用）
+   */
+  private getFirstTextNode(root: HTMLElement): Node | null {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    return walker.nextNode();
+  }
 
   /**
    * 处理全局鼠标按下事件（判断是否点击工具栏）
@@ -374,7 +362,7 @@ private getFirstTextNode(root: HTMLElement): Node | null {
     this.editor = null;
   }
 
-      /**
+  /**
    * 通用方法：修改部分文本的内联样式（完全适配你的 TextState 定义）
    * @param id 文本节点ID
    * @param store Pinia存储（用于获取/更新节点）
@@ -407,13 +395,13 @@ private getFirstTextNode(root: HTMLElement): Node | null {
     if (selectionStart >= selectionEnd) return; // 修正后仍为空范围，直接退出
 
     // 3. 预处理现有样式：过滤空范围（start >= end），保留有效样式
-    const validInlineStyles = inlineStyles.filter(style => style.start < style.end);
+    const validInlineStyles = inlineStyles.filter((style) => style.start < style.end);
 
     // 4. 核心逻辑：找到目标样式对象（同一范围+包含目标属性），处理添加/移除
     // 目标：只修改当前样式属性，不影响其他属性（如已有fontWeight，只改color）
     const updatedStyles = [...validInlineStyles];
     const targetStyleIndex = updatedStyles.findIndex(
-      style =>
+      (style) =>
         // 范围完全匹配（同一文本片段）
         style.start === selectionStart &&
         style.end === selectionEnd &&
@@ -425,18 +413,18 @@ private getFirstTextNode(root: HTMLElement): Node | null {
       // 场景1：切换样式（有则移除，无则添加）
       if (targetStyleIndex > -1) {
         // 存在目标样式：移除该属性（不删除整个样式对象，保留其他属性）
-        const targetStyle = updatedStyles[targetStyleIndex]as {
+        const targetStyle = updatedStyles[targetStyleIndex] as {
           start: number;
           end: number;
           styles: InlineStyleProps;
-        };;
+        };
         const { [styleKey]: _, ...remainingStyles } = targetStyle!.styles;
 
         if (Object.keys(remainingStyles).length > 0) {
           // 还有其他样式属性：更新样式对象
           updatedStyles[targetStyleIndex] = {
             ...targetStyle,
-            styles: remainingStyles
+            styles: remainingStyles,
           };
         } else {
           // 无其他样式属性：删除整个样式对象
@@ -447,7 +435,7 @@ private getFirstTextNode(root: HTMLElement): Node | null {
         updatedStyles.push({
           start: selectionStart,
           end: selectionEnd,
-          styles: { [styleKey]: styleValue } as InlineStyleProps
+          styles: { [styleKey]: styleValue } as InlineStyleProps,
         });
       }
     } else {
@@ -464,15 +452,15 @@ private getFirstTextNode(root: HTMLElement): Node | null {
           end: targetStyle.end,
           styles: {
             ...targetStyle.styles,
-            [styleKey]: styleValue
-          }
+            [styleKey]: styleValue,
+          },
         };
       } else {
         // 不存在目标样式：添加新样式对象
         updatedStyles.push({
           start: selectionStart,
           end: selectionEnd,
-          styles: { [styleKey]: styleValue } as InlineStyleProps
+          styles: { [styleKey]: styleValue } as InlineStyleProps,
         });
       }
     }
@@ -481,8 +469,8 @@ private getFirstTextNode(root: HTMLElement): Node | null {
     store.updateNode(id, {
       props: {
         ...node.props,
-        inlineStyles: updatedStyles // 覆盖原有 inlineStyles
-      }
+        inlineStyles: updatedStyles, // 覆盖原有 inlineStyles
+      },
     });
   }
 }
