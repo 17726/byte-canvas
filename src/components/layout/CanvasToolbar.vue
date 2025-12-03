@@ -109,7 +109,7 @@ function onMenuItemClick(key: string) {
       }
       selectedKeys.value = [key];
       break;
-    //NOTE: 菜单项不支持预览图 故创建图片独立出去处理
+    //NOTE: 菜单项不支持预览图 故创建图片独立出去处理(ImageMenu.vue)
     // case MenuKey.AddImage:
     //   console.log('图片被点击');
     //   toolManager.createImage(imageUrl);

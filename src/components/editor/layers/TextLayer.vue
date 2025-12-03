@@ -5,13 +5,13 @@
     <div
       ref="editor"
       class="textBox"
-      :class="{ 'is-editing': isEditing }"
+      :class="{ 'is-editing': textSelectionHandler.isEditing }"
       contenteditable="true"
-      
+
       v-html="HTMLstring"
       @input="handleContentChange"
       @keyup="handleSelectionChange"
-      @mouseup="handleMouseUpAndSelection"
+      @mouseup="handleMouseUpAndSelection($event, props.node)"
       @mousemove="handleMouseMove"
       @mousedown="handleMouseDown"
       @dblclick="enterEditing"
@@ -22,17 +22,22 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, type CSSProperties, nextTick, onMounted, onUnmounted } from 'vue';
+import { computed, ref, watch, type CSSProperties, onMounted, onUnmounted } from 'vue';
 import type { TextState } from '@/types/state';
-import { useCanvasStore } from '@/store/canvasStore';
 import { getDomStyle } from '@/core/renderers/dom';
+import { textSelectionHandler } from '@/core/handlers/TextSeletionHandler';
+import { TextService } from '@/core/services/TextService';
 
 const props = defineProps<{
   node: TextState;
 }>();
 
-const store = useCanvasStore();
+const editor = ref<HTMLElement | null>(null);
+
+// 计算属性：文本HTML渲染
 const HTMLstring = computed(() => getDomStyle(props.node));
+
+// 计算属性：组件样式
 const style = computed((): CSSProperties => {
   // 类型断言 + 容错：确保 transform 和 style 存在（避免 undefined 报错）
   const text = props.node as TextState & {
@@ -86,345 +91,108 @@ const style = computed((): CSSProperties => {
   };
 });
 
-const editor = ref<HTMLElement | null>(null);
+// 选中状态（从store派生）
+//const isSelected = computed(() => textSelectionHandler['store'].activeElementIds.has(props.node.id));
 
-//编辑状态
-const isEditing = ref(false);
+// 激活节点状态（从handler获取）
+const isActiveNode = computed(() => textSelectionHandler.isActiveNode(props.node));
 
-// 选中状态
-const isSelected = computed(() => store.activeElementIds.has(props.node.id));
-// 文本组件：优化 isActiveNode 计算逻辑（编辑态强制为true）
-// 监听：判断当前文本组件是否是激活节点
-const isActiveNode = computed(() => {
-  const activeNode = store.activeElements[0];
-  const baseActive = activeNode?.id === props.node.id;
-  // 关键：编辑态时，强制返回true（锁定激活状态）
-  const result = isEditing.value ? true : baseActive;
-  console.log('当前节点是否激活：', result, '编辑态：', isEditing.value);
-  return result;
-});
-
-// 文本组件内的局部状态，仅能在当前组件访问
-const currentSelection = ref<{ start: number; end: number } | null>(null);
-
-// 处理内容变化（同步content到结构化数据）
-const handleContentChange = (e: Event) => {
-  const target = e.target as HTMLElement;
-  // 关键1：更新 content 前，先保存当前光标位置
-  const savedCursorPos = saveCursorPosition();
-
-  const newContent=target.textContent;
-  const textNode = props.node as TextState;
-  // 关键2：更新 store 中的 content（会触发 v-html 重新渲染）
-  store.updateNode(textNode.id, {
-    props: { ...textNode.props, content:newContent}
-  });
-
-  // 关键3：DOM 重新渲染后，恢复光标位置
-  restoreCursorPosition(savedCursorPos);
-
-  updateInlineStylesOnContentChange(props.node.props.content, newContent!);
-};
-
-// 文本变化时，同步调整 inlineStyles 的 start/end 索引
-const updateInlineStylesOnContentChange = (oldContent: string, newContent: string) => {
-  const oldLength = oldContent.length;
-  const newLength = newContent.length;
-  const lengthDiff = newLength - oldLength;
-
-  // 无长度变化，无需调整
-  if (lengthDiff === 0) return;
-
-  const textNode = props.node as TextState;
-  const oldInlineStyles = textNode.props.inlineStyles || [];
-  const selection = window.getSelection();
-  if (!selection || !selection.rangeCount) return;
-
-  // 获取光标/选区的结束位置（以选区末尾为基准调整样式范围）
-  const range = selection.getRangeAt(0);
-  const cursorPos = range.endOffset;
-
-  // 调整所有样式范围的索引
-  const newInlineStyles = oldInlineStyles.map(style => {
-    let { start, end } = style;
-
-    // 场景1：文本插入（长度增加）—— 光标后的样式范围向后偏移
-    if (lengthDiff > 0 && end > cursorPos) {
-      start = start > cursorPos ? start + lengthDiff : start;
-      end += lengthDiff;
-    }
-
-    // 场景2：文本删除（长度减少）—— 光标后的样式范围向前偏移
-    if (lengthDiff < 0 && end > cursorPos) {
-      const offset = Math.abs(lengthDiff);
-      start = start > cursorPos ? Math.max(0, start - offset) : start;
-      end = Math.max(start, end - offset); // 避免 end < start（空范围）
-    }
-
-    return { ...style, start, end };
-  }).filter(style => style.start < style.end); // 过滤空范围（start >= end）
-
-  // 更新调整后的 inlineStyles
-  store.updateNode(textNode.id, {
-    props: { ...textNode.props, inlineStyles: newInlineStyles }
-  });
-};
-
-// 新增：保存当前光标位置（返回保存的位置信息）
-const saveCursorPosition = (): {
-  parent: Node | null;
-  offset: number;
-} => {
-  const selection = window.getSelection();
-  if (!selection || selection.rangeCount === 0) {
-    return { parent: null, offset: 0 };
-  }
-  const range = selection.getRangeAt(0);
-  // 记录光标所在的父节点和偏移量（核心：精准定位光标位置）
-  return {
-    parent: range.commonAncestorContainer,
-    offset: range.startOffset,
-  };
-};
-
-// 新增：恢复光标位置（接收保存的位置信息）
-const restoreCursorPosition = (savedPos: { parent: Node | null; offset: number }) => {
-  if (!editor.value || !savedPos.parent || !isEditing.value) return;
-
-  const selection = window.getSelection();
-  if (!selection) return;
-
-  // 等待 DOM 完全渲染（确保 v-html 已更新）
-  nextTick(() => {
-    // 找到保存的父节点（兼容 DOM 重新渲染后的结构）
-    const parentNode = findMatchingNode(editor.value!, savedPos.parent!);
-    if (!parentNode) return;
-
-    // 创建新的选区，恢复光标位置
-    const range = document.createRange();
-    range.setStart(parentNode, savedPos.offset);
-    range.collapse(true); // 光标折叠（不选中文本，只定位光标）
-
-    selection.removeAllRanges();
-    selection.addRange(range);
-  });
-};
-
-// 辅助函数：递归查找 DOM 重新渲染后对应的父节点（兼容 HTML 结构变化）
-const findMatchingNode = (root: HTMLElement, targetNode: Node): Node | null => {
-  // 如果根节点就是目标节点，直接返回
-  if (root === targetNode) return root;
-
-  // 递归查找子节点（匹配文本内容和节点类型）
-  const childNodes = Array.from(root.childNodes);
-  for (const node of childNodes) {
-    if (node.nodeType === targetNode.nodeType && node.textContent === targetNode.textContent) {
-      return node;
-    }
-    const found = findMatchingNode(node as HTMLElement, targetNode);
-    if (found) return found;
-  }
-  return null;
-};
-
-// 文本组件：合并 watch 监听器（核心修复）
-// 合并监听 currentSelection 和 isActiveNode，统一管理选区同步逻辑
+// 监听activeElementIds变化，强制保留编辑态节点激活
 watch(
-  [currentSelection, isActiveNode],
-  ([newSelection, isActive]) => {
-    console.log('watch-选区/激活变化：', { newSelection, isActive });
-    if (isActive && newSelection) {
-      store.updateGlobalTextSelection(newSelection); // 激活且有选区时同步
-    } else {
-      store.updateGlobalTextSelection(null); // 其他情况清空
-    }
-  },
-  { immediate: true, deep: true }
-);
-
-watch(
-  () => Array.from(store.activeElementIds),
+  () => Array.from(textSelectionHandler['store'].activeElementIds),
   (newActiveIds) => {
-    if (isEditing.value && !newActiveIds.includes(props.node.id)) {
-      console.log('编辑态：强制保留当前节点激活');
-      store.setActive([props.node.id]); // 强制激活当前节点
+    if (textSelectionHandler.isEditing && !newActiveIds.includes(props.node.id)) {
+      textSelectionHandler['store'].setActive([props.node.id]); // 强制激活当前节点
     }
   },
   { deep: true }
 );
 
-// 处理选区变化（计算局部选区）
+// 监听选区变化（同步到全局）
+watch(
+  () => [textSelectionHandler.currentSelection, isActiveNode.value],
+  ([newSelection, isActive]) => {
+    // 类型守卫：确保 newSelection 是正确的选区对象（排除 boolean 和 null）
+    const isValidSelection = (
+      typeof newSelection === 'object' &&
+      newSelection !== null &&
+      'start' in newSelection &&
+      'end' in newSelection
+    );
+
+    if (isActive && isValidSelection) {
+      // 此时 TypeScript 能确定 newSelection 是正确类型
+      textSelectionHandler.updateGlobalSelection(newSelection);
+    } else {
+      textSelectionHandler.updateGlobalSelection(null);
+    }
+  },
+  { immediate: true, deep: true }
+);
+
+// 事件代理：内容变化（调用无状态服务）
+const handleContentChange = (e: Event) => {
+  TextService.handleContentChange(
+    e,
+    props.node,
+    () => textSelectionHandler.saveCursorPosition(),
+    (pos) => textSelectionHandler.restoreCursorPosition(pos)
+  );
+};
+
+// 事件代理：选区变化（调用handler）
 const handleSelectionChange = () => {
-  if (!isEditing.value || !editor.value) {
-    //console.log('选区计算：未进入编辑态或无编辑器节点');
-    currentSelection.value = null;
-    return;
-  }
-
-  const selection = window.getSelection();
-  if (!selection || selection.rangeCount === 0 || selection.isCollapsed) {
-    //console.log('选区计算：无有效选区（未选中或光标未选中文本）');
-    currentSelection.value = null;
-    return;
-  }
-
-  const range = selection.getRangeAt(0);
-  if (!editor.value.contains(range.commonAncestorContainer)) {
-    //console.log('选区计算：选区不在当前编辑器内');
-    currentSelection.value = null;
-    return;
-  }
-
-  // 精准计算选中文本的 start 和 end（原有逻辑保留）
-  const getTextOffset = (node: Node, root: HTMLElement): number => {
-    let offset = 0;
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-    let currentNode: Node | null;
-    while ((currentNode = walker.nextNode())) {
-      if (currentNode === node) break;
-      offset += currentNode.textContent?.length || 0;
-    }
-    return offset;
-  };
-
-  const startNode = range.startContainer;
-  const startOffset = range.startOffset;
-  const baseOffset = getTextOffset(startNode, editor.value);
-  const totalStart = baseOffset + startOffset;
-
-  const endNode = range.endContainer;
-  const endOffset = range.endOffset;
-  const endBaseOffset = getTextOffset(endNode, editor.value);
-  const totalEnd = endBaseOffset + endOffset;
-
-  const start = Math.min(totalStart, totalEnd);
-  const end = Math.max(totalStart, totalEnd);
-
-  // 关键日志：输出计算结果
-  //console.log('选区计算结果：', { start, end, content: props.node.props.content });
-
-  if (start < end) {
-    currentSelection.value = { start, end };
-    //console.log('currentSelection 赋值：', currentSelection.value);
-  } else {
-    //console.log('选区计算：start >= end（无效选区）');
-    currentSelection.value = null;
-  }
+  textSelectionHandler.handleSelectionChange(props.node);
 };
 
-// 双击进入编辑状态
+// 事件代理：双击进入编辑（调用handler）
 const enterEditing = (event: MouseEvent) => {
-  event.stopPropagation();
-  if (!isSelected.value) return;
-
-  isEditing.value = true;
-
-  nextTick(() => {
-    if (editor.value) {
-      editor.value.focus();
-      const selection = window.getSelection();
-      const range = document.createRange();
-      range.selectNodeContents(editor.value);
-      selection?.removeAllRanges();
-      selection?.addRange(range);
-    }
-  });
+  textSelectionHandler.enterEditing(event, props.node);
 };
 
+// 事件代理：鼠标按下（调用handler）
 const handleMouseDown = (e: MouseEvent) => {
-  if (isEditing.value) {
-    e.stopPropagation(); // 阻止事件冒泡到上层节点
-  }else{
-    // 阻止文本框聚焦（避免单击时光标出现，不进入编辑态）
-    e.preventDefault();
-  }
+  textSelectionHandler.handleMouseDown(e);
 };
 
+// 事件代理：鼠标移动（调用handler）
 const handleMouseMove = (e: MouseEvent) => {
-  if (isEditing.value) {
-    e.stopPropagation();
-  }
+  textSelectionHandler.handleMouseMove(e);
 };
 
-// 合并 mouseup 和选区计算（确保鼠标选中必触发）
-const handleMouseUpAndSelection = (e: MouseEvent) => {
-  //console.log('mouseup 事件触发'); // 调试日志
-  if (isEditing.value) {
-    e.stopPropagation();
-    handleSelectionChange(); // 直接调用选区计算
-  }
-  // 非编辑态下，事件正常冒泡（不影响选中节点）
+// 事件代理：鼠标抬起（调用handler）
+const handleMouseUpAndSelection = (e: MouseEvent, node: TextState) => {
+  textSelectionHandler.handleMouseUpAndSelection(e, node);
 };
 
-// 标记：是否正在点击工具栏（初始为false）
-const isClickingToolbar = ref(false);
-
-// 全局点击监听：判断点击目标是否在工具栏内
-const handleGlobalMousedown = (e: MouseEvent) => {
-  const target = e.target as HTMLElement;
-  // 直接通过 DOM 查找工具栏（不依赖事件冒泡）
-  const toolbar = document.querySelector('.context-toolbar');
-  const isClickToolbar = toolbar
-    ? toolbar.contains(target) // 用 contains 更可靠，不依赖 closest
-    : false;
-
-  isClickingToolbar.value = isClickToolbar;
-  //console.log('全局 mousedown 捕获：是否点击工具栏', isClickingToolbar.value);
-};
-
-
-
-// 文本组件：修改 handleBlur 逻辑（核心修复）
+// 事件代理：失焦处理（调用handler）
 const handleBlur = () => {
-  //console.log('文本组件失焦：', { isClickingToolbar: isClickingToolbar.value });
-
-  if (isClickingToolbar.value) {
-    // 点击工具栏 → 保留编辑态+重新聚焦
-    //console.log('点击工具栏，保留编辑态');
-    editor.value?.focus(); // 立即重新聚焦，不中断编辑
-  } else {
-    // 点击其他区域 → 正常退出
-    //console.log('点击非工具栏区域，退出编辑态');
-    isEditing.value = false;
-    if (!store.activeElementIds.has(props.node.id)) {
-      store.updateGlobalTextSelection(null);
-    }
-  }
+  textSelectionHandler.handleBlur(props.node);
 };
 
+// 事件代理：文本框点击（调用handler）
 const handleTextBoxClick = (e: MouseEvent) => {
-  if (!isEditing.value) {
-    // 关键1：阻止文本框聚焦（避免单击时光标出现，不进入编辑态）
-    e.preventDefault();
-    // 关键2：阻止文本框选中文字（非编辑态不需要选中文本）
-    // e.stopPropagation();
-
-    // 核心：执行选中逻辑（单击的核心需求）
-    if (!isSelected.value) {
-      store.setActive([props.node.id]);
-    }
-
-    // 关键3：强制让文本框失焦（兜底，避免意外聚焦）
-    editor.value?.blur();
-  } else {
-    // 编辑状态下，正常响应点击（选中文本、输入等）
-    e.stopPropagation();
-  }
+  textSelectionHandler.handleTextBoxClick(e, props.node);
 };
 
-// 组件挂载时添加全局监听，卸载时移除（避免内存泄漏）
+// 组件挂载初始化
 onMounted(() => {
-  // 捕获阶段监听：即使事件被阻止冒泡，document 也能捕获到
-  document.addEventListener('mousedown', handleGlobalMousedown, true);
+  // 初始化编辑器引用
+  textSelectionHandler.init(editor.value);
+  // 注册全局鼠标按下事件
+  document.addEventListener('mousedown', textSelectionHandler.handleGlobalMousedown, true);
 });
 
+// 组件卸载清理
 onUnmounted(() => {
-  document.removeEventListener('mousedown', handleGlobalMousedown, true);
+  // 移除全局事件监听
+  document.removeEventListener('mousedown', textSelectionHandler.handleGlobalMousedown, true);
+  // 清理handler状态
+  textSelectionHandler.destroy();
 });
 </script>
 
 <style scoped>
-
 .textBox {
   width: 100%;
   height: 100%;
@@ -441,7 +209,6 @@ onUnmounted(() => {
   padding: 2px 4px;
 }
 
-
 .textBox.is-editing {
   cursor: text;
   user-select: auto;
@@ -452,12 +219,10 @@ onUnmounted(() => {
   pointer-events: auto;
 }
 
-
 /* 文本选中样式（兼容不同浏览器） */
 .textBox::selection,
 .textBox *::selection {
   background-color: rgba(0, 122, 255, 0.1) !important;
-
 }
 
 .textBox::-moz-selection,

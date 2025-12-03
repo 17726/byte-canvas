@@ -63,6 +63,7 @@ import { ViewportHandler } from './handlers/ViewportHandler';
 import { TransformHandler } from './handlers/TransformHandler';
 import { SelectionHandler } from './handlers/SelectionHandler';
 import { GroupService } from './services/GroupService';
+import { TextSelectionHandler } from './handlers/TextSeletionHandler';
 
 /**
  * 工具管理器类
@@ -79,6 +80,7 @@ export class ToolManager {
   private viewportHandler: ViewportHandler;
   private transformHandler: TransformHandler;
   private selectionHandler: SelectionHandler;
+  private textSelectionHandler: TextSelectionHandler;
 
   // 改为从外部获取空格键状态（不再内部维护）
   private getIsSpacePressed: () => boolean;
@@ -99,6 +101,7 @@ export class ToolManager {
     this.viewportHandler = new ViewportHandler(this.store);
     this.transformHandler = new TransformHandler(this.store);
     this.selectionHandler = new SelectionHandler(this.store, stageEl);
+    this.textSelectionHandler = new TextSelectionHandler(this.store);
   }
 
   /**
@@ -332,6 +335,8 @@ export class ToolManager {
     // 如果双击的是组合节点，进入编辑模式
     if (node.type === NodeType.GROUP) {
       GroupService.enterGroupEdit(this.store, id);
+    }else if(node.type === NodeType.TEXT){
+      this.textSelectionHandler.startEditting();
     }
     this.store.isInteracting = false;
   }
