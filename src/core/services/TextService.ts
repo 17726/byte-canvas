@@ -1,54 +1,76 @@
 import type { TextState } from '@/types/state';
-import { useCanvasStore } from '@/store/canvasStore';
+import type { useCanvasStore } from '@/store/canvasStore';
+import { NodeType } from '@/types/state'; // 导入节点类型枚举（用于校验节点类型）
+
+type CanvasStore = ReturnType<typeof useCanvasStore>;
 
 /**
  * 文本业务服务（无状态）
  * 处理文本相关的原子业务指令，无状态，纯函数操作。
+ * 所有节点相关传参统一为 id，内部通过 store 获取节点。
  */
 export class TextService {
-  private static store = useCanvasStore();
-
   /**
-   * 处理文本内容变化
+   * 处理文本内容变化（入参改为 id）
    * @param e 事件对象
-   * @param node 文本节点数据
+   * @param id 文本节点 ID
+   * @param store Pinia 实例（由调用方传递）
    * @param saveCursorPosition 保存光标位置的函数
    * @param restoreCursorPosition 恢复光标位置的函数
    */
   static handleContentChange(
     e: Event,
-    node: TextState,
+    id: string, // 🔥 改为接收节点 ID
+    store: CanvasStore,
     saveCursorPosition: () => { parent: Node | null; offset: number },
     restoreCursorPosition: (savedPos: { parent: Node | null; offset: number }) => void
   ) {
+    // 🔥 通过 ID 获取节点，加非空+类型校验
+    const node = store.nodes[id] as TextState | undefined;
+    if (!node || node.type !== NodeType.TEXT) return; // 仅处理文本节点
+
     const target = e.target as HTMLElement;
     // 保存当前光标位置
     const savedCursorPos = saveCursorPosition();
 
-    const newContent = target.textContent;
-    // 更新 store 中的 content
-    this.store.updateNode(node.id, {
+    const newContent = target.textContent || ''; // 兜底空字符串，避免 null
+    // 通过 ID 更新节点内容
+    store.updateNode(id, { // 直接使用传入的 id，无需 node.id
       props: { ...node.props, content: newContent }
     });
 
     // DOM 重新渲染后，恢复光标位置
     restoreCursorPosition(savedCursorPos);
 
-    // 同步调整内联样式
-    this.updateInlineStylesOnContentChange(node.props.content, newContent!, node);
+    // 同步调整内联样式（传递 id 给内部方法）
+    const oldContent = node.props.content || '';
+    if (oldContent && newContent) {
+      this.updateInlineStylesOnContentChange(
+        oldContent,
+        newContent,
+        id, // 🔥 传递 ID 而非 node
+        store
+      );
+    }
   }
 
   /**
-   * 文本变化时，同步调整 inlineStyles 的 start/end 索引
+   * 文本变化时，同步调整 inlineStyles 的 start/end 索引（入参改为 id）
    * @param oldContent 旧内容
    * @param newContent 新内容
-   * @param node 文本节点数据
+   * @param id 文本节点 ID
+   * @param store Pinia 实例（由调用方传递）
    */
   static updateInlineStylesOnContentChange(
     oldContent: string,
     newContent: string,
-    node: TextState
+    id: string, // 🔥 改为接收节点 ID
+    store: CanvasStore
   ) {
+    // 🔥 通过 ID 获取节点，加非空+类型校验
+    const node = store.nodes[id] as TextState | undefined;
+    if (!node || node.type !== NodeType.TEXT) return; // 仅处理文本节点
+
     const oldLength = oldContent.length;
     const newLength = newContent.length;
     const lengthDiff = newLength - oldLength;
@@ -84,8 +106,8 @@ export class TextService {
       return { ...style, start, end };
     }).filter(style => style.start < style.end); // 过滤空范围
 
-    // 更新调整后的 inlineStyles
-    this.store.updateNode(node.id, {
+    // 通过 ID 更新内联样式
+    store.updateNode(id, { // 直接使用传入的 id
       props: { ...node.props, inlineStyles: newInlineStyles }
     });
   }

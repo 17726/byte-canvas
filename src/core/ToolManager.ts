@@ -57,7 +57,7 @@
 
 import { useCanvasStore } from '@/store/canvasStore';
 import { useUIStore } from '@/store/uiStore';
-import { NodeType, type BaseNodeState, type TextState } from '@/types/state';
+import { NodeType, type BaseNodeState } from '@/types/state';
 import type { ResizeHandle } from '@/types/editor';
 import { ViewportHandler } from './handlers/ViewportHandler';
 import { TransformHandler } from './handlers/TransformHandler';
@@ -461,12 +461,15 @@ export class ToolManager {
   handleTextInput(e: Event, id: string) {
     if (this.transformHandler.isTransforming) return;
 
-    const node = this.store.nodes[id] as TextState;
+    // 仅需校验节点是否存在（无需传递给 TextService，TextService 内部会二次校验）
+    const node = this.store.nodes[id];
     if (!node || node.type !== NodeType.TEXT) return;
 
+    // 🔥 调用 TextService 时，传递 id 而非 node
     TextService.handleContentChange(
       e,
-      node,
+      id, // 传递节点 ID
+      this.store, // Pinia 实例
       () => this.textSelectionHandler.saveCursorPosition(),
       (pos) => this.textSelectionHandler.restoreCursorPosition(pos)
     );
@@ -523,6 +526,10 @@ export class ToolManager {
     const node = this.store.nodes[id];
     if (!node || node.type !== NodeType.TEXT) return;
     this.textSelectionHandler.handleMouseUpAndSelection(e, id);
+  }
+
+  getTextEditingState():boolean{
+    return this.textSelectionHandler.isEditing;
   }
   // ==================== 组合/解组合功能（已迁移至 GroupService）====================
 

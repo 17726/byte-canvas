@@ -21,7 +21,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref, watch, type CSSProperties, onMounted, onUnmounted, inject } from 'vue';
+import { computed, ref,type Ref, watch, type CSSProperties, onMounted, onUnmounted, inject } from 'vue';
 import type { TextState } from '@/types/state';
 import { getDomStyle } from '@/core/renderers/dom';
 import type { ToolManager } from '@/core/ToolManager';
@@ -32,10 +32,7 @@ const props = defineProps<{
 }>();
 
 // 1. 注入全局 ToolManager 实例（唯一依赖，不直接接触任何 Handler）
-const toolManager = inject<ToolManager>('toolManager');
-if (!toolManager) {
-  throw new Error('文本组件必须在 ToolManager 提供的上下文下使用（需在 Stage 组件内渲染）');
-}
+const toolManagerRef = inject<Ref<ToolManager | null>>('toolManager');
 
 const store = useCanvasStore();
 const editor = ref<HTMLElement | null>(null);
@@ -85,10 +82,7 @@ const style = computed((): CSSProperties => {
 
 // 计算属性：编辑态（通过 ToolManager 间接获取，不直接访问 Handler）
 const isEditing = computed(() => {
-  // 若需严格隔离，可在 ToolManager 暴露 getTextEditingState() 方法，此处调用
-  return toolManager['textSelectionHandler'].isEditing;
-  // 更规范的方式：ToolManager 新增 getTextEditingState() { return this.textSelectionHandler.isEditing; }
-  // 然后此处改为：return toolManager.getTextEditingState();
+  return toolManagerRef?.value?.getTextEditingState();
 });
 
 // 激活节点状态（从 Store 直接获取，不依赖 Handler）
@@ -112,7 +106,7 @@ watch(
   () => [isActiveNode.value, isEditing.value],
   ([isActive, editing]) => {
     if (isActive && editing) {
-      toolManager.handleTextSelectionChange(props.node.id);
+      toolManagerRef?.value?.handleTextSelectionChange(props.node.id);
     } else {
       // 若需清空全局选区，可在 ToolManager 新增 clearGlobalTextSelection() 方法
       store.updateGlobalTextSelection(null);
@@ -123,45 +117,45 @@ watch(
 
 // 2. 所有事件处理：只调用 ToolManager 方法，不直接接触 Handler
 const handleContentChange = (e: Event, id: string) => {
-  toolManager.handleTextInput(e, id); // 调用 ToolManager 文本输入处理
+  toolManagerRef?.value?.handleTextInput(e, id); // 调用 ToolManager 文本输入处理
 };
 
 const handleSelectionChange = (id: string) => {
-  toolManager.handleTextSelectionChange(id); // 调用 ToolManager 选区变化处理
+  toolManagerRef?.value?.handleTextSelectionChange(id); // 调用 ToolManager 选区变化处理
 };
 
 const enterEditing = (e: MouseEvent, id: string) => {
-  toolManager.handleNodeDoubleClick(e, id); // 调用 ToolManager 节点双击事件（内部路由到文本编辑）
+  toolManagerRef?.value?.handleNodeDoubleClick(e, id); // 调用 ToolManager 节点双击事件（内部路由到文本编辑）
 };
 
 const handleMouseDown = (e: MouseEvent, id: string) => {
-  toolManager.handleNodeDown(e, id); // 调用 ToolManager 节点按下事件（内部含文本编辑态判断）
+  toolManagerRef?.value?.handleNodeDown(e, id); // 调用 ToolManager 节点按下事件（内部含文本编辑态判断）
 };
 
 const handleMouseMove = (e: MouseEvent) => {
-  toolManager.handleMouseMove(e); // 调用 ToolManager 全局鼠标移动事件（内部含文本选区更新）
+  toolManagerRef?.value?.handleMouseMove(e); // 调用 ToolManager 全局鼠标移动事件（内部含文本选区更新）
 };
 
 const handleMouseUpAndSelection = (e: MouseEvent, id: string) => {
-  toolManager.handleMouseUp(); // 调用 ToolManager 全局鼠标抬起事件
-  toolManager.handleTextMouseUp(e, id); // 调用 ToolManager 文本鼠标抬起处理
+  toolManagerRef?.value?.handleMouseUp(); // 调用 ToolManager 全局鼠标抬起事件
+  toolManagerRef?.value?.handleTextMouseUp(e, id); // 调用 ToolManager 文本鼠标抬起处理
 };
 
 const handleBlur = (id: string) => {
-  toolManager.handleTextBlur(id); // 调用 ToolManager 文本失焦处理
+  toolManagerRef?.value?.handleTextBlur(id); // 调用 ToolManager 文本失焦处理
 };
 
 const handleTextBoxClick = (e: MouseEvent, id: string) => {
-  toolManager.handleTextClick(e, id); // 调用 ToolManager 文本点击处理
+  toolManagerRef?.value?.handleTextClick(e, id); // 调用 ToolManager 文本点击处理
 };
 
 // 3. 组件生命周期：只调用 ToolManager 方法
 onMounted(() => {
-  toolManager.initTextEditor(editor.value); // 调用 ToolManager 初始化文本编辑器
+  toolManagerRef?.value?.initTextEditor(editor.value); // 调用 ToolManager 初始化文本编辑器
 });
 
 onUnmounted(() => {
-  toolManager.destroy(); // 调用 ToolManager 销毁文本编辑器资源
+  toolManagerRef?.value?.destroy(); // 调用 ToolManager 销毁文本编辑器资源
 });
 </script>
 
