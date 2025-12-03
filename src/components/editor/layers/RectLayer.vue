@@ -5,7 +5,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, type CSSProperties } from 'vue';
 import type { ShapeState } from '@/types/state';
 import { useCanvasStore } from '@/store/canvasStore';
 import { getDomStyle } from '@/core/renderers/dom';
@@ -17,7 +17,7 @@ const props = defineProps<{
 const store = useCanvasStore();
 
 // 获取样式 (使用策略模式分离的渲染器)
-const style = computed(() => getDomStyle(props.node));
+const style = computed(() => getDomStyle(props.node) as CSSProperties);
 
 // 选中状态
 const isSelected = computed(() => store.activeElementIds.has(props.node.id));
@@ -34,5 +34,4 @@ const isSelected = computed(() => store.activeElementIds.has(props.node.id));
   -moz-user-select: none; /* Firefox */
   -ms-user-select: none; /* IE/Edge */
 }
-
 </style>

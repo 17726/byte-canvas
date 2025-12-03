@@ -58,8 +58,7 @@ import { IconPlus, IconEdit, IconDelete } from '@arco-design/web-vue/es/icon';
 //TODO：UI开发完成后优化icon-park库的导入，针对按需导入减小打包体积
 import { Square, Round } from '@icon-park/vue-next';
 import { useCanvasStore } from '@/store/canvasStore';
-import { ToolManager } from '@/core/tools/ToolManager';
-// DEFAULT_CANVAS_THEMES moved to header
+import { NodeFactory } from '@/core/services/NodeFactory';
 import { Notification } from '@arco-design/web-vue';
 import ImageMenu from './ImageMenu.vue';
 
@@ -74,10 +73,6 @@ enum MenuKey {
 
 const store = useCanvasStore();
 const hasSelection = computed(() => store.activeElementIds.size > 0);
-// Settings handled by header component now
-
-// 元素控制底层组件
-const toolManager = new ToolManager(null, () => false);
 
 // 高亮控制
 const selectedKeys = ref<string[]>([]);
@@ -89,17 +84,29 @@ function onMenuItemClick(key: string) {
   switch (key) {
     case MenuKey.AddRect:
       console.log('矩形被点击');
-      toolManager.createRect();
+      {
+        const node = NodeFactory.createRect();
+        store.addNode(node);
+        store.setActive([node.id]);
+      }
       selectedKeys.value = [key];
       break;
     case MenuKey.AddCircle:
       console.log('圆被点击');
-      toolManager.createCircle();
+      {
+        const node = NodeFactory.createCircle();
+        store.addNode(node);
+        store.setActive([node.id]);
+      }
       selectedKeys.value = [key];
       break;
     case MenuKey.AddText:
       console.log('文本被点击');
-      toolManager.createText();
+      {
+        const node = NodeFactory.createText();
+        store.addNode(node);
+        store.setActive([node.id]);
+      }
       selectedKeys.value = [key];
       break;
     //NOTE: 菜单项不支持预览图 故创建图片独立出去处理
@@ -119,7 +126,10 @@ function onMenuItemClick(key: string) {
 }
 
 function onDeleteConfirm() {
-  toolManager.deleteSelected();
+  // 直接调用 store 删除选中节点
+  store.activeElementIds.forEach((id) => {
+    store.deleteNode(id);
+  });
   Notification.success({
     content: '删除成功！',
     closable: true,

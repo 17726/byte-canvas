@@ -1,11 +1,30 @@
-// utils 来存放纯函数（Pure Functions），例如：
-// 坐标转换：鼠标点击的屏幕坐标 (Screen X,Y) 转换成 画布内部坐标 (World X,Y)（需要减去偏移量、除以缩放比例）。
-// 碰撞检测：判断鼠标点击的点是否在某个旋转后的矩形内部 (Hit Test)。
-// 辅助计算：生成 UUID、深拷贝数据、计算两点距离等。
+/**
+ * @file geometry.ts
+ * @description 几何计算工具库
+ *
+ * 本文件存放所有与几何计算相关的纯函数 (Pure Functions)。
+ *
+ * 特点：
+ * 1. 无状态 (Stateless)：不依赖外部 Store 或类实例，输入确定则输出确定。
+ * 2. 纯计算 (Pure Calculation)：仅进行数学运算，不涉及 DOM 操作或副作用。
+ * 3. 通用性 (Generic)：可被 ToolManager、Renderers 或其他 Service 复用。
+ *
+ * 包含函数列表：
+ * - calculateBounds: 计算一组节点的包围盒 (AABB)
+ * - clientToWorld: 屏幕坐标转世界坐标
+ * - worldToClient: 世界坐标转屏幕坐标
+ * - isNodeInRect: 判断节点是否在矩形区域内 (碰撞检测)
+ * - calculateRectResize: 计算矩形缩放后的位置和尺寸
+ * - calculateCircleResize: 计算圆形缩放后的位置和尺寸
+ * - calculateTextResize: 计算文本缩放后的位置和尺寸
+ */
+
 import type { BaseNodeState, ViewportState } from '@/types/state';
+import type { ResizeHandle } from '@/types/editor';
+import { MIN_NODE_SIZE } from '@/config/defaults';
 
 /**
- * 边界框类型
+ * 边界框类型定义
  */
 export interface BoundsRect {
   x: number;
@@ -77,6 +96,13 @@ export function calculateBounds(
 }
 
 // 屏幕坐标 → 画布世界坐标（考虑视口偏移和缩放）
+/**
+ * 将屏幕坐标转换为画布世界坐标
+ * @param viewport 当前视口状态 (包含缩放和偏移)
+ * @param clientX 鼠标事件的 clientX
+ * @param clientY 鼠标事件的 clientY
+ * @returns 转换后的世界坐标 {x, y}
+ */
 export function clientToWorld(
   viewport: ViewportState,
   clientX: number,
@@ -89,6 +115,13 @@ export function clientToWorld(
 }
 
 // 画布世界坐标 → 屏幕坐标
+/**
+ * 将画布世界坐标转换为屏幕坐标
+ * @param viewport 当前视口状态
+ * @param worldX 世界坐标 X
+ * @param worldY 世界坐标 Y
+ * @returns 转换后的屏幕坐标 {x, y}
+ */
 export function worldToClient(
   viewport: ViewportState,
   worldX: number,
@@ -103,6 +136,15 @@ export function worldToClient(
 // 判断矩形框内是否包含某元素
 // TODO: 目前仅基于 AABB (Axis-Aligned Bounding Box) 进行判断，未考虑节点的旋转 (rotation) 属性。
 // 后续需要引入 SAT (Separating Axis Theorem) 或将矩形点逆旋转后判断，以支持旋转后的精确框选。
+/**
+ * 判断节点是否在给定的矩形区域内 (碰撞检测)
+ * @param maxRectWorldX 矩形区域最大 X (世界坐标)
+ * @param maxRectWorldY 矩形区域最大 Y (世界坐标)
+ * @param minRectWorldX 矩形区域最小 X (世界坐标)
+ * @param minRectWorldY 矩形区域最小 Y (世界坐标)
+ * @param baseNode 待检测的节点
+ * @returns 是否相交
+ */
 export function isNodeInRect(
   maxRectWorldX: number,
   maxRectWorldY: number,
@@ -229,4 +271,257 @@ export function isNodeInRect(
       // 未定义类型默认返回false
       return false;
   }
+}
+
+export interface ResizeResult {
+  width: number;
+  height: number;
+  x: number;
+  y: number;
+}
+
+/**
+ * 矩形缩放计算（独立缩放宽高）
+ * @param handle 缩放手柄位置 ('nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w')
+ * @param dx 鼠标 X 轴位移
+ * @param dy 鼠标 Y 轴位移
+ * @param startWidth 初始宽度
+ * @param startHeight 初始高度
+ * @param startNodeX 初始 X 坐标
+ * @param startNodeY 初始 Y 坐标
+ * @returns 缩放后的尺寸和位置 {width, height, x, y}
+ */
+export function calculateRectResize(
+  handle: ResizeHandle,
+  dx: number,
+  dy: number,
+  startWidth: number,
+  startHeight: number,
+  startNodeX: number,
+  startNodeY: number
+): ResizeResult {
+  let newWidth = startWidth;
+  let newHeight = startHeight;
+  let newX = startNodeX;
+  let newY = startNodeY;
+
+  switch (handle) {
+    case 'nw': // 左上
+      newWidth = startWidth - dx;
+      newHeight = startHeight - dy;
+      newX = startNodeX + dx;
+      newY = startNodeY + dy;
+      break;
+    case 'n': // 上
+      newHeight = startHeight - dy;
+      newY = startNodeY + dy;
+      break;
+    case 'ne': // 右上
+      newWidth = startWidth + dx;
+      newHeight = startHeight - dy;
+      newY = startNodeY + dy;
+      break;
+    case 'e': // 右
+      newWidth = startWidth + dx;
+      break;
+    case 'se': // 右下
+      newWidth = startWidth + dx;
+      newHeight = startHeight + dy;
+      break;
+    case 's': // 下
+      newHeight = startHeight + dy;
+      break;
+    case 'sw': // 左下
+      newWidth = startWidth - dx;
+      newHeight = startHeight + dy;
+      newX = startNodeX + dx;
+      break;
+    case 'w': // 左
+      newWidth = startWidth - dx;
+      newX = startNodeX + dx;
+      break;
+  }
+
+  return {
+    width: newWidth,
+    height: newHeight,
+    x: newX,
+    y: newY,
+  };
+}
+
+/**
+ * 圆形缩放计算
+ * @description 角点 (nw, ne, sw, se) 进行等比缩放，边点 (n, s, w, e) 进行自由缩放（可变为椭圆）
+ * @param handle 缩放手柄位置
+ * @param dx 鼠标 X 轴位移
+ * @param dy 鼠标 Y 轴位移
+ * @param startWidth 初始宽度
+ * @param startHeight 初始高度
+ * @param startNodeX 初始 X 坐标
+ * @param startNodeY 初始 Y 坐标
+ * @returns 缩放后的尺寸和位置 {width, height, x, y}
+ */
+export function calculateCircleResize(
+  handle: ResizeHandle,
+  dx: number,
+  dy: number,
+  startWidth: number,
+  startHeight: number,
+  startNodeX: number,
+  startNodeY: number
+): ResizeResult {
+  let newWidth = startWidth;
+  let newHeight = startHeight;
+  let newX = startNodeX;
+  let newY = startNodeY;
+
+  // 宽高比
+  const ratio = startWidth / startHeight;
+
+  // 判断是否为角点（等比缩放）
+  const isCorner = handle.length === 2;
+
+  if (isCorner) {
+    // 角点：等比缩放，保持宽高比
+    // 以宽度变化为主导 (也可以取 max(dx, dy))
+
+    // 1. 计算基于宽度的预期新宽度
+    if (handle.includes('e')) {
+      newWidth = startWidth + dx;
+    } else {
+      newWidth = startWidth - dx;
+    }
+
+    // 2. 根据比例计算高度
+    newHeight = newWidth / ratio;
+
+    // 3. 根据锚点调整位置
+    if (handle === 'se') {
+      // 锚点在左上 (startNodeX, startNodeY) -> 不变
+    } else if (handle === 'sw') {
+      // 锚点在右上 (startNodeX + startWidth, startNodeY)
+      newX = startNodeX + startWidth - newWidth;
+    } else if (handle === 'ne') {
+      // 锚点在左下 (startNodeX, startNodeY + startHeight)
+      newY = startNodeY + startHeight - newHeight;
+    } else if (handle === 'nw') {
+      // 锚点在右下 (startNodeX + startWidth, startNodeY + startHeight)
+      newX = startNodeX + startWidth - newWidth;
+      newY = startNodeY + startHeight - newHeight;
+    }
+  } else {
+    // 边点：独立缩放宽高，可拉伸成椭圆 (与矩形逻辑一致)
+    switch (handle) {
+      case 'n': // 上：只改变高度，锚点在下
+        newHeight = startHeight - dy;
+        newY = startNodeY + dy;
+        break;
+      case 'e': // 右：只改变宽度，锚点在左
+        newWidth = startWidth + dx;
+        break;
+      case 's': // 下：只改变高度，锚点在上
+        newHeight = startHeight + dy;
+        break;
+      case 'w': // 左：只改变宽度，锚点在右
+        newWidth = startWidth - dx;
+        newX = startNodeX + dx;
+        break;
+    }
+  }
+
+  return {
+    width: newWidth,
+    height: newHeight,
+    x: newX,
+    y: newY,
+  };
+}
+
+/**
+ * 文本缩放计算（只改变容器大小，不改变字号）
+ * @description 文本节点的缩放逻辑目前与矩形一致，仅改变包围盒大小
+ * @param handle 缩放手柄位置
+ * @param dx 鼠标 X 轴位移
+ * @param dy 鼠标 Y 轴位移
+ * @param startWidth 初始宽度
+ * @param startHeight 初始高度
+ * @param startNodeX 初始 X 坐标
+ * @param startNodeY 初始 Y 坐标
+ * @returns 缩放后的尺寸和位置 {width, height, x, y}
+ */
+export function calculateTextResize(
+  handle: ResizeHandle,
+  dx: number,
+  dy: number,
+  startWidth: number,
+  startHeight: number,
+  startNodeX: number,
+  startNodeY: number
+): ResizeResult {
+  let newWidth = startWidth;
+  let newHeight = startHeight;
+  let newX = startNodeX;
+  let newY = startNodeY;
+
+  // 文本容器的缩放逻辑与矩形相同
+  switch (handle) {
+    case 'nw': // 左上
+      newWidth = startWidth - dx;
+      newHeight = startHeight - dy;
+      newX = startNodeX + dx;
+      newY = startNodeY + dy;
+      break;
+    case 'n': // 上
+      newHeight = startHeight - dy;
+      newY = startNodeY + dy;
+      break;
+    case 'ne': // 右上
+      newWidth = startWidth + dx;
+      newHeight = startHeight - dy;
+      newY = startNodeY + dy;
+      break;
+    case 'e': // 右
+      newWidth = startWidth + dx;
+      break;
+    case 'se': // 右下
+      newWidth = startWidth + dx;
+      newHeight = startHeight + dy;
+      break;
+    case 's': // 下
+      newHeight = startHeight + dy;
+      break;
+    case 'sw': // 左下
+      newWidth = startWidth - dx;
+      newHeight = startHeight + dy;
+      newX = startNodeX + dx;
+      break;
+    case 'w': // 左
+      newWidth = startWidth - dx;
+      newX = startNodeX + dx;
+      break;
+  }
+
+  // 限制最小尺寸
+  const minSize = MIN_NODE_SIZE;
+
+  if (newWidth < minSize) {
+    newWidth = minSize;
+    if (handle.includes('w')) {
+      newX = startNodeX + startWidth - minSize;
+    }
+  }
+  if (newHeight < minSize) {
+    newHeight = minSize;
+    if (handle.includes('n')) {
+      newY = startNodeY + startHeight - minSize;
+    }
+  }
+
+  return {
+    width: newWidth,
+    height: newHeight,
+    x: newX,
+    y: newY,
+  };
 }
