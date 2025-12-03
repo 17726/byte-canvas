@@ -1,66 +1,118 @@
-import type { CSSProperties } from 'vue';
 import type { INodeRenderer } from '..';
-import type { NodeState, TextState } from '@/types/state';
+import type { TextState } from '@/types/state';
 
-/**
- * 【策略模式 - 具体策略】
- * 文本 DOM 渲染器
- * * 职责：
- * 1. 充当“翻译官”：将 Store 中的几何数据 (x, y, color) 翻译成 Vue 能用的 CSS 样式。
- * 2. 实现数据解耦：Vue 组件不需要知道数据怎么变样式，只管应用这个样式。
- */
-export class DomTextRenderer implements INodeRenderer<CSSProperties> {
-  /**
-   * 执行渲染逻辑
-   * @param node 基础节点数据
-   */
-  render(node: NodeState): CSSProperties {
-    // 1. 类型断言 (Type Assertion)
-    // 我们确信传入给 TextRenderer 的一定是 TextState，所以强制告诉 TS "相信我"
-    // 这样我们才能访问 props.content、props.fontFamily 等特有属性
-    const shape = node as TextState;
-    const { transform, style, props } = shape;
+export class DomTextRenderer implements INodeRenderer<string> {
+  render(node: TextState): string {
+    const { content, inlineStyles = [], ...globalStyles } = node.props;
+    if (!content) return '<span>&nbsp;</span>'; // 空内容返回占位
 
-    // 计算文本装饰
-    const textDecoration: string[] = [];
-    if (props.underline) textDecoration.push('underline');
-    if (props.strikethrough) textDecoration.push('line-through');
+    if (inlineStyles.length === 0) {
+      // 处理全局颜色（如果有）
+      const globalStyleStr = this.convertStylesToCss(globalStyles);
+      return globalStyleStr
+        ? `<span style="${globalStyleStr}">${this.escapeHtml(content)}</span>`
+        : this.escapeHtml(content);
+    }
 
-    // 2. 样式映射 (Mapping)
-    return {
-      // --- 布局属性 ---
-      position: 'absolute',
-      // 将逻辑坐标映射为 CSS 像素值
-      left: `${transform.x}px`,
-      top: `${transform.y}px`,
-      width: `${transform.width}px`,
-      height: `${transform.height}px`,
-      // 处理旋转，注意单位是 deg
-      transform: `rotate(${transform.rotation}deg)`,
+    const groupedStyles = this.groupStylesByRange(inlineStyles);
+    const splitPoints = new Set<number>([0, content.length]);
+    groupedStyles.forEach(style => {
+      splitPoints.add(style.start!);
+      splitPoints.add(style.end!);
+    });
+    const sortedSplitPoints = Array.from(splitPoints).sort((a, b) => a - b);
 
-      // --- 外观属性 ---
-      backgroundColor: style.backgroundColor,
-      borderWidth: `${style.borderWidth}px`,
-      borderStyle: style.borderStyle,
-      borderColor: style.borderColor,
-      opacity: style.opacity,
-      zIndex: style.zIndex,
+    let html = '';
+    for (let i = 0; i < sortedSplitPoints.length - 1; i++) {
+      const start = sortedSplitPoints[i];
+      const end = sortedSplitPoints[i + 1];
+      if (start! >= end!) continue;
 
-      // 文本相关CSS变量
-      '--font-family': props.fontFamily || 'sans-serif',
-      '--text-size': `${props.fontSize || 16}px`,
-      '--font-weight': props.fontWeight || 400,
-      '--font-style': props.fontStyle || 'normal',
-      '--text-color': props.color || '#000000',
-      '--line-height': props.lineHeight || 1.6,
-      '--text-scale': 1,
-      '--text-decoration-line': textDecoration.length > 0 ? textDecoration.join(' ') : 'none',
+      const textFragment = this.escapeHtml(content.slice(start, end));
+      const matchedStyles = groupedStyles.filter(style => {
+        return style.start! <= start! && style.end! >= end!;
+      });
 
-      // --- 交互属性 ---
-      // NOTE: 后期可恢复基于 isVisible 的 display 控制，否则文本节点无法按可见性隐藏，行为与其他渲染器不一致。
+      if (matchedStyles.length > 0) {
+        const combinedStyle = matchedStyles.reduce((acc, cur) => {
+          return { ...acc, ...cur.combinedStyles };
+        }, {});
 
-      // 这里的 display 控制显隐
-      display: node.isVisible ? 'block' : 'none',
-    };
+        // 转换样式（包含颜色的显式处理）
+        const styleStr = this.convertStylesToCss(combinedStyle);
+
+        html += `<span style="${styleStr}">${textFragment}</span>`;
+      } else {
+        html += textFragment;
+      }
+    }
+
+    return html;
   }
+
+  // 核心修改：显式处理颜色属性，添加合法性校验
+  private convertStylesToCss(styles: Record<string, unknown>): string {
+    const cssEntries: string[] = [];
+    const textDecorations: string[] = [];
+
+    Object.entries(styles).forEach(([key, value]) => {
+      // 跳过无效值（undefined/null/false/空字符串）
+      if (value === undefined || value === null || value === false || value === '') return;
+
+      switch (key) {
+        // 显式处理颜色属性（确保不被遗漏）
+        case 'color':
+          cssEntries.push(`color:${value}`);
+          break;
+        // 下划线处理
+        case 'underline':
+          if (value) textDecorations.push('underline');
+          break;
+        // 删除线处理
+        case 'strikethrough':
+          if (value) textDecorations.push('line-through');
+          break;
+        // 其他样式（保持驼峰转连字符）
+        default:
+          const cssKey = key.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`);
+          cssEntries.push(`${cssKey}:${value}`);
+          break;
+      }
+    });
+
+    // 合并 text-decoration
+    if (textDecorations.length > 0) {
+      cssEntries.push(`text-decoration:${textDecorations.join(' ')}`);
+    }
+
+    // 避免空 style 属性
+    return cssEntries.join('; ') || 'visibility: inherit';
+  }
+
+  // 原有方法保持不变
+  groupStylesByRange = (styles: Array<{
+    start: number;
+    end: number;
+    styles: Record<string, unknown>;
+  }>) => {
+    const rangeMap = new Map<string, Record<string, unknown>>();
+    styles.forEach(style => {
+      const key = `${style.start}-${style.end}`;
+      // 合并样式时，后添加的颜色会覆盖先添加的（符合 CSS 优先级）
+      rangeMap.set(key, { ...rangeMap.get(key), ...style.styles });
+    });
+    return Array.from(rangeMap.entries()).map(([key, combinedStyles]) => {
+      const [start, end] = key.split('-').map(Number);
+      return { start, end, combinedStyles };
+    });
+  };
+
+  escapeHtml = (str: string) => {
+    return str
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  };
 }

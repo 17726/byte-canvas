@@ -92,17 +92,32 @@
           /> -->
           <a-input-number 
           size="mini"
-          v-model="fontSize" 
-          style="width: 50px;margin-left: 2px;" 
-          class="input-demo"
-          :min="12" 
-          :max="100"/>
-        </div>
-        <div class="tool-item">
-        <a-popover trigger="click" position="bottom" content-class="toolbar-popover-content">
-            <a-tooltip placement="top" content="文本样式">
-            <a-button size="mini" type="text">
-              <icon-text />
+          v-model="fontSize"
+          :min="12"
+          :max="100"
+          style="width: 50px;margin-left: 2px;"
+          hide-button
+          @change="handleFontSizeChange"
+        />
+      </div>
+      <div class="tool-item">
+        <a-tooltip placement="top" content="加粗">
+          <a-button size="mini" :type="isBold ? 'primary' : 'text'" @click="handleToggleBold">
+            <icon-text-bold />
+          </a-button>
+        </a-tooltip>
+      </div>
+      <div class="tool-item">
+        <a-tooltip placement="top" content="倾斜">
+          <a-button size="mini" :type="isItalic ? 'primary' : 'text'" @click="handleToggleItalic">
+            <icon-text-italic />
+          </a-button>
+        </a-tooltip>
+      </div>
+      <div class="tool-item">
+        <a-tooltip placement="top" content="下划线">
+            <a-button size="mini" :type="isUnderline ? 'primary' : 'text'" @click="handleToggleUnderline">
+              <icon-text-underline />
             </a-button>
           </a-tooltip>
           <template #content>
@@ -196,52 +211,74 @@
 
       <!-- Delete -->
       <div class="tool-item">
-        <div class="divider"></div>
-        <a-tooltip placement="top" content="删除">
-          <a-button size="mini" status="danger" type="text" @click="handleDelete">
-            <icon-delete />
+        <a-tooltip placement="top" content="删除线">
+          <a-button size="mini" :type="isStrikethrough ? 'primary' : 'text'" @click="handleToggleStrikeThrough">
+            <icon-strikethrough />
           </a-button>
         </a-tooltip>
       </div>
-    </div>
-  </template>
-
-  <script setup lang="ts">
-  import { computed} from 'vue';
-  import { useCanvasStore } from '@/store/canvasStore';
-  import { NodeType,type ShapeState, type TextState } from '@/types/state';
-  import { worldToClient } from '@/core/utils/geometry';
-  // import { DEFAULT_IMAGE_FILTERS, DEFAULT_IMAGE_URL } from '@/config/defaults';
-  import {
-    Delete as IconDelete,
-    TextBold as IconTextBold,
-    TextItalic as IconTextItalic,
-    TextUnderline as IconTextUnderline,
-    Strikethrough as IconStrikethrough,
-    BringToFrontOne as IconBringToFront,
-    SentToBack as IconSendToBack,
-    Layers as IconLayers, // 新增图标
-  Text as IconText,     // 新增图标
-  } from '@icon-park/vue-next';
-
-  const store = useCanvasStore();
-
-  // 获取当前选中的第一个节点（ContextToolbar 仅在单选时显示）
-  const activeNode = computed(() => {
-    const ids = Array.from(store.activeElementIds);
-    if (ids.length !== 1) return null;
-    return store.nodes[ids[0]!];
-  });
-  const isGroup = computed(() => activeNode.value?.type === NodeType.GROUP);
+      <div class="tool-item">
+        <a-color-picker size="mini" v-model="textColor" trigger="hover" @input="handleColorChange" />
+      </div>
+    </template>
 
   // 显示条件：有且仅有一个选中节点，并且不在其他交互中（如拖拽）
   const isVisible = computed(() => !!activeNode.value && !store.isInteracting && !isGroup.value);
 
-  // 计算属性工具栏在屏幕中的位置，用 worldToClient 将世界坐标转换为 DOM 客户端坐标 
-  // 说明：由于 ContextToolbar 本身放在视口外层 (不受 viewport transform)，因此需要将节点的世界坐标映射到 client 坐标
-  // 计算工具栏在页面中的绝对位置：以节点的中心为锚点向上偏移
-  const positionStyle = computed(() => {
-    if (!activeNode.value) return {};
+    <!-- Delete -->
+    <div class="tool-item">
+      <div class="divider"></div>
+      <a-tooltip placement="top" content="删除">
+        <a-button size="mini" status="danger" type="text" @click="handleDelete">
+          <icon-delete />
+        </a-button>
+      </a-tooltip>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { computed,ref } from 'vue';
+import { useCanvasStore } from '@/store/canvasStore';
+import { NodeType, type ImageState,type InlineStyleProps,type ShapeState, type TextDecorationValue, type TextState } from '@/types/state';
+import { worldToClient } from '@/core/utils/geometry';
+import { DEFAULT_IMAGE_FILTERS, DEFAULT_IMAGE_URL } from '@/config/defaults';
+import {
+  Delete as IconDelete,
+  TextBold as IconTextBold,
+  TextItalic as IconTextItalic,
+  TextUnderline as IconTextUnderline,
+  Strikethrough as IconStrikethrough,
+  BringToFrontOne as IconBringToFront,
+  SentToBack as IconSendToBack,
+} from '@icon-park/vue-next';
+
+const store = useCanvasStore();
+
+// 获取当前选中的第一个节点（ContextToolbar 仅在单选时显示）
+const activeNode = computed(() => {
+  const ids = Array.from(store.activeElementIds);
+  if (ids.length !== 1) return null;
+  return store.nodes[ids[0]!];
+});
+
+// 显示条件：有且仅有一个选中节点，并且不在其他交互中（如拖拽）
+const isVisible = computed(() => !!activeNode.value && !store.isInteracting);
+
+// 计算属性工具栏在屏幕中的位置，用 worldToClient 将世界坐标转换为 DOM 客户端坐标
+// 说明：由于 ContextToolbar 本身放在视口外层 (不受 viewport transform)，因此需要将节点的世界坐标映射到 client 坐标
+// 计算工具栏在页面中的绝对位置：以节点的中心为锚点向上偏移
+const positionStyle = computed(() => {
+  if (!activeNode.value) return {};
+
+  const node = activeNode.value;
+  const { x, y, width } = node.transform;
+
+  // 计算节点在屏幕上的位置（相对于 CanvasStage 容器）
+  const worldCenter = {
+    x: x + width / 2,
+    y: y,
+  };
 
     const node = activeNode.value;
     const { x, y, width } = node.transform;
@@ -270,20 +307,261 @@
     return activeNode.value?.type === NodeType.TEXT;
   });
 
-  const isImage = computed(() => {
-    return activeNode.value?.type === NodeType.IMAGE;
-  });
+// 2. 从 Pinia 获取全局选区（与激活节点对应）
+const globalTextSelection = computed(() => {
+  console.log('工具栏获取全局选区：', store.globalTextSelection);
+  return store.globalTextSelection;
+});
 
-  // --- Common Actions (对选中节点的操作，例如置于最前 / 置于最底 / 删除) ---
-  const opacity = computed({
-    get: () => activeNode.value?.style.opacity ?? 1,
-    set: (val) => {
-      if (activeNode.value) {
-        store.updateNode(activeNode.value.id, {
-          style: { ...activeNode.value.style, opacity: val as number },
-        });
+
+// --- 具体的属性绑定 ---
+
+const fontSize = computed({
+  get: () => activeTextNode.value?.props.fontSize || 14,
+  set: (val) =>
+    activeTextNode.value &&
+    store.updateNode(activeTextNode.value.id, {
+      props: { fontSize: val as number },
+    } as Partial<TextState>),
+});
+
+const textColor = computed({
+  get: () => activeTextNode.value?.props.color || '#000000',
+  set: (val) =>
+    activeTextNode.value &&
+    store.updateNode(activeTextNode.value.id, {
+      props: { color: val as string },
+    } as Partial<TextState>),
+});
+
+// --- 样式开关 (Toggle) ---
+
+const isBold = computed(() => {
+  const fw = activeTextNode.value?.props.fontWeight || 400;
+  return fw >= 700;
+});
+const isItalic = computed(() => activeTextNode.value?.props.fontStyle === 'italic');
+const isUnderline = computed(() => activeTextNode.value?.props.textDecoration?.includes('underline') || false);
+const isStrikethrough = computed(() => activeTextNode.value?.props.textDecoration?.includes('line-through') || false);
+
+// 工具函数：添加/移除部分文本样式（修改依赖为全局状态）
+// 工具栏组件：优化 toggleInlineStyle 函数
+const toggleInlineStyle = (
+  styleKey: keyof InlineStyleProps,
+  value: InlineStyleProps[keyof InlineStyleProps]
+) => {
+  if (!activeTextNode.value || !globalTextSelection.value) {
+    console.warn('请先选中需要格式化的文本');
+    return;
+  }
+
+  const { start, end } = globalTextSelection.value;
+  const newInlineStyles = [...(activeTextNode.value.props.inlineStyles || [])];
+
+  // 关键：按选区+样式Key查找（而非全量匹配），支持同一选区添加多个样式
+  const existingIndex = newInlineStyles.findIndex(
+    s => s.start === start && s.end === end && s.styles.hasOwnProperty(styleKey)
+  );
+
+  if (existingIndex !== -1) {
+    // 情况1：已存在该样式 → 仅移除该样式属性
+    const styleEntry = newInlineStyles[existingIndex];
+    if (styleEntry && styleEntry.styles && styleEntry.styles.hasOwnProperty(styleKey)) {
+      delete styleEntry.styles[styleKey];
+      // 如果该选区已无样式，则移除整个 entry
+      if (Object.keys(styleEntry.styles).length === 0) {
+        newInlineStyles.splice(existingIndex, 1);
       }
-    },
+    }
+  } else {
+    // 情况2：不存在该样式 → 添加（合并到同一选区）
+    newInlineStyles.push({ start, end, styles: { [styleKey]: value } });
+  }
+
+  store.updateNode(activeTextNode.value.id, {
+    props: { ...activeTextNode.value.props, inlineStyles: newInlineStyles }
+  });
+};
+
+// 加粗切换
+const handleToggleBold = () => {
+  if (!activeTextNode.value) return;
+  const currentWeight = activeTextNode.value.props.fontWeight;
+  toggleInlineStyle('fontWeight', currentWeight === 700 ? 400 : 700);
+};
+
+// 斜体切换
+const handleToggleItalic = () => {
+  if (!activeTextNode.value) return;
+  const currentStyle = activeTextNode.value.props.fontStyle;
+  toggleInlineStyle('fontStyle', currentStyle === 'italic' ? 'normal' : 'italic');
+};
+
+// 下划线切换（核心：通过值组合/移除实现单独切换）
+const handleToggleUnderline = () => {
+  if (!activeTextNode.value || !store.globalTextSelection) return;
+
+  const currentDecoration = getCurrentTextDecoration();
+  let newDecoration: TextDecorationValue = 'none';
+
+  if (currentDecoration.includes('underline')) {
+    // 情况1：已有下划线 → 移除（保留其他装饰）
+    newDecoration = currentDecoration
+      .split(' ')
+      .filter(part => part !== 'underline')
+      .join(' ') as TextDecorationValue;
+    // 若移除后为空，设为 'none'
+    newDecoration = newDecoration || 'none';
+  } else {
+    // 情况2：无下划线 → 添加（叠加其他装饰）
+    newDecoration = currentDecoration === 'none'
+      ? 'underline'
+      : `${currentDecoration} underline` as TextDecorationValue;
+  }
+
+  // 调用 toggleInlineStyle，styleKey 为 'textDecoration'，值为新的组合
+  toggleInlineStyle('textDecoration', newDecoration);
+};
+
+// 删除线切换（逻辑与下划线一致）
+const handleToggleStrikeThrough = () => {
+  if (!activeTextNode.value || !store.globalTextSelection) return;
+
+  const currentDecoration = getCurrentTextDecoration();
+  let newDecoration: TextDecorationValue = 'none';
+
+  if (currentDecoration.includes('line-through')) {
+    // 移除删除线
+    newDecoration = currentDecoration
+      .split(' ')
+      .filter(part => part !== 'line-through')
+      .join(' ') as TextDecorationValue;
+    newDecoration = newDecoration || 'none';
+  } else {
+    // 添加删除线
+    newDecoration = currentDecoration === 'none'
+      ? 'line-through'
+      : `${currentDecoration} line-through` as TextDecorationValue;
+  }
+
+  toggleInlineStyle('textDecoration', newDecoration);
+};
+
+
+
+// 字体选择(稍后实现)
+// const handleFontFamilyChange = (e: Event) => {
+//   const target = e.target as HTMLSelectElement;
+//   const fontFamily = target.value.trim(); // 去除空格，避免空字符串
+
+//   // 校验：有激活节点 + 有选区 + 字体值有效
+//   if (!activeTextNode.value || !globalTextSelection.value || !fontFamily) {
+//     target.value = ''; // 重置下拉框
+//     return;
+//   }
+
+//   // 调用工具函数添加/移除字体样式
+//   toggleInlineStyle('fontFamily', fontFamily);
+//   target.value = ''; // 重置下拉框，提升用户体验
+// };
+
+// 字号选择
+const handleFontSizeChange = (e: Event) => {
+  const target = e.target as HTMLSelectElement;
+  const fontSize = Number(target.value);
+
+  // 校验：有激活节点 + 有选区 + 字号是有效数字（8-48px 范围）
+  if (
+    !activeTextNode.value ||
+    !globalTextSelection.value ||
+    isNaN(fontSize) ||
+    fontSize < 8 ||
+    fontSize > 48
+  ) {
+    target.value = ''; // 重置下拉框
+    return;
+  }
+
+  // 调用工具函数添加/移除字号样式
+  toggleInlineStyle('fontSize', fontSize);
+  target.value = ''; // 重置下拉框
+};
+
+// 颜色选择
+const handleColorChange = (color: string) => {
+  // 无激活文本节点 → 直接返回
+  if (!activeTextNode.value) {
+    console.warn('请先选中文本节点再设置颜色');
+    return;
+  }
+
+  // 更新文本节点的全局 color 属性（同步到 store）
+  store.updateNode(activeTextNode.value.id, {
+    props: {
+      ...activeTextNode.value.props,
+      color: color // 直接赋值验证后的有效颜色
+    }
+  });
+};
+
+// 辅助函数：获取选中文本的当前 textDecoration 状态（行内样式优先，无则取全局）
+const getCurrentTextDecoration = (): TextDecorationValue => {
+  const { globalTextSelection } = store;
+  if (!activeTextNode.value || !globalTextSelection) return 'none';
+
+  const { start, end } = globalTextSelection;
+  const { inlineStyles, textDecoration: globalDecoration } = activeTextNode.value.props;
+
+  // 1. 先找行内样式（选中范围的 textDecoration）
+  const targetInlineStyle = inlineStyles?.find(s => s.start === start && s.end === end);
+  if (targetInlineStyle?.styles.textDecoration) {
+    return targetInlineStyle.styles.textDecoration;
+  }
+
+  // 2. 无行内样式则取全局样式
+  return globalDecoration || 'none';
+};
+
+const handleDelete = () => {
+  if (activeNode.value) {
+    store.deleteNode(activeNode.value.id);
+  }
+};
+
+// 选择滤镜
+const selectedFilter = ref<string | null>(null);
+const selectFilter = (filterType: string) => {
+  selectedFilter.value = filterType;
+
+  switch (filterType) {
+    case 'grayscale':
+      grayscaleFilter();
+      break;
+    case 'blur':
+      blurFilter();
+      break;
+    case 'vintage':
+      vintageFilter();
+      break;
+    case 'reset':
+      resetFilter();
+      break;
+  }
+};
+const grayscaleFilter = () => {
+  store.activeElements.forEach((element) => {
+    if (element && element.id && element.type === 'image') {
+      store.updateNode(element.id, {
+        props: {
+          ...element.props,
+          filters: {
+            grayscale: 100,
+            contrast: 110,
+            brightness: 95,
+          },
+        },
+      });
+    }
   });
 
   const bringToFront = () => {
