@@ -73,24 +73,24 @@
           <div class="section-title">变换</div>
           <a-row :gutter="8" class="prop-row">
             <a-col :span="12">
-              <a-input-number v-model="transformX" size="small" precision="2">
+              <a-input-number v-model="transformX" size="small" :precision="2">
                 <template #prefix>X</template>
               </a-input-number>
             </a-col>
             <a-col :span="12">
-              <a-input-number v-model="transformY" size="small" precision="2">
+              <a-input-number v-model="transformY" size="small" :precision="2">
                 <template #prefix>Y</template>
               </a-input-number>
             </a-col>
           </a-row>
           <a-row :gutter="8" class="prop-row">
             <a-col :span="12">
-              <a-input-number v-model="transformW" size="small" :min="1">
+              <a-input-number v-model="transformW" size="small" :min="1" :precision="2">
                 <template #prefix>W</template>
               </a-input-number>
             </a-col>
             <a-col :span="12">
-              <a-input-number v-model="transformH" size="small" :min="1">
+              <a-input-number v-model="transformH" size="small" :min="1" :precision="2">
                 <template #prefix>H</template>
               </a-input-number>
             </a-col>
@@ -101,6 +101,16 @@
                 <template #prefix>∠</template>
                 <template #suffix>°</template>
               </a-input-number>
+              <span class="section-title">旋转角度</span>
+              <a-slider
+                v-model="transformRotation"
+                :min="-180"
+                :max="180"
+                :step="0.1"
+                show-input
+                size="small"
+                @dblclick="resetRotationToZero"
+              />
             </a-col>
           </a-row>
         </div>
@@ -109,10 +119,10 @@
 
         <!-- Section 2: 外观 (Appearance) -->
         <div class="panel-section">
-          <div class="section-title">外观</div>
+          <div class="label">外观</div>
 
           <!-- Fill -->
-          <div class="prop-item" v-if="canEditShapeStyle">
+          <div class="prop-item" v-if="canEditShapeStyle && !isImage">
             <span class="label">填充</span>
             <div class="flex-row">
               <a-color-picker v-model="fillColorTemp" size="small" @change="applyFillColor" />
@@ -139,14 +149,11 @@
               </a-input-number>
             </div>
           </div>
-
-          <!-- Opacity: 对所有节点显示 -->
+          <!-- Opacity -->
           <div class="prop-item">
-            <span class="label">不透明度</span>
+            <div class="section-title">不透明度</div>
             <a-slider v-model="opacity" :min="0" :max="1" :step="0.01" show-input size="small" />
           </div>
-
-          <!-- 圆角: 仅对形状节点显示 -->
           <template v-if="isShape">
             <div class="prop-item">
               <span class="label">圆角 (%)</span>
@@ -173,27 +180,24 @@
           </div>
           <br />
           <!-- Text Specific -->
-          <template v-if="isText">
-            <div class="prop-item">
-              <span class="label">内容</span>
-              <a-textarea v-model="textContent" :auto-size="{ minRows: 2, maxRows: 5 }" />
-            </div>
-          </template>
-
           <template v-if="canEditText">
             <div class="prop-item">
-              <span class="label">字号</span>
+              <div class="section-title">内容</div>
+              <a-textarea v-model="textContent" :auto-size="{ minRows: 2, maxRows: 5 }" />
+            </div>
+            <div class="prop-item">
+              <div class="section-title">字号</div>
               <a-input-number v-model="fontSize" size="small" :min="1" />
             </div>
             <div class="prop-item">
-              <span class="label">字重</span>
+              <div class="section-title">字重</div>
               <a-select v-model="fontWeight" size="small">
                 <a-option :value="400">Normal</a-option>
                 <a-option :value="700">Bold</a-option>
               </a-select>
             </div>
             <div class="prop-item">
-              <span class="label">颜色</span>
+              <div class="section-title">颜色</div>
               <a-color-picker v-model="textColor" show-text size="small" />
             </div>
           </template>
@@ -317,6 +321,9 @@ const isShape = computed(
   () => activeNode.value?.type === NodeType.RECT || activeNode.value?.type === NodeType.CIRCLE
 );
 const isText = computed(() => activeNode.value?.type === NodeType.TEXT);
+// const isRect = computed(
+//   () => isShape.value && (activeNode.value as ShapeState)?.shapeType === 'rect'
+// );
 const isImage = computed(() => activeNode.value?.type === NodeType.IMAGE);
 const isGroup = computed(() => activeNode.value?.type === NodeType.GROUP);
 
@@ -407,6 +414,11 @@ const transformRotation = computed({
       transform: { ...activeNode.value.transform, rotation: val as number },
     }),
 });
+
+const resetRotationToZero = () => {
+  if (!activeNode.value) return;
+  transformRotation.value = 0;
+};
 
 // --- Appearance Bindings ---
 const fillColorTemp = ref('#ffffff');
@@ -637,8 +649,8 @@ const zIndex = computed({
 const textContent = computed({
   get: () => primaryTextNode.value?.props.content || '',
   set: (val) => {
-    if (!isText.value || !activeNode.value || activeNode.value.type !== NodeType.TEXT) return;
-    store.updateNode(activeNode.value.id, { props: { content: val } } as Partial<TextState>);
+    if (!canEditText.value) return;
+    applyTextProps({ content: val as string });
   },
 });
 const fontSize = computed({
@@ -659,7 +671,7 @@ const textColor = computed({
   get: () => primaryTextNode.value?.props.color || '#000000',
   set: (val) => {
     if (!canEditText.value) return;
-    applyTextProps({ color: val });
+    applyTextProps({ color: val as string });
   },
 });
 
