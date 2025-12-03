@@ -1,7 +1,7 @@
 <template>
   <div v-if="hasSelectedNodes && !allNodesLocked" class="selection-container">
-    <!-- 多选时：显示每个元素的单独选中框 -->
-    <template v-if="selectedNodes.length > 1">
+    <!-- 组合编辑模式下：为选中的子元素始终显示单独选中框（包括单选） -->
+    <template v-if="isEditingGroup && selectedNodes.length > 0">
       <div
         v-for="node in selectedNodes"
         :key="node.id"
@@ -33,7 +33,7 @@ import { computed, inject, type Ref } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
 import type { ToolManager } from '@/core/ToolManager';
 import type { ResizeHandle } from '@/types/editor';
-import type { BaseNodeState } from '@/types/state';
+import { NodeType, type BaseNodeState, type NodeState } from '@/types/state';
 
 const store = useCanvasStore();
 const toolManagerRef = inject<Ref<ToolManager | null>>('toolManager');
@@ -44,13 +44,33 @@ if (!toolManagerRef) {
 
 const handles: ResizeHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
 
-// 1. 多选判断：选中节点数 ≥ 1 且未全部锁定
-const hasSelectedNodes = computed(() => store.activeElements.length > 0);
+// 是否处于组合编辑模式
+const isEditingGroup = computed(() => !!store.editingGroupId);
+
+// 1. 可见性判断：
+// - 普通模式：有选中节点时显示
+// - 组合编辑模式：即使没有选中子节点，也始终显示组合外框
+const hasSelectedNodes = computed(() => store.activeElements.length > 0 || !!store.editingGroupId);
+
+// 当前用于计算“大框”的目标节点：
+// - 若处于组合编辑模式：固定使用正在编辑的组合节点
+// - 否则：使用当前选中的节点列表
+const overlayNodes = computed<BaseNodeState[]>(() => {
+  const editingId = store.editingGroupId;
+  if (editingId) {
+    const node = store.nodes[editingId];
+    if (node) {
+      return [node as BaseNodeState];
+    }
+  }
+  return store.activeElements as BaseNodeState[];
+});
+
 const allNodesLocked = computed(() =>
-  store.activeElements.every((node) => (node as BaseNodeState).isLocked)
+  overlayNodes.value.every((node) => (node as BaseNodeState).isLocked)
 );
 
-// 选中的节点列表
+// 选中的节点列表（仅用于绘制每个子元素的单独虚线框）
 const selectedNodes = computed(() => store.activeElements as BaseNodeState[]);
 
 // 单个元素选中框样式（使用绝对坐标，考虑父组合位置）
@@ -120,10 +140,50 @@ const getRotatedBounds = (node: BaseNodeState) => {
   return { minX, maxX, minY, maxY };
 };
 
+// 组合编辑模式下：实时计算当前组合子元素的包围盒
+const editingGroupBounds = computed(() => {
+  const editingId = store.editingGroupId;
+  if (!editingId) return null;
+
+  const group = store.nodes[editingId];
+  if (!group || group.type !== NodeType.GROUP) return null;
+
+  const childNodes = group.children
+    .map((id) => store.nodes[id])
+    .filter((node): node is NodeState => Boolean(node));
+
+  if (childNodes.length === 0) return null;
+
+  let minX = Infinity,
+    maxX = -Infinity,
+    minY = Infinity,
+    maxY = -Infinity;
+
+  childNodes.forEach((child) => {
+    const bounds = getRotatedBounds(child as BaseNodeState);
+    minX = Math.min(minX, bounds.minX);
+    maxX = Math.max(maxX, bounds.maxX);
+    minY = Math.min(minY, bounds.minY);
+    maxY = Math.max(maxY, bounds.maxY);
+  });
+
+  return {
+    x: minX,
+    y: minY,
+    width: maxX - minX,
+    height: maxY - minY,
+    rotation: group.transform.rotation || 0,
+  };
+});
+
 // 2. 计算多选大框的包围盒（核心：包裹所有选中节点的最小矩形，考虑旋转）
 // 使用绝对坐标，支持组合内子节点的正确显示
 const selectionBounds = computed(() => {
-  const nodes = store.activeElements as BaseNodeState[];
+  if (editingGroupBounds.value) {
+    return editingGroupBounds.value;
+  }
+
+  const nodes = overlayNodes.value;
   if (nodes.length === 0) return null;
   if (!nodes[0]) return null;
 
@@ -137,6 +197,7 @@ const selectionBounds = computed(() => {
       y: transform.y,
       width: transform.width,
       height: transform.height,
+      rotation: node.transform.rotation || 0,
     };
   }
 
@@ -159,6 +220,7 @@ const selectionBounds = computed(() => {
     y: minY,
     width: maxX - minX,
     height: maxY - minY,
+    rotation: 0,
   };
 });
 
@@ -167,9 +229,7 @@ const overlayStyle = computed(() => {
   const bounds = selectionBounds.value;
   if (!bounds) return {};
 
-  const nodes = store.activeElements as BaseNodeState[];
-  // 单选时，选中框跟随节点旋转
-  const rotation = nodes.length === 1 && nodes[0] ? nodes[0].transform.rotation : 0;
+  const rotation = 'rotation' in bounds ? bounds.rotation || 0 : 0;
 
   return {
     transform: `translate(${bounds.x}px, ${bounds.y}px) rotate(${rotation}deg)`,
