@@ -195,11 +195,10 @@
   </template>
 
 <script setup lang="ts">
-import { computed,ref } from 'vue';
+import { computed,} from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
-import { NodeType, type ImageState,type InlineStyleProps,type ShapeState, type TextDecorationValue, type TextState } from '@/types/state';
+import { NodeType,type InlineStyleProps,type ShapeState, type TextDecorationValue, type TextState } from '@/types/state';
 import { worldToClient } from '@/core/utils/geometry';
-import { DEFAULT_IMAGE_FILTERS, DEFAULT_IMAGE_URL } from '@/config/defaults';
 import {
   Delete as IconDelete,
   TextBold as IconTextBold,
