@@ -5,7 +5,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, type CSSProperties } from 'vue';
 import type { ShapeState } from '@/types/state';
 import { useCanvasStore } from '@/store/canvasStore';
 import { getDomStyle } from '@/core/renderers/dom';
@@ -18,7 +18,7 @@ const store = useCanvasStore();
 
 // 获取样式 (使用策略模式分离的渲染器)
 const style = computed(() => {
-  const baseStyle = getDomStyle(props.node);
+  const baseStyle = getDomStyle(props.node) as CSSProperties;
 
   // 确保圆形样式：宽高相等，border-radius 为 50%
   return {

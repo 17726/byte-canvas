@@ -19,9 +19,9 @@ const imageRenderer = new DomImageRenderer();
  * * 职责：根据节点类型 (NodeType)，自动分发给对应的渲染器去处理。
  * 视图层 (Vue) 只需要调用这个函数，不需要知道具体用了哪个 Renderer 类。
  * @param node 节点数据
- * @returns 计算好的 CSS 样式对象
+ * @returns 计算好的 CSS 样式对象（或 Text 节点的 HTML 字符串）
  */
-export function getDomStyle(node: NodeState): CSSProperties {
+export function getDomStyle(node: NodeState): CSSProperties | string {
   switch (node.type) {
     case NodeType.RECT:
       return rectRenderer.render(node);
@@ -35,6 +35,6 @@ export function getDomStyle(node: NodeState): CSSProperties {
       // 【Fail Fast 机制】
       // 如果出现了未知的节点类型，直接抛错，防止渲染出奇怪的东西难以排查
       console.warn(`[Renderer] Unsupported node type: ${node.type}`);
-      return { display: 'none' }; // 安全回退：隐藏该节点
+      return { display: 'none' } as CSSProperties; // 安全回退：隐藏该节点
   }
 }

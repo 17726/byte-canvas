@@ -8,7 +8,7 @@
 import { getDomStyle } from '@/core/renderers/dom';
 import { useCanvasStore } from '@/store/canvasStore';
 import type { ImageState } from '@/types/state';
-import { computed } from 'vue';
+import { computed, type CSSProperties } from 'vue';
 
 const props = defineProps<{
   node: ImageState;
@@ -17,13 +17,15 @@ const props = defineProps<{
 const store = useCanvasStore();
 
 // 获取样式 (使用策略模式分离的渲染器)
-const style = computed(() => getDomStyle(props.node));
+const style = computed(() => getDomStyle(props.node) as CSSProperties);
 
 // 选中状态
 const isSelected = computed(() => store.activeElementIds.has(props.node.id));
 
 // 图片URL
-const imageUrl = computed(() => props.node.props.imageUrl || import.meta.env.BASE_URL + 'uploads/images/img-test_1.jpg');
+const imageUrl = computed(
+  () => props.node.props.imageUrl || import.meta.env.BASE_URL + 'uploads/images/img-test_1.jpg'
+);
 
 // 滤镜样式
 const filterStyle = computed(() => {

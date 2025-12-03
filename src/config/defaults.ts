@@ -65,6 +65,7 @@ export const DEFAULT_TEXT_PROPS = {
   lineHeight: 1.6,
   underline: false,
   strikethrough: false,
+  inlineStyles: [],
 };
 
 export const DEFAULT_TEXT_SIZE = {
