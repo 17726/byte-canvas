@@ -52,7 +52,6 @@ export class TextSelectionHandler {
   // 公共方法，更新全局选区
   updateGlobalSelection(selection: { start: number; end: number } | null) {
     this.store.updateGlobalTextSelection(selection);
-    console.log('是这里');
   }
 
   /**

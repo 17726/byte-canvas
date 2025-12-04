@@ -149,7 +149,7 @@ export class ToolManager {
     // 3. 三重阻止：彻底屏蔽外部拦截
     e.stopImmediatePropagation(); // 阻止当前元素其他监听器（关键抵御外部注入）
     e.stopPropagation(); // 阻止冒泡到父元素
-    e.preventDefault(); // 阻止浏览器默认行为+外部软件默认响应
+    //e.preventDefault(); // 阻止浏览器默认行为+外部软件默认响应
 
     // 4. 标记交互状态
     this.isCanvasInteracting = true;
