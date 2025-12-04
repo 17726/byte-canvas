@@ -19,7 +19,7 @@
  * - calculateTextResize: 计算文本缩放后的位置和尺寸
  */
 
-import type { BaseNodeState, ViewportState, NodeType } from '@/types/state';
+import type { BaseNodeState, ViewportState } from '@/types/state';
 import type { ResizeHandle } from '@/types/editor';
 import { MIN_NODE_SIZE } from '@/config/defaults';
 
