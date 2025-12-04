@@ -21,7 +21,16 @@
 </template>
 
 <script setup lang="ts">
-import { computed, ref,type Ref, watch, type CSSProperties, onMounted, onUnmounted, inject } from 'vue';
+import {
+  computed,
+  ref,
+  type Ref,
+  watch,
+  type CSSProperties,
+  onMounted,
+  onUnmounted,
+  inject,
+} from 'vue';
 import type { TextState } from '@/types/state';
 import { getDomStyle } from '@/core/renderers/dom';
 import type { ToolManager } from '@/core/ToolManager';
@@ -55,7 +64,7 @@ const style = computed((): CSSProperties => {
     borderStyle = 'none',
     borderColor = 'transparent',
     opacity = 1,
-    zIndex = 1
+    zIndex = 1,
   } = nodeStyle;
 
   return {
