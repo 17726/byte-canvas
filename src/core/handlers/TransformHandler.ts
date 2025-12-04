@@ -524,7 +524,7 @@ export class TransformHandler {
       newY = startCenterY - newHeight / 2;
     }
 
-    // 步骤3：执行等比缩放计算 (如果需要，并保证最小尺寸和翻转已经被步骤5预修正)
+    // 步骤3：执行等比缩放计算 (如果需要，并保证最小尺寸和翻转已经被上方“最小尺寸/翻转吸附预检测”逻辑预修正)
     if (shouldEnforceRatio) {
       const safeStartHeight = Math.abs(startHeight) < 1e-6 ? MIN_NODE_SIZE : startHeight;
       const baseRatio = startWidth / safeStartHeight;
