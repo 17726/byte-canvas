@@ -587,6 +587,7 @@ export class ToolManager {
    * @param id - 文本节点 ID
    */
   handleTextClick(e: MouseEvent, id: string) {
+    e.stopPropagation();
     if (this.getIsSpacePressed()) return;
 
     const node = this.store.nodes[id];
@@ -600,8 +601,6 @@ export class ToolManager {
         return;
       }
     }
-
-    e.stopPropagation();
 
     this.textSelectionHandler.handleTextBoxClick(e, id);
     console.log('单击文本节点');
