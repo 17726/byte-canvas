@@ -285,7 +285,10 @@ export function isNodeHitRectSAT(
   else {
     // 仅支持以下类型，其他类型直接返回 false
     const isPolygon =
-      baseNode.type === 'rect' || baseNode.type === 'image' || baseNode.type === 'text';
+      baseNode.type === 'rect' ||
+      baseNode.type === 'image' ||
+      baseNode.type === 'text' ||
+      baseNode.type === 'group';
 
     if (!isPolygon) return false;
 
