@@ -342,34 +342,18 @@ export class TransformHandler {
     const isShiftPressed = e.shiftKey;
     let shouldEnforceRatio = false;
 
-    // 基础规则：图形类型+拖拽类型的默认等比
-    switch (nodeType) {
-      case NodeType.IMAGE:
-        // 图片：四角拖拽 → 原比例等比缩放
-        shouldEnforceRatio = isCorner;
-        break;
-      case NodeType.RECT:
-      case NodeType.TEXT:
-      case NodeType.CIRCLE:
-        // 矩形/文本/圆形：默认自由缩放
-        shouldEnforceRatio = false;
-        break;
+    // 缩放规则（优先级：Shift > 图片四角 > 默认自由）
+    // 1. Shift 键：强制等比缩放（对所有节点类型和所有控制点生效）
+    if (isShiftPressed) {
+      shouldEnforceRatio = true;
     }
-
-    // 叠加Shift键规则
-    switch (nodeType) {
-      case NodeType.RECT:
-      case NodeType.TEXT:
-        // 矩形/文本：Shift → 当前比例等比缩放
-        if (isShiftPressed) shouldEnforceRatio = true;
-        break;
-      case NodeType.CIRCLE:
-        // 圆形：Shift → 强制正圆（等比）
-        if (isShiftPressed) shouldEnforceRatio = true;
-        break;
-      case NodeType.IMAGE:
-        // 图片：Shift无效果
-        break;
+    // 2. 图片四角拖拽：默认等比缩放
+    else if (nodeType === NodeType.IMAGE && isCorner) {
+      shouldEnforceRatio = true;
+    }
+    // 3. 其他情况：自由缩放
+    else {
+      shouldEnforceRatio = false;
     }
 
     // ======================================================
@@ -574,18 +558,18 @@ export class TransformHandler {
       ratioBasedWidth = Math.max(MIN_NODE_SIZE, Math.abs(ratioBasedWidth)) * startSignX;
       ratioBasedHeight = Math.max(MIN_NODE_SIZE, Math.abs(ratioBasedHeight)) * startSignY;
 
-      if (nodeType === NodeType.CIRCLE) {
-        const absWidth = Math.abs(ratioBasedWidth);
-        const absHeight = Math.abs(ratioBasedHeight);
-        const maxSize = Math.max(absWidth, absHeight);
-
-        ratioBasedWidth = maxSize * Math.sign(ratioBasedWidth);
-        ratioBasedHeight = maxSize * Math.sign(ratioBasedHeight);
-      }
+      // 注意：圆形也按照初始宽高比缩放，不强制正圆
+      // 如果初始是正圆则保持正圆，如果初始是椭圆则保持椭圆比例
 
       // 调整位置（适配等比后的尺寸）
-      // 如果是Alt模式，位置在步骤2已经计算过
-      if (!isAltPressed) {
+      if (isAltPressed) {
+        // Alt 模式：等比缩放后重新计算中心点位置，保证中心不动
+        const startCenterX = startNodeX + startWidth / 2;
+        const startCenterY = startNodeY + startHeight / 2;
+        newX = startCenterX - ratioBasedWidth / 2;
+        newY = startCenterY - ratioBasedHeight / 2;
+      } else {
+        // 非 Alt 模式：根据拖拽控制点调整锚点位置
         if (handle.includes('w')) {
           newX = startNodeX + startWidth - ratioBasedWidth;
         }
@@ -654,14 +638,14 @@ export class TransformHandler {
         const rawChildHeight = childStart.height * scaleY;
 
         // 最小尺寸限制 (保留符号)
-        let newChildWidth =
+        const newChildWidth =
           Math.max(MIN_NODE_SIZE, Math.abs(rawChildWidth)) * Math.sign(rawChildWidth || 1);
-        let newChildHeight =
+        const newChildHeight =
           Math.max(MIN_NODE_SIZE, Math.abs(rawChildHeight)) * Math.sign(rawChildHeight || 1);
 
         // 子节点的新位置 (相对于父节点)
-        let newOffsetX = childStart.x * scaleX;
-        let newOffsetY = childStart.y * scaleY;
+        const newOffsetX = childStart.x * scaleX;
+        const newOffsetY = childStart.y * scaleY;
 
         // 将子节点转换为标准正尺寸表示
         let finalChildWidth = newChildWidth;
@@ -810,7 +794,7 @@ export class TransformHandler {
     let dy = (e.clientY - startMouseY) / this.store.viewport.zoom;
 
     const isShiftPressed = e.shiftKey;
-    let shouldEnforceBoundsRatio = isShiftPressed; // 多选时 Shift 键默认强制等比
+    const shouldEnforceBoundsRatio = isShiftPressed; // 多选时 Shift 键默认强制等比
 
     // ======================================================
     // 最小尺寸/翻转吸附预检测 (修正 dx, dy)
@@ -1027,7 +1011,7 @@ export class TransformHandler {
     // ------------------------------------------------------
 
     // 步骤6：转换为标准正尺寸表示 (处理负值)
-    let finalBounds = { ...newBounds };
+    const finalBounds = { ...newBounds };
 
     if (finalBounds.width < 0) {
       finalBounds.x = newBounds.x + newBounds.width;
@@ -1054,20 +1038,11 @@ export class TransformHandler {
       // 使用带符号的比例计算原始新尺寸和位置
       let newNodeWidth = startState.width * finalScaleX;
       let newNodeHeight = startState.height * finalScaleY;
-      let newNodeX = finalBounds.x + startState.offsetX * finalBounds.width;
-      let newNodeY = finalBounds.y + startState.offsetY * finalBounds.height;
+      const newNodeX = finalBounds.x + startState.offsetX * finalBounds.width;
+      const newNodeY = finalBounds.y + startState.offsetY * finalBounds.height;
 
-      // 特殊规则（保持符号）
-      if (nodeType === NodeType.IMAGE && isCorner) {
-        const safeStartWidth = Math.abs(startState.width) < 1e-6 ? MIN_NODE_SIZE : startState.width;
-        newNodeHeight = (startState.height / safeStartWidth) * newNodeWidth;
-      }
-
-      if (nodeType === NodeType.CIRCLE) {
-        const avgSize = (Math.abs(newNodeWidth) + Math.abs(newNodeHeight)) / 2;
-        newNodeWidth = avgSize * Math.sign(newNodeWidth || 1);
-        newNodeHeight = avgSize * Math.sign(newNodeHeight || 1);
-      }
+      // 注意：多选时，所有节点（包括图片、圆形）都跟随整体缩放
+      // 等比缩放完全由 Shift 键控制，不对特定节点类型做特殊处理
 
       // 最小尺寸限制 (保持符号，防止子节点尺寸小于最小尺寸)
       newNodeWidth = Math.max(MIN_NODE_SIZE, Math.abs(newNodeWidth)) * Math.sign(newNodeWidth || 1);
