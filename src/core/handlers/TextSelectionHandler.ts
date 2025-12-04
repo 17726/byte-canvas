@@ -52,7 +52,7 @@ export class TextSelectionHandler {
   // 公共方法，更新全局选区
   updateGlobalSelection(selection: { start: number; end: number } | null) {
     this.store.updateGlobalTextSelection(selection);
-    console.log("是这里")
+    console.log('是这里');
   }
 
   /**
@@ -83,7 +83,7 @@ export class TextSelectionHandler {
         range.selectNodeContents(this.editor); // 选中编辑器内所有内容
         selection?.removeAllRanges();
         selection?.addRange(range);
-        console.log("双击全选");
+        console.log('双击全选');
 
         // 2. 更新 currentSelection 为「全部文本范围」
         const content = node.props.content || ''; // 获取文本内容
@@ -92,12 +92,12 @@ export class TextSelectionHandler {
         // 调用方法更新 currentSelection
         this.setCurrentSelection({
           start: 0, // 全选从索引 0 开始
-          end: contentLength // 全选到文本长度结束（符合你的 inlineStyles 规则：end 排除）
+          end: contentLength, // 全选到文本长度结束（符合你的 inlineStyles 规则：end 排除）
         });
         // 3. 关键同步：更新 Pinia 全局的 globalTextSelection（响应式状态）
         this.store.updateGlobalTextSelection({
           start: 0, // 全选从索引 0 开始
-          end: contentLength // 全选到文本长度结束（符合你的 inlineStyles 规则：end 排除）
+          end: contentLength, // 全选到文本长度结束（符合你的 inlineStyles 规则：end 排除）
         });
         console.log(this.currentSelection);
       }
@@ -139,7 +139,10 @@ export class TextSelectionHandler {
   handleMouseUpAndSelection(e: MouseEvent, id: string) {
     if (this.isEditing) {
       e.stopPropagation();
-      this.handleSelectionChange(id); // 传入 node 参数
+      // 延迟处理选区变化，让浏览器先处理完点击事件（清除全选等）
+      nextTick(() => {
+        this.handleSelectionChange(id);
+      });
     }
     console.log("处理文本节点的handleMouseUpAndSelection")
   }
@@ -237,17 +240,83 @@ export class TextSelectionHandler {
 
       // 执行选中逻辑（单击的核心需求）
       const isSelected = this.store.activeElementIds.has(id);
-      if(!isSelected) this.store.setActive([id]);
+      if (!isSelected) this.store.setActive([id]);
       // 强制让文本框失焦（兜底，避免意外聚焦）
       this.editor?.blur();
     } else {
       // 编辑状态下，正常响应点击（选中文本、输入等）
       console.log("处于编辑态 正常响应点击")
       e.stopPropagation();
+
+      // 修复：点击时如果当前是全选状态，清除全选并将光标设置到点击位置
+      // 使用 nextTick 确保在浏览器处理完点击事件后再处理
+      nextTick(() => {
+        if (this.editor) {
+          const selection = window.getSelection();
+          if (selection && selection.rangeCount > 0) {
+            const range = selection.getRangeAt(0);
+            // 检查是否是全选状态（选区覆盖整个编辑器内容）
+            const editorText = this.editor.textContent || '';
+            const selectedText = range.toString();
+
+            // 如果选中的文本长度等于编辑器文本长度，说明是全选
+            if (selectedText.length === editorText.length && editorText.length > 0) {
+              // 尝试获取点击位置的文本节点和偏移量
+              let targetNode: Node | null = null;
+              let offset = 0;
+
+              // 使用 document.caretPositionFromPoint (Firefox) 或 document.caretRangeFromPoint (Chrome)
+              if (document.caretPositionFromPoint) {
+                const caretPos = document.caretPositionFromPoint(e.clientX, e.clientY);
+                if (caretPos) {
+                  targetNode = caretPos.offsetNode;
+                  offset = caretPos.offset;
+                }
+              } else {
+                // TypeScript 类型定义中可能没有 caretRangeFromPoint，使用类型断言
+                const doc = document as Document & {
+                  caretRangeFromPoint?: (x: number, y: number) => Range | null;
+                };
+                if (doc.caretRangeFromPoint) {
+                  const clickRange = doc.caretRangeFromPoint(e.clientX, e.clientY);
+                  if (clickRange) {
+                    targetNode = clickRange.startContainer;
+                    offset = clickRange.startOffset;
+                  }
+                }
+              }
+
+              // 如果成功获取到点击位置，设置光标到该位置
+              if (targetNode && this.editor.contains(targetNode)) {
+                const newRange = document.createRange();
+                newRange.setStart(targetNode, offset);
+                newRange.collapse(true);
+                selection.removeAllRanges();
+                selection.addRange(newRange);
+                // 更新选区状态（清除全选）
+                this.handleSelectionChange(id);
+              } else {
+                // 降级方案：将光标设置到文本末尾
+                const lastTextNode = this.getLastTextNode(this.editor);
+                if (lastTextNode) {
+                  const textLength = lastTextNode.textContent?.length || 0;
+                  const newRange = document.createRange();
+                  newRange.setStart(lastTextNode, textLength);
+                  newRange.collapse(true);
+                  selection.removeAllRanges();
+                  selection.addRange(newRange);
+                  // 更新选区状态（清除全选）
+                  this.handleSelectionChange(id);
+                }
+              }
+            }
+          }
+        }
+      });
     }
   }
 
-    /**
+  /**
    * 判断当前文本节点是否可以直接进入编辑态
    * - 顶层文本节点（没有 parentId）始终允许
    * - 组合子节点只有在父组合已经处于编辑模式时才允许
@@ -350,6 +419,19 @@ export class TextSelectionHandler {
   }
 
   /**
+   * 辅助方法：获取编辑器下最后一个文本节点
+   */
+  private getLastTextNode(root: HTMLElement): Node | null {
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    let lastNode: Node | null = null;
+    let currentNode: Node | null;
+    while ((currentNode = walker.nextNode())) {
+      lastNode = currentNode;
+    }
+    return lastNode;
+  }
+
+  /**
    * 处理全局鼠标按下事件（判断是否点击工具栏）
    * @param e 鼠标事件
    */
@@ -411,7 +493,7 @@ export class TextSelectionHandler {
     }
   }
 
-      /**
+  /**
    * 通用方法：修改部分文本的内联样式（完全适配你的 TextState 定义）
    * @param id 文本节点ID
    * @param store Pinia存储（用于获取/更新节点）
@@ -436,7 +518,7 @@ export class TextSelectionHandler {
     // 2. 获取并处理选中范围（遵循你的规则：越界修正 + 空范围过滤）
     const selection = this.currentSelection;
 
-    console.log(selection);//???(6,7)
+    console.log(selection); //???(6,7)
 
     if (!selection || selection.start >= selection.end) return;
 
@@ -446,7 +528,7 @@ export class TextSelectionHandler {
     selectionEnd = Math.min(contentLength, selectionEnd);
 
     if (selectionStart >= selectionEnd) return; // 修正后仍为空范围，直接退出
-    console.log("开始设置")
+    console.log('开始设置');
     // 3. 预处理现有样式：过滤空范围（start >= end），保留有效样式
     const validInlineStyles = inlineStyles.filter((style) => style.start < style.end);
 
@@ -470,7 +552,8 @@ export class TextSelectionHandler {
           start: number;
           end: number;
           styles: InlineStyleProps;
-        };;
+        };
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
         const { [styleKey]: _, ...remainingStyles } = targetStyle!.styles;
 
         if (Object.keys(remainingStyles).length > 0) {
