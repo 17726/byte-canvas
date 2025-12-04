@@ -56,14 +56,14 @@
  */
 import { useCanvasStore } from '@/store/canvasStore';
 import { useUIStore } from '@/store/uiStore';
-import { NodeType, type BaseNodeState } from '@/types/state';
 import type { ResizeHandle } from '@/types/editor';
-import { ViewportHandler } from './handlers/ViewportHandler';
-import { TransformHandler } from './handlers/TransformHandler';
+import { NodeType, type BaseNodeState } from '@/types/state';
 import { RotationHandler } from './handlers/RotationHandler';
 import { SelectionHandler } from './handlers/SelectionHandler';
-import { GroupService } from './services/GroupService';
 import { TextSelectionHandler } from './handlers/TextSelectionHandler';
+import { TransformHandler } from './handlers/TransformHandler';
+import { ViewportHandler } from './handlers/ViewportHandler';
+import { GroupService } from './services/GroupService';
 import { TextService } from './services/TextService';
 
 /**
@@ -245,7 +245,7 @@ export class ToolManager {
 
       // 文本处理器：点击空白处结束编辑态
       if (this.textSelectionHandler.isEditing) {
-        console.log("结束编辑态")
+        console.log('结束编辑态');
         this.textSelectionHandler.exitEditing();
       }
 
@@ -437,11 +437,11 @@ export class ToolManager {
 
     // 文本节点：进入编辑态
     if (node.type === NodeType.TEXT) {
-      if(!this.textSelectionHandler.canEnterEditingDirectly(id)){
+      if (!this.textSelectionHandler.canEnterEditingDirectly(id)) {
         const parentId = node.parentId;
-        if(parentId){
-          console.log("进入组合编辑");
-          GroupService.enterGroupEdit(this.store,parentId);
+        if (parentId) {
+          console.log('进入组合编辑');
+          GroupService.enterGroupEdit(this.store, parentId);
         }
       }
       this.textSelectionHandler.enterEditing(e, id);
@@ -593,15 +593,15 @@ export class ToolManager {
 
     e.stopPropagation();
 
-    if(!this.textSelectionHandler.canEnterEditingDirectly(id)){
+    if (!this.textSelectionHandler.canEnterEditingDirectly(id)) {
       const parentId = node.parentId;
-      if(parentId){
-        console.log("进入组合编辑");
-        GroupService.enterGroupEdit(this.store,parentId);
+      if (parentId) {
+        console.log('进入组合编辑');
+        GroupService.enterGroupEdit(this.store, parentId);
       }
     }
     this.textSelectionHandler.handleTextBoxClick(e, id);
-    console.log("单击文本节点");
+    console.log('单击文本节点');
 
     if (!this.store.activeElementIds.has(id)) {
       this.store.setActive([id]);
@@ -617,7 +617,7 @@ export class ToolManager {
       'bold', // 样式值（支持 'bold' 或 700）
       true // toggle：有则移除，无则添加
     );
-    console.log("真的设置粗体完毕");
+    console.log('真的设置粗体完毕');
   }
 
   handleToggleItalic(id: string) {
