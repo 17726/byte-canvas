@@ -16,6 +16,7 @@
       @dblclick="(e) => enterEditing(e, props.node.id)"
       @blur="() => handleBlur(props.node.id)"
       @click="(e) => handleTextBoxClick(e, props.node.id)"
+      @dragstart="handleDragStart"
     ></div>
   </div>
 </template>
@@ -185,6 +186,11 @@ onMounted(() => {
 onUnmounted(() => {
   toolManagerRef?.value?.destroy(); // 调用 ToolManager 销毁文本编辑器资源
 });
+
+// 核心：禁用拖拽复制/虚影，保留选中文本
+const handleDragStart = (e: DragEvent) => {
+  e.preventDefault(); // 仅拦截dragstart的默认行为
+};
 </script>
 
 <style scoped>
