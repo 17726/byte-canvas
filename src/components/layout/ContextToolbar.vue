@@ -41,7 +41,7 @@
       <div class="divider"></div>
       <div class="tool-item">
         <a-popover trigger="click" position="top" content-class="toolbar-popover-content">
-          <a-tooltip placement="top" content="文本样式">
+          <a-tooltip position="top" content="文本样式">
             <a-button size="mini" type="text">
               <icon-text />
             </a-button>
