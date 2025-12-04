@@ -356,7 +356,23 @@ export const useCanvasStore = defineStore('canvas', () => {
   }
 
   function setActive(ids: string[]) {
-    activeElementIds.value = new Set(ids);
+    // activeElementIds：获取当前选中的 Set（避免重复创建）
+    const currentActiveSet = activeElementIds.value;
+    //预处理新 ids：去重 + 验证有效性（复用 nodes 字典，过滤无效节点 ID）
+    const validNewIds = [...new Set(ids)].filter((id) => nodes.value[id]); // 只保留存在的节点 ID
+
+    // 核心：对比新/旧 Set 内容是否一致（复用 currentActiveSet，无需额外创建）
+    const isContentSame =
+      validNewIds.length === currentActiveSet.size &&
+      validNewIds.every((id) => currentActiveSet.has(id));
+
+    // 只有内容不同 + 非交互锁时，才执行更新（避免无意义的响应式触发）
+    if (!isContentSame && !isInteracting.value) {
+      //直接替换为新 Set（保持原有 Set 性能优化）
+      activeElementIds.value = new Set(validNewIds);
+      //Node 改动时更新脏标记（符合现有设计逻辑）
+      version.value++;
+    }
   }
 
   function toggleSelection(id: string) {
@@ -591,7 +607,7 @@ export const useCanvasStore = defineStore('canvas', () => {
   // 新增：更新全局选区（供文本组件调用）
   function updateGlobalTextSelection(selection: { start: number; end: number } | null) {
     // 响应式 ref 需通过 .value 赋值
-    console.log("触发updateGlobalTextSelection",selection)
+    console.log('触发updateGlobalTextSelection', selection);
     globalTextSelection.value = selection;
     console.log('Pinia 全局选区更新：', selection); // 调试日志（可选）
   }
