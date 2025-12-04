@@ -63,7 +63,7 @@ import { ViewportHandler } from './handlers/ViewportHandler';
 import { TransformHandler } from './handlers/TransformHandler';
 import { SelectionHandler } from './handlers/SelectionHandler';
 import { GroupService } from './services/GroupService';
-import { TextSelectionHandler } from './handlers/TextSeletionHandler';
+import { TextSelectionHandler } from './handlers/TextSelectionHandler';
 import { TextService } from './services/TextService';
 
 /**
@@ -207,7 +207,7 @@ export class ToolManager {
       }
 
       // 文本处理器：点击空白处结束编辑态
-      if (this.textSelectionHandler.isEditing){
+      if (this.textSelectionHandler.isEditing) {
         this.textSelectionHandler.exitEditing();
       }
 
@@ -340,10 +340,10 @@ export class ToolManager {
     if (!node || node.isLocked) return;
 
     // 文本节点专属逻辑：
-    if (node.type === NodeType.TEXT ) {
+    if (node.type === NodeType.TEXT) {
       this.textSelectionHandler.handleMouseDown(e);
       //编辑态下阻止继续向后执行拖拽逻辑
-      if(this.textSelectionHandler.isEditing) return;
+      if (this.textSelectionHandler.isEditing) return;
     }
 
     // 4. 展示右侧属性面板并切换为节点模式
@@ -376,7 +376,7 @@ export class ToolManager {
     // 文本节点：进入编辑态
     if (node.type === NodeType.TEXT) {
       this.textSelectionHandler.enterEditing(e, id);
-      console.log("进入编辑态")
+      console.log('进入编辑态');
     }
 
     this.store.isInteracting = false;
@@ -440,7 +440,7 @@ export class ToolManager {
       this.getIsSpacePressed()
     );
   }
-    // ==================== 文本节点专属辅助方法 ====================
+  // ==================== 文本节点专属辅助方法 ====================
   /**
    * 初始化文本编辑器（供文本组件调用，复用现有逻辑）
    * @param editor - 文本编辑器 DOM 引用
@@ -448,11 +448,7 @@ export class ToolManager {
   initTextEditor(editor: HTMLElement | null) {
     this.textSelectionHandler.init(editor);
     // 注册全局事件
-    document.addEventListener(
-      'mousedown',
-      this.textSelectionHandler.handleGlobalMousedown,
-      true
-    );
+    document.addEventListener('mousedown', this.textSelectionHandler.handleGlobalMousedown, true);
   }
 
   /**
@@ -477,17 +473,17 @@ export class ToolManager {
     );
   }
 
-    /**
+  /**
    * 处理文本节点选区变化（供文本组件调用，内部转发给 TextSelectionHandler）
    * @param id - 文本节点 ID
    */
-    handleTextSelectionChange(id: string) {
-      if (this.transformHandler.isTransforming) return;
-      const node = this.store.nodes[id];
-      if (!node || node.type !== NodeType.TEXT) return;
-      this.textSelectionHandler.handleSelectionChange(id);
-      console.log("触发handleTextSelectionChange")
-    }
+  handleTextSelectionChange(id: string) {
+    if (this.transformHandler.isTransforming) return;
+    const node = this.store.nodes[id];
+    if (!node || node.type !== NodeType.TEXT) return;
+    this.textSelectionHandler.handleSelectionChange(id);
+    console.log('触发handleTextSelectionChange');
+  }
 
   /**
    * 处理文本节点失焦事件（供文本组件调用）
@@ -517,11 +513,11 @@ export class ToolManager {
     if (!this.store.activeElementIds.has(id)) {
       this.store.setActive([id]);
     }
-    console.log("触发handleTextClick");
+    console.log('触发handleTextClick');
   }
 
   //处理文本样式
-  handleToggleBold(id: string){
+  handleToggleBold(id: string) {
     this.textSelectionHandler.updatePartialInlineStyle(
       id,
       this.store,
@@ -532,27 +528,27 @@ export class ToolManager {
     console.log("真的设置粗体完毕");
   }
 
-  handleToggleItalic(id: string){
+  handleToggleItalic(id: string) {
     this.textSelectionHandler.updatePartialInlineStyle(
       id,
       this.store,
       'fontStyle', // 对应 InlineStyleProps 中的 fontStyle
-      'italic',    // 目标样式值（切换为斜体）
-      true         // toggle 模式：有则移除，无则添加
+      'italic', // 目标样式值（切换为斜体）
+      true // toggle 模式：有则移除，无则添加
     );
   }
 
-  handleToggleUnderline(id: string){
+  handleToggleUnderline(id: string) {
     this.textSelectionHandler.updatePartialInlineStyle(
       id,
       this.store,
       'textDecoration', // 对应 InlineStyleProps 中的 textDecoration
-      'underline',   // 目标样式值（切换为删除线）
-      true              // toggle 模式：有则移除，无则添加
+      'underline', // 目标样式值（切换为删除线）
+      true // toggle 模式：有则移除，无则添加
     );
   }
 
-  handleToggleStrikethrough(id: string){
+  handleToggleStrikethrough(id: string) {
     this.textSelectionHandler.updatePartialInlineStyle(
       id,
       this.store,
@@ -571,14 +567,14 @@ export class ToolManager {
     const node = this.store.nodes[id];
     if (!node || node.type !== NodeType.TEXT) return;
     this.textSelectionHandler.handleMouseUpAndSelection(e, id);
-    console.log("触发handleTextMouseUp");
+    console.log('触发handleTextMouseUp');
   }
 
-  getTextEditingState():boolean{
+  getTextEditingState(): boolean {
     return this.textSelectionHandler.isEditing;
   }
 
-  getCurrentSelection(){
+  getCurrentSelection() {
     return this.textSelectionHandler.currentSelection;
   }
   // ==================== 组合/解组合功能（已迁移至 GroupService）====================
