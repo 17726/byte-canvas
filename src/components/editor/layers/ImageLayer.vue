@@ -121,11 +121,4 @@ const filterStyle = computed(() => {
       因为我们监听的是div上的mousedown 同时禁止事件冒泡 这里不穿透的话光标在img上时无法拖拽*/
   pointer-events: none;
 }
-
-.is-selected {
-  /* 选中时的视觉反馈 */
-  /* outline: 2px solid #1890ff;
-  outline-offset: 0; /* 确保 outline 不会触发焦点 */
-  /* box-shadow: 0 0 0 4px rgba(24, 144, 255, 0.2); */
-}
 </style>

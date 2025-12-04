@@ -151,7 +151,7 @@
           </div>
           <!-- Opacity -->
           <div class="prop-item">
-            <div class="section-title">不透明度</div>
+            <div class="section-title">透明度</div>
             <a-slider v-model="opacity" :min="0" :max="1" :step="0.01" show-input size="small" />
           </div>
           <template v-if="isShape">

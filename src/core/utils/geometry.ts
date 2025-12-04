@@ -19,7 +19,7 @@
  * - calculateTextResize: 计算文本缩放后的位置和尺寸
  */
 
-import type { BaseNodeState, ViewportState, NodeType } from '@/types/state';
+import type { BaseNodeState, ViewportState } from '@/types/state';
 import type { ResizeHandle } from '@/types/editor';
 import { MIN_NODE_SIZE } from '@/config/defaults';
 
@@ -284,8 +284,12 @@ export function isNodeHitRectSAT(
   // ========================================================================
   else {
     // 仅支持以下类型，其他类型直接返回 false
+    // ✅ 增加对 group 的支持：组合在几何上可以视为一个矩形包围盒
     const isPolygon =
-      baseNode.type === 'rect' || baseNode.type === 'image' || baseNode.type === 'text';
+      baseNode.type === 'rect' ||
+      baseNode.type === 'image' ||
+      baseNode.type === 'text' ||
+      baseNode.type === 'group';
 
     if (!isPolygon) return false;
 
