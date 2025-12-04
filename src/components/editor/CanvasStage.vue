@@ -4,6 +4,7 @@
     ref="stageRef"
     @mousedown="handleMouseDown"
     @wheel="handleWheel"
+    @contextmenu="handleContextMenu"
     :style="stageStyle"
   >
     <!--
@@ -30,6 +31,7 @@
         :node="node"
         @mousedown="handleNodeDown($event, node!.id)"
         @dblclick="handleNodeDoubleClick($event, node!.id)"
+        @contextmenu="(e) => handleNodeContextMenu(e, node!.id)"
       />
 
       <!-- 选中覆盖层 (处理拖拽缩放) -->
@@ -238,6 +240,37 @@ const handleNodeDown = (e: MouseEvent, id: string) => {
 const handleNodeDoubleClick = (e: MouseEvent, id: string) => {
   if (!toolManagerRef.value) return;
   toolManagerRef.value.handleNodeDoubleClick(e, id);
+};
+
+// 处理画布右键菜单
+const handleContextMenu = (e: MouseEvent) => {
+  e.preventDefault(); // 阻止默认右键菜单
+
+  // 如果没有选中任何节点，则取消选中
+  if (!store.activeElementIds.has(e.target.closest('.node-layer')?.id)) {
+    store.setActive([]);
+  }
+
+  // 转发到ToolManager处理
+  if (toolManagerRef.value) {
+    toolManagerRef.value.handleContextMenu(e);
+  }
+};
+
+// 处理节点右键菜单
+const handleNodeContextMenu = (e: MouseEvent, id: string) => {
+  e.preventDefault(); // 阻止默认右键菜单
+  e.stopPropagation(); // 阻止事件冒泡到画布
+
+  // 如果节点未被选中，将其设为唯一选中项
+  if (!store.activeElementIds.has(id)) {
+    store.setActive([id]);
+  }
+
+  // 转发到ToolManager处理
+  if (toolManagerRef.value) {
+    toolManagerRef.value.handleNodeContextMenu(e, id);
+  }
 };
 
 // 暴露创建节点的方法（供父组件/子组件调用）
