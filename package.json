@@ -20,9 +20,6 @@
   "lint-staged": {
     "*.{js,ts,vue,json,md,scss}": [
       "prettier --write"
-    ],
-    "*.{js,ts,vue}": [
-      "eslint --fix"
     ]
   },
   "dependencies": {
