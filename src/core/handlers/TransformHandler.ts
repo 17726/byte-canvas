@@ -451,21 +451,6 @@ export class TransformHandler {
     }
 
     // 4. 等比缩放时，使用修正后的 dx/dy 重新计算另一个轴的修正值
-    if (shouldEnforceRatio) {
-      const safeStartWidth = Math.abs(startWidth) < 1e-6 ? MIN_NODE_SIZE : startWidth;
-      const safeStartHeight = Math.abs(startHeight) < 1e-6 ? MIN_NODE_SIZE : startHeight;
-      const baseRatio = safeStartWidth / safeStartHeight;
-
-      // 如果只有其中一个轴被修正，则需要更新另一个轴
-      const isHorizontal = handle.includes('e') || handle.includes('w');
-      const isVertical = handle.includes('n') || handle.includes('s');
-
-      // **注意：由于翻转和最小尺寸通常是最终的限制，等比逻辑应该在应用 dx/dy 之前进行，
-      // 但为了实现“达到最小值后 dx/dy 失效”的精确控制，我们暂时忽略等比导致的二次修正
-      // 因为最小尺寸的优先级最高，这里只进行简单的位置和尺寸更新。
-      // 等比的最终修正将在步骤3中处理**
-    }
-
     // 步骤1：根据修正后的 dx/dy 重新计算尺寸/位置
     let newWidth = startWidth;
     let newHeight = startHeight;
