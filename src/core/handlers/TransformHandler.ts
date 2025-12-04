@@ -1036,8 +1036,8 @@ export class TransformHandler {
       // 使用带符号的比例计算原始新尺寸和位置
       let newNodeWidth = startState.width * finalScaleX;
       let newNodeHeight = startState.height * finalScaleY;
-      let newNodeX = finalBounds.x + startState.offsetX * newBounds.width;
-      let newNodeY = finalBounds.y + startState.offsetY * newBounds.height;
+      let newNodeX = finalBounds.x + startState.offsetX * finalBounds.width;
+      let newNodeY = finalBounds.y + startState.offsetY * finalBounds.height;
 
       // 特殊规则（保持符号）
       if (nodeType === NodeType.IMAGE && isCorner) {
