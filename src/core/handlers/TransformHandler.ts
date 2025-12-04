@@ -342,16 +342,34 @@ export class TransformHandler {
     const isShiftPressed = e.shiftKey;
     let shouldEnforceRatio = false;
 
-    // 基础规则：图片四角拖拽默认等比
-    if (nodeType === NodeType.IMAGE && isCorner) {
-      shouldEnforceRatio = true;
+    // 基础规则：图形类型+拖拽类型的默认等比
+    switch (nodeType) {
+      case NodeType.IMAGE:
+        // 图片：四角拖拽 → 原比例等比缩放
+        shouldEnforceRatio = isCorner;
+        break;
+      case NodeType.RECT:
+      case NodeType.TEXT:
+      case NodeType.CIRCLE:
+        // 矩形/文本/圆形：默认自由缩放
+        shouldEnforceRatio = false;
+        break;
     }
 
-    // 叠加Shift键规则：Shift强制等比（覆盖或启用）
-    if (isShiftPressed) {
-      if (nodeType !== NodeType.IMAGE) {
-        shouldEnforceRatio = true;
-      }
+    // 叠加Shift键规则
+    switch (nodeType) {
+      case NodeType.RECT:
+      case NodeType.TEXT:
+        // 矩形/文本：Shift → 当前比例等比缩放
+        if (isShiftPressed) shouldEnforceRatio = true;
+        break;
+      case NodeType.CIRCLE:
+        // 圆形：Shift → 强制正圆（等比）
+        if (isShiftPressed) shouldEnforceRatio = true;
+        break;
+      case NodeType.IMAGE:
+        // 图片：Shift无效果
+        break;
     }
 
     // ======================================================

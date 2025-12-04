@@ -553,21 +553,89 @@ export const useCanvasStore = defineStore('canvas', () => {
 
     const newIds: string[] = [];
 
-    clipboardData.nodes.forEach((node) => {
-      // 生成新的 ID
-      const newId = uuidv4();
-      const newNode: NodeState = {
-        ...node,
-        id: newId,
-        transform: {
-          ...node.transform,
-          x: node.transform.x + offset,
-          y: node.transform.y + offset,
-        },
+    /**
+     * 深拷贝组合及其所有子节点，生成全新的 ID 和 parentId 关系
+     * 关键：避免两个组合共享同一批子节点，导致缩放/移动互相影响
+     */
+    const cloneGroupWithChildren = (sourceGroupId: string, rootOffset: number): string | null => {
+      const sourceGroup = nodes.value[sourceGroupId] as
+        | import('@/types/state').GroupState
+        | undefined;
+      if (!sourceGroup) return null;
+
+      const idMap = new Map<string, string>();
+
+      const cloneNodeRecursive = (originalId: string, parentNewId: string | null) => {
+        const original = nodes.value[originalId];
+        if (!original) return;
+
+        const newId = uuidv4();
+        idMap.set(originalId, newId);
+
+        const isGroup = original.type === NodeType.GROUP;
+
+        // 仅对根组合应用粘贴偏移，子节点保持相对坐标不变
+        const shouldApplyOffset = parentNewId === null;
+
+        const clonedNode: NodeState = {
+          // 使用深拷贝，避免共享引用（如 props / style）
+          ...(cloneDeep(original) as NodeState),
+          id: newId,
+          parentId: parentNewId,
+          transform: {
+            ...original.transform,
+            x: original.transform.x + (shouldApplyOffset ? rootOffset : 0),
+            y: original.transform.y + (shouldApplyOffset ? rootOffset : 0),
+          },
+        };
+
+        // 先占位 children，等递归完子节点后再用新 ID 列表覆盖
+        if (isGroup) {
+          (clonedNode as import('@/types/state').GroupState).children = [];
+        }
+
+        addNode(clonedNode);
+
+        if (isGroup) {
+          const origGroup = original as import('@/types/state').GroupState;
+          const newChildren: string[] = [];
+          origGroup.children.forEach((childOrigId) => {
+            cloneNodeRecursive(childOrigId, newId);
+            const mappedId = idMap.get(childOrigId);
+            if (mappedId) newChildren.push(mappedId);
+          });
+          (nodes.value[newId] as import('@/types/state').GroupState).children = newChildren;
+        }
       };
 
-      addNode(newNode);
-      newIds.push(newId);
+      cloneNodeRecursive(sourceGroupId, null);
+      return idMap.get(sourceGroupId) ?? null;
+    };
+
+    clipboardData.nodes.forEach((node) => {
+      // 情况1：普通节点（矩形/圆形/文本/图片）——保持原有逻辑
+      if (node.type !== NodeType.GROUP) {
+        const newId = uuidv4();
+        const newNode: NodeState = {
+          ...node,
+          id: newId,
+          transform: {
+            ...node.transform,
+            x: node.transform.x + offset,
+            y: node.transform.y + offset,
+          },
+        };
+
+        addNode(newNode);
+        newIds.push(newId);
+        return;
+      }
+
+      // 情况2：组合节点 —— 深拷贝整棵子树，避免共享子节点
+      const rootNewId = cloneGroupWithChildren(node.id, offset);
+      if (rootNewId) {
+        newIds.push(rootNewId);
+      }
     });
 
     // 选中新粘贴的元素
@@ -591,7 +659,7 @@ export const useCanvasStore = defineStore('canvas', () => {
   // 新增：更新全局选区（供文本组件调用）
   function updateGlobalTextSelection(selection: { start: number; end: number } | null) {
     // 响应式 ref 需通过 .value 赋值
-    console.log("触发updateGlobalTextSelection",selection)
+    console.log('触发updateGlobalTextSelection', selection);
     globalTextSelection.value = selection;
     console.log('Pinia 全局选区更新：', selection); // 调试日志（可选）
   }
