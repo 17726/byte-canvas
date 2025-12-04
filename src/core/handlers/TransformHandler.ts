@@ -782,7 +782,7 @@ export class TransformHandler {
   }
 
   /**
-   * 更新多选缩放（核心修正：最小尺寸吸附逻辑 + 禁用拖拽翻转）
+   * 更新多选缩放（核心修正：最小尺寸吸附逻辑 + 禁用缩放翻转）
    * @param e 鼠标事件
    */
   updateMultiResize(e: MouseEvent) {
