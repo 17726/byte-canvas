@@ -8,7 +8,6 @@ import { useCanvasStore } from '@/store/canvasStore';
 import { nextTick } from 'vue';
 import type { TransformHandler } from './TransformHandler';
 import type { ViewportHandler } from './ViewportHandler';
-
 type CanvasStore = ReturnType<typeof useCanvasStore>;
 
 // 有状态处理器：维护交互过程中的中间状态
@@ -118,7 +117,8 @@ export class TextSelectionHandler {
     if (!this.isEditing) {
       // 非编辑态阻止文本框单击聚焦（避免单击时光标出现，不进入编辑态）
       e.preventDefault();
-    }
+    }else
+    console.log("处理文本节点的handleMouseDown")
   }
 
   /**
@@ -129,6 +129,7 @@ export class TextSelectionHandler {
     if (this.isEditing) {
       e.stopPropagation();
     }
+    console.log("处理文本节点的handleMouseMove")
   }
 
   /**
@@ -140,6 +141,7 @@ export class TextSelectionHandler {
       e.stopPropagation();
       this.handleSelectionChange(id); // 传入 node 参数
     }
+    console.log("处理文本节点的handleMouseUpAndSelection")
   }
 
   /**
@@ -229,8 +231,9 @@ export class TextSelectionHandler {
    */
   handleTextBoxClick(e: MouseEvent, id: string) {
     if (!this.isEditing) {
+      console.log("没有在编辑状态");
       // 阻止文本框聚焦（避免单击时光标出现，不进入编辑态）
-      e.preventDefault();
+      //e.preventDefault();
 
       // 执行选中逻辑（单击的核心需求）
       const isSelected = this.store.activeElementIds.has(id);
@@ -239,6 +242,7 @@ export class TextSelectionHandler {
       this.editor?.blur();
     } else {
       // 编辑状态下，正常响应点击（选中文本、输入等）
+      console.log("处于编辑态 正常响应点击")
       e.stopPropagation();
     }
   }

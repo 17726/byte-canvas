@@ -245,6 +245,7 @@ export class ToolManager {
 
       // 文本处理器：点击空白处结束编辑态
       if (this.textSelectionHandler.isEditing) {
+        console.log("结束编辑态")
         this.textSelectionHandler.exitEditing();
       }
 
@@ -431,10 +432,18 @@ export class ToolManager {
     // 原有业务逻辑：进入组合编辑
     if (node.type === NodeType.GROUP) {
       GroupService.enterGroupEdit(this.store, id);
+      return;
     }
 
     // 文本节点：进入编辑态
     if (node.type === NodeType.TEXT) {
+      if(!this.textSelectionHandler.canEnterEditingDirectly(id)){
+        const parentId = node.parentId;
+        if(parentId){
+          console.log("进入组合编辑");
+          GroupService.enterGroupEdit(this.store,parentId);
+        }
+      }
       this.textSelectionHandler.enterEditing(e, id);
       console.log('进入编辑态');
     }
@@ -584,19 +593,19 @@ export class ToolManager {
 
     e.stopPropagation();
 
-    if(this.textSelectionHandler.canEnterEditingDirectly(id)){
+    if(!this.textSelectionHandler.canEnterEditingDirectly(id)){
       const parentId = node.parentId;
       if(parentId){
+        console.log("进入组合编辑");
         GroupService.enterGroupEdit(this.store,parentId);
       }
     }
     this.textSelectionHandler.handleTextBoxClick(e, id);
-    console.log("textSelectionHandler.handleTextBoxClick");
+    console.log("单击文本节点");
 
     if (!this.store.activeElementIds.has(id)) {
       this.store.setActive([id]);
     }
-    console.log('触发handleTextClick');
   }
 
   //处理文本样式
