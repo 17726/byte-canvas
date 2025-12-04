@@ -90,7 +90,7 @@
       <div class="tool-item">
         <a-tooltip placement="top" title="不透明度" :mouseEnterDelay="0.3" content="透明度">
           <span class="label" style="cursor: help; display: flex; align-items: center;">
-            <svg class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" width="20" height="20" role="img" aria-hidden="true">
+            <svg class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" width="20" height="20" aria-hidden="true">
               <path d="M102.4 716.8v-204.8h204.8v204.8z m0-409.6V102.4h204.8v204.8z" opacity=".8" fill="#1296db"></path>
               <path d="M307.2 921.6v-204.8h204.8v204.8z m0-409.6V307.2h204.8v204.8z" opacity=".6" fill="#1296db"></path>
               <path d="M512 716.8v-204.8h204.8v204.8z m0-409.6V102.4h204.8v204.8z" opacity=".4" fill="#1296db"></path>
