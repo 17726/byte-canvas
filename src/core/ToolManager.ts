@@ -529,6 +529,7 @@ export class ToolManager {
       'bold', // 样式值（支持 'bold' 或 700）
       true // toggle：有则移除，无则添加
     );
+    console.log("真的设置粗体完毕");
   }
 
   handleToggleItalic(id: string){

@@ -53,6 +53,7 @@ export class TextSelectionHandler {
   // 公共方法，更新全局选区
   updateGlobalSelection(selection: { start: number; end: number } | null) {
     this.store.updateGlobalTextSelection(selection);
+    console.log("是这里")
   }
 
   /**
@@ -76,13 +77,30 @@ export class TextSelectionHandler {
     this.isEditing = true;
     nextTick(() => {
       if (this.editor) {
+        // 1. DOM 层面全选文本（原有逻辑不变）
         this.editor.focus();
         const selection = window.getSelection();
         const range = document.createRange();
-        range.selectNodeContents(this.editor);
+        range.selectNodeContents(this.editor); // 选中编辑器内所有内容
         selection?.removeAllRanges();
         selection?.addRange(range);
         console.log("双击全选");
+
+        // 2. 更新 currentSelection 为「全部文本范围」
+        const content = node.props.content || ''; // 获取文本内容
+        const contentLength = content.length; // 文本总长度（全选的 end 索引）
+
+        // 调用方法更新 currentSelection
+        this.setCurrentSelection({
+          start: 0, // 全选从索引 0 开始
+          end: contentLength // 全选到文本长度结束（符合你的 inlineStyles 规则：end 排除）
+        });
+        // 3. 关键同步：更新 Pinia 全局的 globalTextSelection（响应式状态）
+        this.store.updateGlobalTextSelection({
+          start: 0, // 全选从索引 0 开始
+          end: contentLength // 全选到文本长度结束（符合你的 inlineStyles 规则：end 排除）
+        });
+        console.log(this.currentSelection);
       }
     });
   }
@@ -238,9 +256,9 @@ saveCursorPosition(): {
   }
 
   const range = selection.getRangeAt(0);
-  // ✅ 关键1：保存光标所在的「最小文本节点」（startContainer）
-  // ✅ 关键2：保存 endOffset（输入后光标在末尾，更符合预期）
-  // ✅ 关键3：保存节点文本内容，用于恢复时精准匹配
+  // 关键1：保存光标所在的「最小文本节点」（startContainer）
+  // 关键2：保存 endOffset（输入后光标在末尾，更符合预期）
+  // 关键3：保存节点文本内容，用于恢复时精准匹配
   return {
     parent: range.startContainer,
     offset: range.endOffset,
@@ -374,6 +392,16 @@ private getFirstTextNode(root: HTMLElement): Node | null {
     this.editor = null;
   }
 
+  // 新增：设置选中范围（供外部调用，比如双击全选时）
+  setCurrentSelection(selection: { start: number; end: number }): void {
+    // 可选：添加范围有效性校验（符合你的 inlineStyles 规则）
+    if (selection.start >= 0 && selection.end > selection.start) {
+      this.currentSelection = selection;
+    } else {
+      this.currentSelection = null; // 无效范围则置空
+    }
+  }
+
       /**
    * 通用方法：修改部分文本的内联样式（完全适配你的 TextState 定义）
    * @param id 文本节点ID
@@ -398,14 +426,18 @@ private getFirstTextNode(root: HTMLElement): Node | null {
 
     // 2. 获取并处理选中范围（遵循你的规则：越界修正 + 空范围过滤）
     const selection = this.currentSelection;
+
+    console.log(selection);//???(6,7)
+
     if (!selection || selection.start >= selection.end) return;
 
     // 越界处理：start < 0 按 0 算，end > 文本长度按文本长度算
     let { start: selectionStart, end: selectionEnd } = selection;
     selectionStart = Math.max(0, selectionStart);
     selectionEnd = Math.min(contentLength, selectionEnd);
-    if (selectionStart >= selectionEnd) return; // 修正后仍为空范围，直接退出
 
+    if (selectionStart >= selectionEnd) return; // 修正后仍为空范围，直接退出
+console.log("开始设置")
     // 3. 预处理现有样式：过滤空范围（start >= end），保留有效样式
     const validInlineStyles = inlineStyles.filter(style => style.start < style.end);
 

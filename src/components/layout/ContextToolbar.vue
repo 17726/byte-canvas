@@ -324,7 +324,9 @@ import { ToolManager } from '@/core/ToolManager';
   const toggleBold = () => {
     const activeId = Array.from(store.activeElementIds)[0];
     if (activeId) {
+      console.log("设置粗体");
       toolManagerRef?.value.handleToggleBold(activeId);
+      console.log("设置粗体完毕");
     }
   };
 
