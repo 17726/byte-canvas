@@ -63,6 +63,8 @@ import { TransformHandler } from './handlers/TransformHandler';
 import { RotationHandler } from './handlers/RotationHandler';
 import { SelectionHandler } from './handlers/SelectionHandler';
 import { GroupService } from './services/GroupService';
+import { TextSelectionHandler } from './handlers/TextSelectionHandler';
+import { TextService } from './services/TextService';
 
 /**
  * 工具管理器类
@@ -79,6 +81,7 @@ export class ToolManager {
   private viewportHandler: ViewportHandler;
   private transformHandler: TransformHandler;
   private selectionHandler: SelectionHandler;
+  private textSelectionHandler: TextSelectionHandler;
   private rotationHandler: RotationHandler;
 
   // 改为从外部获取空格键状态（不再内部维护）
@@ -102,6 +105,11 @@ export class ToolManager {
     this.viewportHandler = new ViewportHandler(this.store);
     this.transformHandler = new TransformHandler(this.store);
     this.selectionHandler = new SelectionHandler(this.store, stageEl);
+    this.textSelectionHandler = new TextSelectionHandler(
+      this.store,
+      this.transformHandler,
+      this.viewportHandler
+    );
     this.rotationHandler = new RotationHandler(); // 新增：初始化旋转处理器
   }
 
@@ -141,7 +149,7 @@ export class ToolManager {
     // 3. 三重阻止：彻底屏蔽外部拦截
     e.stopImmediatePropagation(); // 阻止当前元素其他监听器（关键抵御外部注入）
     e.stopPropagation(); // 阻止冒泡到父元素
-    e.preventDefault(); // 阻止浏览器默认行为+外部软件默认响应
+    //e.preventDefault(); // 阻止浏览器默认行为+外部软件默认响应
 
     // 4. 标记交互状态
     this.isCanvasInteracting = true;
@@ -203,6 +211,8 @@ export class ToolManager {
       if (this.store.editingGroupId) {
         GroupService.exitGroupEdit(this.store);
       }
+      // 文本处理器：结束编辑态
+      this.textSelectionHandler.exitEditing();
       return;
     }
 
@@ -233,6 +243,13 @@ export class ToolManager {
         GroupService.exitGroupEdit(this.store);
       }
 
+      // 文本处理器：点击空白处结束编辑态
+      if (this.textSelectionHandler.isEditing) {
+        console.log('结束编辑态');
+        this.textSelectionHandler.exitEditing();
+      }
+
+      // 启动框选（仅未按空格时）
       // 原有业务逻辑：启动框选
       this.selectionHandler.startBoxSelect(e);
     }
@@ -242,7 +259,7 @@ export class ToolManager {
    * 处理全局鼠标移动事件
    *
    * 根据当前交互状态更新对应操作：
-   * - 多选缩放 > 单选缩放 > 节点拖拽 > 画布平移 > 框选
+   * - 多选缩放 > 单选缩放 > 文本选区 > 节点拖拽 > 画布平移 > 框选
    *
    * @param e - 鼠标事件
    */
@@ -263,6 +280,12 @@ export class ToolManager {
     // 其次：单选缩放
     if (this.transformHandler.isResizing) {
       this.transformHandler.updateResize(e);
+      return;
+    }
+
+    // 再次：文本处理器：编辑态下更新选区
+    if (this.textSelectionHandler.isEditing) {
+      this.textSelectionHandler.handleMouseMove(e);
       return;
     }
 
@@ -315,6 +338,18 @@ export class ToolManager {
       this.selectionHandler.finishBoxSelect();
     }
 
+    // 文本处理器：编辑态下同步选区到全局
+    if (this.textSelectionHandler.isEditing) {
+      // 获取当前激活的文本节点ID
+      const activeTextNodeId = Array.from(this.store.activeElementIds).find((id) => {
+        const node = this.store.nodes[id];
+        return node?.type === NodeType.TEXT;
+      });
+      if (activeTextNodeId) {
+        this.textSelectionHandler.handleSelectionChange(activeTextNodeId);
+      }
+    }
+
     // 如果在组合编辑模式下有拖拽/缩放/旋转操作，检查并扩展组合边界
     if (hadDragOrResize && this.store.editingGroupId) {
       GroupService.expandGroupToFitChildren(this.store);
@@ -365,7 +400,14 @@ export class ToolManager {
       return;
     }
 
-    // 原有业务逻辑：显示属性面板
+    // 文本节点专属逻辑：
+    if (node.type === NodeType.TEXT) {
+      this.textSelectionHandler.handleMouseDown(e);
+      //编辑态下阻止继续向后执行拖拽逻辑
+      if (this.textSelectionHandler.isEditing) return;
+    }
+
+    // 4. 展示右侧属性面板并切换为节点模式
     this.ui.setActivePanel('node');
     this.ui.setPanelExpanded(true);
 
@@ -390,7 +432,22 @@ export class ToolManager {
     // 原有业务逻辑：进入组合编辑
     if (node.type === NodeType.GROUP) {
       GroupService.enterGroupEdit(this.store, id);
+      return;
     }
+
+    // 文本节点：进入编辑态
+    if (node.type === NodeType.TEXT) {
+      if (!this.textSelectionHandler.canEnterEditingDirectly(id)) {
+        const parentId = node.parentId;
+        if (parentId) {
+          console.log('进入组合编辑');
+          GroupService.enterGroupEdit(this.store, parentId);
+        }
+      }
+      this.textSelectionHandler.enterEditing(e, id);
+      console.log('进入编辑态');
+    }
+
     this.store.isInteracting = false;
     this.endCanvasInteraction();
   }
@@ -399,19 +456,26 @@ export class ToolManager {
   handleResizeHandleDown(e: MouseEvent, nodeId: string, handle: ResizeHandle) {
     // 强制防护：三重阻止+事件源校验
     if (!this.forceProtectEvent(e)) return;
-
     // 原有业务逻辑：额外加固阻止
     e.stopPropagation();
     e.preventDefault();
     e.stopImmediatePropagation();
 
-    // 新增：节点有效性校验
     const node = this.store.nodes[nodeId] as BaseNodeState;
+
+    // 新增：节点有效性校验
     if (!node || node.isLocked) {
       this.endCanvasInteraction();
       return;
     }
 
+    // 文本节点：缩放时结束编辑态
+    if (node?.type === NodeType.TEXT) {
+      this.textSelectionHandler.exitEditing();
+      this.store.updateGlobalTextSelection(null);
+    }
+
+    // 委托给 TransformHandler
     // 原有业务逻辑：启动单选缩放
     this.transformHandler.startResize(e, nodeId, handle);
   }
@@ -430,6 +494,7 @@ export class ToolManager {
     e.preventDefault();
     e.stopImmediatePropagation();
 
+    // 委托给 TransformHandler
     // 新增：过滤锁定节点
     const validNodeIds = nodeIds.filter((id) => {
       const node = this.store.nodes[id];
@@ -440,6 +505,16 @@ export class ToolManager {
       return;
     }
 
+    // 文本节点：缩放时结束编辑态
+    const hasTextNode = nodeIds.some((id) => {
+      const node = this.store.nodes[id];
+      return node?.type === NodeType.TEXT;
+    });
+    if (hasTextNode) {
+      this.textSelectionHandler.exitEditing();
+      this.store.updateGlobalTextSelection(null);
+    }
+
     // 原有业务逻辑：启动多选缩放
     this.transformHandler.startMultiResize(
       e,
@@ -448,6 +523,151 @@ export class ToolManager {
       validNodeIds,
       this.getIsSpacePressed()
     );
+  }
+  // ==================== 文本节点专属辅助方法 ====================
+  /**
+   * 初始化文本编辑器（供文本组件调用，复用现有逻辑）
+   * @param editor - 文本编辑器 DOM 引用
+   */
+  initTextEditor(editor: HTMLElement | null) {
+    this.textSelectionHandler.init(editor);
+    // 注册全局事件
+    document.addEventListener('mousedown', this.textSelectionHandler.handleGlobalMousedown, true);
+  }
+
+  /**
+   * 处理文本节点输入事件（供文本组件调用）
+   * @param e - 输入事件
+   * @param id - 文本节点 ID
+   */
+  handleTextInput(e: Event, id: string) {
+    if (this.transformHandler.isTransforming) return;
+
+    // 仅需校验节点是否存在（无需传递给 TextService，TextService 内部会二次校验）
+    const node = this.store.nodes[id];
+    if (!node || node.type !== NodeType.TEXT) return;
+
+    // 调用 TextService 时，传递 id 而非 node
+    TextService.handleContentChange(
+      e,
+      id, // 传递节点 ID
+      this.store, // Pinia 实例
+      () => this.textSelectionHandler.saveCursorPosition(),
+      (pos) => this.textSelectionHandler.restoreCursorPosition(pos)
+    );
+  }
+
+  /**
+   * 处理文本节点选区变化（供文本组件调用，内部转发给 TextSelectionHandler）
+   * @param id - 文本节点 ID
+   */
+  handleTextSelectionChange(id: string) {
+    if (this.transformHandler.isTransforming) return;
+    const node = this.store.nodes[id];
+    if (!node || node.type !== NodeType.TEXT) return;
+    this.textSelectionHandler.handleSelectionChange(id);
+    console.log('触发handleTextSelectionChange');
+  }
+
+  /**
+   * 处理文本节点失焦事件（供文本组件调用）
+   * @param id - 文本节点 ID
+   */
+  handleTextBlur(id: string) {
+    const node = this.store.nodes[id];
+    if (!node || node.type !== NodeType.TEXT) return;
+
+    this.textSelectionHandler.handleBlur(id);
+  }
+
+  /**
+   * 处理文本节点点击事件（供文本组件调用）
+   * @param e - 鼠标事件
+   * @param id - 文本节点 ID
+   */
+  handleTextClick(e: MouseEvent, id: string) {
+    if (this.getIsSpacePressed()) return;
+
+    const node = this.store.nodes[id];
+    if (!node || node.type !== NodeType.TEXT) return;
+
+    e.stopPropagation();
+
+    if (!this.textSelectionHandler.canEnterEditingDirectly(id)) {
+      const parentId = node.parentId;
+      if (parentId) {
+        console.log('进入组合编辑');
+        GroupService.enterGroupEdit(this.store, parentId);
+      }
+    }
+    this.textSelectionHandler.handleTextBoxClick(e, id);
+    console.log('单击文本节点');
+
+    if (!this.store.activeElementIds.has(id)) {
+      this.store.setActive([id]);
+    }
+  }
+
+  //处理文本样式
+  handleToggleBold(id: string) {
+    this.textSelectionHandler.updatePartialInlineStyle(
+      id,
+      this.store,
+      'fontWeight',
+      'bold', // 样式值（支持 'bold' 或 700）
+      true // toggle：有则移除，无则添加
+    );
+    console.log('真的设置粗体完毕');
+  }
+
+  handleToggleItalic(id: string) {
+    this.textSelectionHandler.updatePartialInlineStyle(
+      id,
+      this.store,
+      'fontStyle', // 对应 InlineStyleProps 中的 fontStyle
+      'italic', // 目标样式值（切换为斜体）
+      true // toggle 模式：有则移除，无则添加
+    );
+  }
+
+  handleToggleUnderline(id: string) {
+    this.textSelectionHandler.updatePartialInlineStyle(
+      id,
+      this.store,
+      'textDecoration', // 对应 InlineStyleProps 中的 textDecoration
+      'underline', // 目标样式值（切换为删除线）
+      true // toggle 模式：有则移除，无则添加
+    );
+  }
+
+  handleToggleStrikethrough(id: string) {
+    this.textSelectionHandler.updatePartialInlineStyle(
+      id,
+      this.store,
+      'textDecoration',
+      'line-through',
+      true
+    );
+  }
+  /**
+   * 处理文本节点鼠标抬起（供文本组件调用，内部转发给 TextSelectionHandler）
+   * @param e - 鼠标事件
+   * @param id - 文本节点 ID
+   */
+  handleTextMouseUp(e: MouseEvent, id: string) {
+    if (this.transformHandler.isTransforming) return;
+    const node = this.store.nodes[id];
+    if (!node || node.type !== NodeType.TEXT) return;
+    this.textSelectionHandler.handleMouseUpAndSelection(e, id);
+    console.log('触发handleTextMouseUp');
+  }
+
+  getTextEditingState(): boolean {
+    return this.textSelectionHandler.isEditing;
+  }
+
+  getCurrentSelection() {
+    return this.textSelectionHandler.currentSelection;
   }
 
   // ==================== 旋转控制点事件（新增）====================

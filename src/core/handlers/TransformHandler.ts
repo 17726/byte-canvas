@@ -795,8 +795,8 @@ export class TransformHandler {
       if (!node || !startState) return;
 
       const nodeType = node.type;
-      let finalScaleX = newBounds.width / startBounds.width;
-      let finalScaleY = newBounds.height / startBounds.height;
+      const finalScaleX = newBounds.width / startBounds.width;
+      const finalScaleY = newBounds.height / startBounds.height;
       let newNodeWidth = startState.width * finalScaleX;
       let newNodeHeight = startState.height * finalScaleY;
       let newNodeX = newBounds.x + startState.offsetX * newBounds.width;
