@@ -4,7 +4,7 @@
     <template v-if="isShape">
       <div class="tool-item">
         <a-tooltip position="bottom" content="填充色">
-          <a-color-picker position="right" :popup-offset="-100" :popup-translate="[-50,-160]" size="mini" v-model="fillColor" trigger="hover" disabled-alpha />
+          <a-color-picker :popup-offset="-150" :popup-translate="[-100,-160]" size="mini" v-model="fillColor" trigger="hover" disabled-alpha />
         </a-tooltip>
       </div>
       <div class="divider"></div>
@@ -75,7 +75,7 @@
       <div class="divider"></div>
       <div class="tool-item">
         <a-tooltip position="bottom" content="文本颜色">
-          <a-color-picker position="right" :popup-offset="-100" :popup-translate="[-50,-160]" size="mini" v-model="textColor" trigger="hover" />
+          <a-color-picker :popup-offset="-150" :popup-translate="[-100,-160]" size="mini" v-model="textColor" trigger="hover" />
         </a-tooltip>
       </div>
     </template>
@@ -89,19 +89,24 @@
     <div class="tool-section">
       <div class="tool-item">
         <a-tooltip placement="top" title="不透明度" :mouseEnterDelay="0.3" content="透明度">
-          <span class="label" style="pointer-events: none;width: 38px;">
-            <svg t="1764815849591" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="5303" width="20" height="20"><path d="M102.4 716.8v-204.8h204.8v204.8z m0-409.6V102.4h204.8v204.8z" opacity=".8" p-id="5304" fill="#1296db"></path><path d="M307.2 921.6v-204.8h204.8v204.8z m0-409.6V307.2h204.8v204.8z" opacity=".6" p-id="5305" fill="#1296db"></path><path d="M512 716.8v-204.8h204.8v204.8z m0-409.6V102.4h204.8v204.8z" opacity=".4" p-id="5306" fill="#1296db"></path><path d="M716.8 921.6v-204.8h204.8v204.8z m0-409.6V307.2h204.8v204.8z" opacity=".2" p-id="5307" fill="#1296db"></path></svg>
+          <span class="label" style="cursor: help; display: flex; align-items: center;">
+            <svg class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" width="20" height="20">
+              <path d="M102.4 716.8v-204.8h204.8v204.8z m0-409.6V102.4h204.8v204.8z" opacity=".8" fill="#1296db"></path>
+              <path d="M307.2 921.6v-204.8h204.8v204.8z m0-409.6V307.2h204.8v204.8z" opacity=".6" fill="#1296db"></path>
+              <path d="M512 716.8v-204.8h204.8v204.8z m0-409.6V102.4h204.8v204.8z" opacity=".4" fill="#1296db"></path>
+              <path d="M716.8 921.6v-204.8h204.8v204.8z m0-409.6V307.2h204.8v204.8z" opacity=".2" fill="#1296db"></path>
+            </svg>
           </span>
+        </a-tooltip>
           <a-slider
             v-model="opacity"
             :min="0"
             :max="1"
             :step="0.01"
-            style="width: 60px; margin-left: 0px"
+            style="width: 60px; margin-left: 4px"
             size="mini"
             :tooltip-visible="false"
           />
-        </a-tooltip>
       </div>
       <div class="divider"></div>
       <div class="tool-item">
@@ -452,6 +457,8 @@
     gap: 8px;
     pointer-events: auto;
     border: 1px solid var(--color-border-2);
+    user-select: none; 
+  -webkit-user-select: none;
   }
 
   .tool-section {
