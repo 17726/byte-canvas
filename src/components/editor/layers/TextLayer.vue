@@ -1,6 +1,6 @@
 <template>
   <!-- 外层容器：用于放置缩放控制点 -->
-  <div class="text-layer-wrapper" :style="style" >
+  <div class="text-layer-wrapper" :style="style">
     <!-- 透明矩形内部写文字，即文本框 -->
     <div
       ref="editor"
@@ -91,6 +91,24 @@ const isActiveNode = computed(() => {
 });
 
 // 监听activeElementIds变化，强制保留编辑态节点激活（通过 Store 操作，不依赖 Handler）
+// 文本组件内的局部状态，仅能在当前组件访问
+const currentSelection = ref<{ start: number; end: number } | null>(null);
+
+// 文本组件：合并 watch 监听器（核心修复）
+// 合并监听 currentSelection 和 isActiveNode，统一管理选区同步逻辑
+watch(
+  [currentSelection, isActiveNode],
+  ([newSelection, isActive]) => {
+    console.log('watch-选区/激活变化：', { newSelection, isActive });
+    if (isActive && newSelection) {
+      store.updateGlobalTextSelection(newSelection); // 激活且有选区时同步
+    } else {
+      store.updateGlobalTextSelection(null); // 其他情况清空
+    }
+  },
+  { immediate: true, deep: true }
+);
+
 watch(
   () => Array.from(store.activeElementIds),
   (newActiveIds) => {
@@ -187,6 +205,7 @@ onUnmounted(() => {
   pointer-events: auto;
 }
 
+/* 文本选中样式（兼容不同浏览器） */
 .textBox::selection,
 .textBox *::selection {
   background-color: rgba(0, 122, 255, 0.1) !important;

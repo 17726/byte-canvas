@@ -72,7 +72,7 @@ export class TextSelectionHandler {
 
     event.stopPropagation();
     const isSelected = this.store.activeElementIds.has(id);
-    if (!isSelected) return;
+    if (!isSelected) this.store.setActive([id]);
 
     this.isEditing = true;
     nextTick(() => {
@@ -228,17 +228,13 @@ export class TextSelectionHandler {
    * @param node 文本节点数据
    */
   handleTextBoxClick(e: MouseEvent, id: string) {
-    const node = this.store.nodes[id] as TextState;
     if (!this.isEditing) {
       // 阻止文本框聚焦（避免单击时光标出现，不进入编辑态）
       e.preventDefault();
 
       // 执行选中逻辑（单击的核心需求）
-      const isSelected = this.store.activeElementIds.has(node.id);
-      if (!isSelected) {
-        this.store.setActive([node.id]);
-      }
-
+      const isSelected = this.store.activeElementIds.has(id);
+      if(!isSelected) this.store.setActive([id]);
       // 强制让文本框失焦（兜底，避免意外聚焦）
       this.editor?.blur();
     } else {
@@ -246,6 +242,21 @@ export class TextSelectionHandler {
       e.stopPropagation();
     }
   }
+
+    /**
+   * 判断当前文本节点是否可以直接进入编辑态
+   * - 顶层文本节点（没有 parentId）始终允许
+   * - 组合子节点只有在父组合已经处于编辑模式时才允许
+   */
+  canEnterEditingDirectly = (id: string) => {
+    const node = this.store.nodes[id];
+    if (!node) return;
+
+    const parentId = node.parentId;
+    if (!parentId) return true;
+
+    return this.store.editingGroupId === parentId;
+  };
 
   /**
    * 保存当前光标位置（修复：保存真实光标节点和结束偏移）
@@ -431,7 +442,7 @@ export class TextSelectionHandler {
     selectionEnd = Math.min(contentLength, selectionEnd);
 
     if (selectionStart >= selectionEnd) return; // 修正后仍为空范围，直接退出
-console.log("开始设置")
+    console.log("开始设置")
     // 3. 预处理现有样式：过滤空范围（start >= end），保留有效样式
     const validInlineStyles = inlineStyles.filter((style) => style.start < style.end);
 
