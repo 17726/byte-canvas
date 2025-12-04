@@ -382,7 +382,7 @@ export class TransformHandler {
 
     // 步骤2：根据“图形类型+拖拽类型+Shift键”确定是否等比缩放
     let shouldEnforceRatio = false;
-    let isImageOriginalRatio = false; // 图片是否用“原比例”等比
+    // let isImageOriginalRatio = false; // 图片是否用“原比例”等比
     const isShiftPressed = e.shiftKey;
 
     // 基础规则：图形类型+拖拽类型的默认等比
@@ -390,7 +390,7 @@ export class TransformHandler {
       case NodeType.IMAGE:
         // 图片：四角拖拽 → 原比例等比缩放
         shouldEnforceRatio = isCorner;
-        isImageOriginalRatio = isCorner;
+        // isImageOriginalRatio = isCorner;
         break;
       case NodeType.RECT:
       case NodeType.TEXT:
