@@ -116,8 +116,7 @@ export class TextSelectionHandler {
     if (!this.isEditing) {
       // 非编辑态阻止文本框单击聚焦（避免单击时光标出现，不进入编辑态）
       e.preventDefault();
-    }else
-    console.log("处理文本节点的handleMouseDown")
+    } else console.log('处理文本节点的handleMouseDown');
   }
 
   /**
@@ -128,7 +127,7 @@ export class TextSelectionHandler {
     if (this.isEditing) {
       e.stopPropagation();
     }
-    console.log("处理文本节点的handleMouseMove")
+    console.log('处理文本节点的handleMouseMove');
   }
 
   /**
@@ -143,7 +142,7 @@ export class TextSelectionHandler {
         this.handleSelectionChange(id);
       });
     }
-    console.log("处理文本节点的handleMouseUpAndSelection")
+    console.log('处理文本节点的handleMouseUpAndSelection');
   }
 
   /**
@@ -233,7 +232,7 @@ export class TextSelectionHandler {
    */
   handleTextBoxClick(e: MouseEvent, id: string) {
     if (!this.isEditing) {
-      console.log("没有在编辑状态");
+      console.log('没有在编辑状态');
       // 阻止文本框聚焦（避免单击时光标出现，不进入编辑态）
       //e.preventDefault();
 
@@ -244,7 +243,7 @@ export class TextSelectionHandler {
       this.editor?.blur();
     } else {
       // 编辑状态下，正常响应点击（选中文本、输入等）
-      console.log("处于编辑态 正常响应点击")
+      console.log('处于编辑态 正常响应点击');
       e.stopPropagation();
 
       // 修复：点击时如果当前是全选状态，清除全选并将光标设置到点击位置

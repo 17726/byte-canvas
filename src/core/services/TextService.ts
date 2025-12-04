@@ -22,7 +22,11 @@ export class TextService {
     id: string,
     store: CanvasStore,
     saveCursorPosition: () => { parent: Node | null; offset: number; textContent: string },
-    restoreCursorPosition: (savedPos: { parent: Node | null; offset: number ; textContent: string }) => void
+    restoreCursorPosition: (savedPos: {
+      parent: Node | null;
+      offset: number;
+      textContent: string;
+    }) => void
   ) {
     //通过 ID 获取节点，加非空+类型校验
     const node = store.nodes[id] as TextState | undefined;
@@ -35,7 +39,7 @@ export class TextService {
     const newContent = target.textContent || ''; // 兜底空字符串，避免 null
     // 通过 ID 更新节点内容
     store.updateNode(id, {
-      props: { ...node.props, content: newContent }
+      props: { ...node.props, content: newContent },
     });
 
     // DOM 重新渲染后，恢复光标位置
@@ -44,12 +48,7 @@ export class TextService {
     // 同步调整内联样式（传递 id 给内部方法）
     const oldContent = node.props.content || '';
     if (oldContent && newContent) {
-      this.updateInlineStylesOnContentChange(
-        oldContent,
-        newContent,
-        id,
-        store
-      );
+      this.updateInlineStylesOnContentChange(oldContent, newContent, id, store);
     }
   }
 
@@ -88,34 +87,36 @@ export class TextService {
     const cursorPos = range.endOffset; // 比如在 "你好" 后面插入 "世界"，光标Pos是 2
 
     // 6. 核心逻辑：根据长度变化，调整每个样式的范围索引
-    const newInlineStyles = oldInlineStyles.map(style => {
-      let { start, end } = style; // 每个样式的原范围（比如 start:1, end:2 → 对应旧文本第1-2个字符）
+    const newInlineStyles = oldInlineStyles
+      .map((style) => {
+        let { start, end } = style; // 每个样式的原范围（比如 start:1, end:2 → 对应旧文本第1-2个字符）
 
-      // 场景1：文本「插入」（长度增加，lengthDiff>0）—— 光标后的样式范围向后偏移
-      if (lengthDiff > 0 && end > cursorPos) {
-        // 比如：旧文本 "你好"（长度2），在光标Pos=2插入"世界"（长度+2）
-        // 原样式 start:1, end:2 → 光标后，所以 start 不变（1），end +2 → 4
-        // 新样式范围 start:1, end:4 → 依然对应 "好"（新文本第1-2个字符，插入后"世界"在后面，不影响）
-        start = start > cursorPos ? start + lengthDiff : start;
-        end += lengthDiff;
-      }
+        // 场景1：文本「插入」（长度增加，lengthDiff>0）—— 光标后的样式范围向后偏移
+        if (lengthDiff > 0 && end > cursorPos) {
+          // 比如：旧文本 "你好"（长度2），在光标Pos=2插入"世界"（长度+2）
+          // 原样式 start:1, end:2 → 光标后，所以 start 不变（1），end +2 → 4
+          // 新样式范围 start:1, end:4 → 依然对应 "好"（新文本第1-2个字符，插入后"世界"在后面，不影响）
+          start = start > cursorPos ? start + lengthDiff : start;
+          end += lengthDiff;
+        }
 
-      // 场景2：文本「删除」（长度减少，lengthDiff<0）—— 光标后的样式范围向前偏移
-      if (lengthDiff < 0 && end > cursorPos) {
-        const offset = Math.abs(lengthDiff); // 删除的字符数（比如删除1个字符，offset=1）
-        // 比如：旧文本 "你好世界"（长度4），光标Pos=2，删除"世界"（长度-2）
-        // 原样式 start:2, end:4 → 光标后，所以 start= max(0, 2-2)=0，end= max(0,4-2)=2
-        // 新样式范围 start:0, end:2 → 对应删除后的"你好"，样式不丢失
-        start = start > cursorPos ? Math.max(0, start - offset) : start;
-        end = Math.max(start, end - offset); // 避免 end < start（无效样式范围）
-      }
+        // 场景2：文本「删除」（长度减少，lengthDiff<0）—— 光标后的样式范围向前偏移
+        if (lengthDiff < 0 && end > cursorPos) {
+          const offset = Math.abs(lengthDiff); // 删除的字符数（比如删除1个字符，offset=1）
+          // 比如：旧文本 "你好世界"（长度4），光标Pos=2，删除"世界"（长度-2）
+          // 原样式 start:2, end:4 → 光标后，所以 start= max(0, 2-2)=0，end= max(0,4-2)=2
+          // 新样式范围 start:0, end:2 → 对应删除后的"你好"，样式不丢失
+          start = start > cursorPos ? Math.max(0, start - offset) : start;
+          end = Math.max(start, end - offset); // 避免 end < start（无效样式范围）
+        }
 
-      return { ...style, start, end }; // 返回调整后的样式
-    }).filter(style => style.start < style.end); // 过滤无效样式（start≥end的空范围）
+        return { ...style, start, end }; // 返回调整后的样式
+      })
+      .filter((style) => style.start < style.end); // 过滤无效样式（start≥end的空范围）
 
     // 7. 最终：更新节点的内联样式（同步到store，视图自动刷新）
     store.updateNode(id, {
-      props: { ...node.props, inlineStyles: newInlineStyles }
+      props: { ...node.props, inlineStyles: newInlineStyles },
     });
   }
 }
