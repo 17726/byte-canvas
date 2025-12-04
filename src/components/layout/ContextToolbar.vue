@@ -1,59 +1,16 @@
 <template>
   <div v-if="isVisible" class="context-toolbar" :style="positionStyle" @mousedown.stop>
-    <!-- Common Properties (Opacity & Layer) -->
-    <div class="tool-section">
-      <div class="tool-item">
-        <a-tooltip placement="top" title="不透明度" :mouseEnterDelay="0.3">
-          <span class="label" style="pointer-events: none;width: 38px;">透明度</span>
-          <a-slider
-            v-model="opacity"
-            :min="0"
-            :max="1"
-            :step="0.01"
-            style="width: 60px; margin-left: 8px"
-            size="mini"
-            :tooltip-visible="false"
-          />
-        </a-tooltip>
-      </div>
-      <div class="divider"></div>
-      <div class="tool-item">
-        <a-popover trigger="click" position="bottom" content-class="layer-popover">
-          <a-tooltip placement="top" content="图层顺序">
-            <a-button size="mini" type="text">
-              <icon-layers />
-            </a-button>
-          </a-tooltip>
-          <!-- 展开的内容（添加提示文字） -->
-          <template #content>
-            <div class="popover-row">
-              <a-button size="mini" type="text" @click="bringToFront" long>
-                <template #icon><icon-bring-to-front /></template>
-                置于顶层
-              </a-button>
-              <a-button size="mini" type="text" @click="sendToBack" long>
-                <template #icon><icon-send-to-back /></template>
-                置于底层
-              </a-button>
-            </div>
-          </template>
-        </a-popover>
-      </div>
-    </div>
-
-    <div class="divider" v-if="isShape || isText"></div>
-
     <!-- Shape Controls -->
     <template v-if="isShape">
       <div class="tool-item">
-        <a-tooltip placement="top" content="填充色">
-          <a-color-picker size="mini" v-model="fillColor" trigger="hover" disabled-alpha />
+        <a-tooltip position="bottom" content="填充色">
+          <a-color-picker position="right" :popup-offset="-100" :popup-translate="[-50,-160]" size="mini" v-model="fillColor" trigger="hover" disabled-alpha />
         </a-tooltip>
       </div>
       <div class="divider"></div>
       <div class="tool-item">
-        <a-tooltip placement="top" content="边框色">
-          <a-color-picker size="mini" v-model="strokeColor" trigger="hover" />
+        <a-tooltip position="bottom" content="边框色">
+          <a-color-picker  :popup-offset="-150" :popup-translate="[-100,-160]" size="mini" v-model="strokeColor" trigger="hover" />
         </a-tooltip>
       </div>
       <div class="divider"></div>
@@ -83,7 +40,7 @@
       </div>
       <div class="divider"></div>
       <div class="tool-item">
-        <a-popover trigger="click" position="bottom" content-class="toolbar-popover-content">
+        <a-popover trigger="click" position="top" content-class="toolbar-popover-content">
           <a-tooltip placement="top" content="文本样式">
             <a-button size="mini" type="text">
               <icon-text />
@@ -117,8 +74,8 @@
       </div>
       <div class="divider"></div>
       <div class="tool-item">
-        <a-tooltip placement="top" content="文本颜色">
-          <a-color-picker size="mini" v-model="textColor" trigger="hover" />
+        <a-tooltip position="bottom" content="文本颜色">
+          <a-color-picker position="right" :popup-offset="-100" :popup-translate="[-50,-160]" size="mini" v-model="textColor" trigger="hover" />
         </a-tooltip>
       </div>
     </template>
@@ -127,8 +84,49 @@
     <template v-if="isImage">
       <!-- 预留图片滤镜区域，后续恢复时直接取消注释即可 -->
     </template>
-
-    <!-- Delete（修复divider位置，避免嵌套错误） -->
+    <div class="divider" v-if="isShape || isText"></div>
+    <!-- Common Properties (Opacity & Layer) -->
+    <div class="tool-section">
+      <div class="tool-item">
+        <a-tooltip placement="top" title="不透明度" :mouseEnterDelay="0.3" content="透明度">
+          <span class="label" style="pointer-events: none;width: 38px;">
+            <svg t="1764815849591" class="icon" viewBox="0 0 1024 1024" version="1.1" xmlns="http://www.w3.org/2000/svg" p-id="5303" width="20" height="20"><path d="M102.4 716.8v-204.8h204.8v204.8z m0-409.6V102.4h204.8v204.8z" opacity=".8" p-id="5304" fill="#1296db"></path><path d="M307.2 921.6v-204.8h204.8v204.8z m0-409.6V307.2h204.8v204.8z" opacity=".6" p-id="5305" fill="#1296db"></path><path d="M512 716.8v-204.8h204.8v204.8z m0-409.6V102.4h204.8v204.8z" opacity=".4" p-id="5306" fill="#1296db"></path><path d="M716.8 921.6v-204.8h204.8v204.8z m0-409.6V307.2h204.8v204.8z" opacity=".2" p-id="5307" fill="#1296db"></path></svg>
+          </span>
+          <a-slider
+            v-model="opacity"
+            :min="0"
+            :max="1"
+            :step="0.01"
+            style="width: 60px; margin-left: 0px"
+            size="mini"
+            :tooltip-visible="false"
+          />
+        </a-tooltip>
+      </div>
+      <div class="divider"></div>
+      <div class="tool-item">
+        <a-popover trigger="click" position="bottom" content-class="layer-popover">
+          <a-tooltip placement="top" content="图层顺序">
+            <a-button size="mini" type="text">
+              <icon-layers />
+            </a-button>
+          </a-tooltip>
+          <!-- 展开的内容（添加提示文字） -->
+          <template #content>
+            <div class="popover-row">
+              <a-button size="mini" type="text" @click="bringToFront" long>
+                <template #icon><icon-bring-to-front /></template>
+                置于顶层
+              </a-button>
+              <a-button size="mini" type="text" @click="sendToBack" long>
+                <template #icon><icon-send-to-back /></template>
+                置于底层
+              </a-button>
+            </div>
+          </template>
+        </a-popover>
+      </div>
+    </div>
     <div class="divider"></div>
     <div class="tool-item">
       <a-tooltip placement="top" content="删除">
@@ -529,4 +527,5 @@
   flex-direction: column; /* 按钮垂直排列 */
   gap: 4px; /* 按钮之间的间距 */
 }
+
   </style>
