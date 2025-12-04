@@ -307,7 +307,7 @@ export class TransformHandler {
   }
 
   /**
-   * 更新单节点缩放（核心修正：最小尺寸吸附逻辑 + 禁用拖拽翻转）
+   * 更新单节点缩放（核心修正：最小尺寸吸附逻辑 + 禁用缩放翻转）
    * @param e 鼠标事件
    */
   updateResize(e: MouseEvent) {
