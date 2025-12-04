@@ -156,7 +156,26 @@ const enterEditing = (e: MouseEvent, id: string) => {
 };
 
 const handleMouseDown = (e: MouseEvent, id: string) => {
-  toolManagerRef?.value?.handleNodeDown(e, id); // 调用 ToolManager 节点按下事件（内部含文本编辑态判断）
+  const node = store.nodes[id] as TextState | undefined;
+  const parentId = node?.parentId;
+
+  // 1. 文本是组合子节点 && 父组合当前不在“编辑组合模式”
+  //    → 单击时行为应当是：选中父组合，不进入文本编辑，也不出现光标
+  if (parentId && store.editingGroupId !== parentId) {
+    // 阻止 contenteditable 的默认聚焦/光标行为
+    e.preventDefault();
+    // 把这次按下事件交给父组合节点，模仿圆形/矩形那种“选中组合”的效果
+    toolManagerRef?.value?.handleNodeDown(e, parentId);
+    // 防止事件继续冒泡到 GroupLayer 的 @mousedown 等，避免重复处理
+    e.stopPropagation();
+    return;
+  }
+
+  // 2. 其他情况（独立文本，或父组合已经在编辑模式下）
+  //    交给当前文本节点处理：
+  //    - TextSelectionHandler.handleMouseDown 会在非编辑态下 preventDefault，避免单击直接进入编辑
+  //    - 双击通过 handleNodeDoubleClick → enterEditing 才真正进入文本编辑态
+  toolManagerRef?.value?.handleNodeDown(e, id);
 };
 
 const handleMouseMove = (e: MouseEvent) => {

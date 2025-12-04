@@ -442,6 +442,7 @@ export class ToolManager {
         if (parentId) {
           console.log('进入组合编辑');
           GroupService.enterGroupEdit(this.store, parentId);
+          return;
         }
       }
       this.textSelectionHandler.enterEditing(e, id);
@@ -591,15 +592,17 @@ export class ToolManager {
     const node = this.store.nodes[id];
     if (!node || node.type !== NodeType.TEXT) return;
 
-    e.stopPropagation();
-
     if (!this.textSelectionHandler.canEnterEditingDirectly(id)) {
       const parentId = node.parentId;
       if (parentId) {
-        console.log('进入组合编辑');
-        GroupService.enterGroupEdit(this.store, parentId);
+        // 选中父节点
+        this.store.setActive([parentId]);
+        return;
       }
     }
+
+    e.stopPropagation();
+
     this.textSelectionHandler.handleTextBoxClick(e, id);
     console.log('单击文本节点');
 
