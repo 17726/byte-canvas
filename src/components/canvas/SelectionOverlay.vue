@@ -283,23 +283,6 @@ const getHandleStyle = (handle: ResizeHandle) => {
   };
 };
 
-// 旋转控制点样式（下边下方一段距离中间，跟随选中框旋转）
-const rotateHandleStyle = computed(() => {
-  const bounds = selectionBounds.value;
-  if (!bounds) return {};
-
-  const scale = 1 / store.viewport.zoom;
-  if (!selectedNodes.value[0]) return {};
-  const rotation = selectedNodes.value.length === 1 ? selectedNodes.value[0].transform.rotation : 0;
-
-  // 定位在下边下方35px处（距离选中框底部外侧35px），水平居中
-  // 可根据需求调整 bottom 值（负值越大，距离越远）
-  return {
-    transform: `translateX(-50%) rotate(${-rotation}deg) scale(${scale})`, // 水平居中 + 反向旋转（保持正立） + 缩放
-    bottom: '-35px', // 核心修改：距离选中框底部外侧35px（默认-10px，改为-30px即向下移动20px）
-    left: '50%', // 水平居中基准点
-  };
-});
 // 5. 触发多选缩放
 const onHandleDown = (e: MouseEvent, handle: ResizeHandle) => {
   const bounds = selectionBounds.value;
@@ -318,6 +301,26 @@ const onHandleDown = (e: MouseEvent, handle: ResizeHandle) => {
     toolManagerRef.value.handleMultiResizeDown(e, handle, bounds, nodeIds);
   }
 };
+
+//旋转样式计算
+const rotateHandleStyle = computed(() => {
+  const bounds = selectionBounds.value;
+  if (!bounds) return {};
+
+  const scale = 1 / store.viewport.zoom;
+  if (!selectedNodes.value[0]) return {};
+  const rotation = selectedNodes.value.length === 1 ? selectedNodes.value[0].transform.rotation : 0;
+
+  // 计算选中框高度的1/4
+  const quarterHeight = bounds.height / 4;
+
+  // 定位：水平居中 + 垂直在选中框底部外侧1/4高度处（可根据需求调整）
+  return {
+    transform: `translateX(-50%) rotate(${-rotation}deg) scale(${scale})`,
+    bottom: `${0.3 * quarterHeight}px`, // 核心：动态1/4高度（外部），内部则改为 `${3 * quarterHeight}px`
+    left: '50%',
+  };
+});
 
 // 旋转控制点鼠标按下事件
 const onRotateHandleDown = (e: MouseEvent) => {
