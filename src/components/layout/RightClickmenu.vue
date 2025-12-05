@@ -7,7 +7,7 @@
       :style="menuStyle"
       @contextmenu.prevent
     >
-      <a-menu mode="vertical" @menu-item-click="RightMenuItemClick" style="min-width: 200px">
+      <a-menu mode="vertical" @menu-item-click="handleMenuItemClick" style="min-width: 200px">
         <a-menu-item :disabled="!hasSelection" key="copy">复制</a-menu-item>
         <a-menu-item key="paste">粘贴</a-menu-item>
         <a-menu-item :disabled="!hasSelection" key="cut">剪切</a-menu-item>
@@ -99,7 +99,7 @@ enum MenuKey {
 }
 
 /* ---------- 菜单点击处理 ---------- */
-function RightMenuItemClick(key: string) {
+function handleMenuItemClick(key: string) {
   switch (key) {
     case MenuKey.Copy:
       if (!hasSelection.value) return;
@@ -148,7 +148,7 @@ function RightMenuItemClick(key: string) {
       break;
     case MenuKey.SelectAll:
       // Select all non-locked nodes
-      const allNodeIds = store.nodeOrder.filter(id => {
+      const allNodeIds = store.nodeOrder.filter((id) => {
         const node = store.nodes[id];
         return node && !node.isLocked;
       });
