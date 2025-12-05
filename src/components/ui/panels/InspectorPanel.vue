@@ -1075,7 +1075,6 @@ const resetFilter = () => {
 .label {
   display: block;
   font-size: 12px;
-  margin-bottom: 8px;
   font-weight: bold;
   color: var(--color-text-2);
   margin-bottom: 4px;
