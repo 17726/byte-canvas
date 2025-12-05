@@ -95,7 +95,7 @@ export type TextDecorationValue = 'none' | 'underline' | 'line-through' | 'under
 // 1. 定义行内样式专属类型（仅允许文本片段独立设置的属性）
 export type InlineStyleProps = {
   color?: string; // 文本颜色（支持行内独立设置）
-  fontWeight?: 'normal' | 'bold' | 400 | 700; // 字体粗细
+  fontWeight?: 'normal' | 'bold' | number; // 字体粗细
   fontStyle?: 'normal' | 'italic'; // 字体斜体
   textDecoration?: TextDecorationValue; // 文本装饰（下划线/删除线）
   fontSize?: number; // 字体大小（支持行内局部调整）
@@ -108,7 +108,7 @@ export interface TextState extends BaseNodeState {
     content: string;
     fontFamily: string;
     fontSize: number;
-    fontWeight: 'normal' | 'bold' | 400 | 700; // B (加粗)
+    fontWeight: 'normal' | 'bold' | number; // B (加粗)
     fontStyle: 'normal' | 'italic'; // I (斜体)
     color: string;
     lineHeight: number;

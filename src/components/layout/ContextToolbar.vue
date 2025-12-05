@@ -1,59 +1,29 @@
 <template>
   <div v-if="isVisible" class="context-toolbar" :style="positionStyle" @mousedown.stop>
-    <!-- Common Properties (Opacity & Layer) -->
-    <div class="tool-section">
+    <!-- Shape Controls -->
+    <template v-if="isShape">
       <div class="tool-item">
-        <a-tooltip placement="top" title="不透明度" :mouseEnterDelay="0.3">
-          <span class="label" style="pointer-events: none; width: 38px">透明度</span>
-          <a-slider
-            v-model="opacity"
-            :min="0"
-            :max="1"
-            :step="0.01"
-            style="width: 60px; margin-left: 8px"
+        <a-tooltip position="bottom" content="填充色">
+          <a-color-picker
+            :popup-offset="-150"
+            :popup-translate="[-100, -160]"
             size="mini"
-            :tooltip-visible="false"
+            v-model="fillColor"
+            trigger="hover"
+            disabled-alpha
           />
         </a-tooltip>
       </div>
       <div class="divider"></div>
       <div class="tool-item">
-        <a-popover trigger="click" position="bottom" content-class="layer-popover">
-          <a-tooltip placement="top" content="图层顺序">
-            <a-button size="mini" type="text">
-              <icon-layers />
-            </a-button>
-          </a-tooltip>
-          <!-- 展开的内容（添加提示文字） -->
-          <template #content>
-            <div class="popover-row">
-              <a-button size="mini" type="text" @click="bringToFront" long>
-                <template #icon><icon-bring-to-front /></template>
-                置于顶层
-              </a-button>
-              <a-button size="mini" type="text" @click="sendToBack" long>
-                <template #icon><icon-send-to-back /></template>
-                置于底层
-              </a-button>
-            </div>
-          </template>
-        </a-popover>
-      </div>
-    </div>
-
-    <div class="divider" v-if="isShape || isText"></div>
-
-    <!-- Shape Controls -->
-    <template v-if="isShape">
-      <div class="tool-item">
-        <a-tooltip placement="top" content="填充色">
-          <a-color-picker size="mini" v-model="fillColor" trigger="hover" disabled-alpha />
-        </a-tooltip>
-      </div>
-      <div class="divider"></div>
-      <div class="tool-item">
-        <a-tooltip placement="top" content="边框色">
-          <a-color-picker size="mini" v-model="strokeColor" trigger="hover" />
+        <a-tooltip position="bottom" content="边框色">
+          <a-color-picker
+            :popup-offset="-150"
+            :popup-translate="[-100, -160]"
+            size="mini"
+            v-model="strokeColor"
+            trigger="hover"
+          />
         </a-tooltip>
       </div>
       <div class="divider"></div>
@@ -85,8 +55,8 @@
       </div>
       <div class="divider"></div>
       <div class="tool-item">
-        <a-popover trigger="click" position="bottom" content-class="toolbar-popover-content">
-          <a-tooltip placement="top" content="文本样式">
+        <a-popover trigger="click" position="top" content-class="toolbar-popover-content">
+          <a-tooltip position="top" content="文本样式">
             <a-button size="mini" type="text">
               <icon-text />
             </a-button>
@@ -127,8 +97,14 @@
       </div>
       <div class="divider"></div>
       <div class="tool-item">
-        <a-tooltip placement="top" content="文本颜色">
-          <a-color-picker size="mini" v-model="textColor" trigger="hover" />
+        <a-tooltip position="bottom" content="文本颜色">
+          <a-color-picker
+            :popup-offset="-150"
+            :popup-translate="[-100, -160]"
+            size="mini"
+            v-model="textColor"
+            trigger="hover"
+          />
         </a-tooltip>
       </div>
     </template>
@@ -137,8 +113,78 @@
     <template v-if="isImage">
       <!-- 预留图片滤镜区域，后续恢复时直接取消注释即可 -->
     </template>
-
-    <!-- Delete（修复divider位置，避免嵌套错误） -->
+    <div class="divider" v-if="isShape || isText"></div>
+    <!-- Common Properties (Opacity & Layer) -->
+    <div class="tool-section">
+      <div class="tool-item">
+        <a-tooltip placement="top" title="不透明度" :mouseEnterDelay="0.3" content="透明度">
+          <span class="label" style="cursor: help; display: flex; align-items: center">
+            <svg
+              class="icon"
+              viewBox="0 0 1024 1024"
+              version="1.1"
+              xmlns="http://www.w3.org/2000/svg"
+              width="20"
+              height="20"
+              aria-hidden="true"
+            >
+              <path
+                d="M102.4 716.8v-204.8h204.8v204.8z m0-409.6V102.4h204.8v204.8z"
+                opacity=".8"
+                fill="#1296db"
+              ></path>
+              <path
+                d="M307.2 921.6v-204.8h204.8v204.8z m0-409.6V307.2h204.8v204.8z"
+                opacity=".6"
+                fill="#1296db"
+              ></path>
+              <path
+                d="M512 716.8v-204.8h204.8v204.8z m0-409.6V102.4h204.8v204.8z"
+                opacity=".4"
+                fill="#1296db"
+              ></path>
+              <path
+                d="M716.8 921.6v-204.8h204.8v204.8z m0-409.6V307.2h204.8v204.8z"
+                opacity=".2"
+                fill="#1296db"
+              ></path>
+            </svg>
+          </span>
+        </a-tooltip>
+        <a-slider
+          v-model="opacity"
+          :min="0"
+          :max="1"
+          :step="0.01"
+          style="width: 60px; margin-left: 4px"
+          size="mini"
+          :tooltip-visible="false"
+        />
+      </div>
+      <div class="divider"></div>
+      <div class="tool-item">
+        <a-popover trigger="click" position="bottom" content-class="layer-popover">
+          <a-tooltip placement="top" content="图层顺序">
+            <a-button size="mini" type="text">
+              <icon-layers />
+            </a-button>
+          </a-tooltip>
+          <!-- 展开的内容（添加提示文字） -->
+          <template #content>
+            <div class="popover-row">
+              <a-button size="mini" type="text" @click="bringToFront" long>
+                <template #icon><icon-bring-to-front /></template>
+                置于顶层
+              </a-button>
+              <a-button size="mini" type="text" @click="sendToBack" long>
+                <template #icon><icon-send-to-back /></template>
+                置于底层
+              </a-button>
+            </div>
+          </template>
+        </a-popover>
+      </div>
+    </div>
     <div class="divider"></div>
     <div class="tool-item">
       <a-tooltip placement="top" content="删除">
@@ -482,100 +528,6 @@ const handleDelete = () => {
     store.deleteNode(activeNode.value.id);
   }
 };
-
-// 选择滤镜
-// const selectedFilter = ref<string | null>(null);
-// const selectFilter = (filterType: string) => {
-//   selectedFilter.value = filterType;
-
-//   switch (filterType) {
-//     case 'grayscale':
-//       grayscaleFilter();
-//       break;
-//     case 'blur':
-//       blurFilter();
-//       break;
-//     case 'vintage':
-//       vintageFilter();
-//       break;
-//     case 'reset':
-//       resetFilter();
-//       break;
-//   }
-// };
-// const grayscaleFilter = () => {
-//   store.activeElements.forEach((element) => {
-//     if (element && element.id && element.type === 'image') {
-//       store.updateNode(element.id, {
-//         props: {
-//           ...element.props,
-//           filters: {
-//             grayscale: 100,
-//             contrast: 110,
-//             brightness: 95,
-//           },
-//         },
-//       });
-//     }
-//   });
-// };
-
-// const blurFilter = () => {
-//   store.activeElements.forEach((element) => {
-//     if (element && element.id && element.type === 'image') {
-//       store.updateNode(element.id, {
-//         props: {
-//           ...element.props,
-//           filters: {
-//             blur: 8,
-//             brightness: 98,
-//             filterOpacity: 95,
-//           },
-//         },
-//       });
-//     }
-//   });
-// };
-
-// const vintageFilter = () => {
-//   store.activeElements.forEach((element) => {
-//     if (element && element.id && element.type === 'image') {
-//       store.updateNode(element.id, {
-//         props: {
-//           ...element.props,
-//           filters: {
-//             sepia: 60, // 棕褐色调
-//             contrast: 115, // 增强对比度
-//             brightness: 95, // 降低亮度
-//             saturate: 85, // 降低饱和度
-//             hueRotate: -10, // 轻微色相偏移
-//           },
-//         },
-//       });
-//     }
-//   });
-// };
-
-// const resetFilter = () => {
-//   store.activeElements.forEach((element) => {
-//     if (element && element.id && element.type === 'image') {
-//       store.updateNode(element.id, {
-//         props: {
-//           ...element.props,
-//           filters: DEFAULT_IMAGE_FILTERS,
-//         },
-//       });
-//     }
-//   });
-// };
-// // 预览图片（可以使用当前选中图片的缩略图）
-// const previewImage = computed(() => {
-//   // 这里可以返回当前选中图片的URL
-//   return (activeNode.value as ImageState)?.props?.imageUrl || DEFAULT_IMAGE_URL;
-// });
-
-// // 默认预览图片（当没有选中图片时使用）
-// const defaultImage = DEFAULT_IMAGE_URL;
 </script>
 
 <style scoped>
