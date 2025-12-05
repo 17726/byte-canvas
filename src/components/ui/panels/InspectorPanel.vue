@@ -213,54 +213,62 @@
               <div class="filter-options">
                 <!-- 黑白滤镜 -->
                 <div class="filter-item" @click="selectFilter('grayscale')">
-                  <div
-                    class="filter-preview"
-                    :class="{ active: selectedFilter === 'grayscale' }"
-                    :style="{
-                      backgroundImage: 'url(' + (previewImage || defaultImage) + ')',
-                      filter: 'grayscale(100%) contrast(110%) brightness(95%)',
-                    }"
-                  ></div>
+                  <div class="filter-preview" :class="{ active: selectedFilter === 'grayscale' }">
+                    <!-- 新增内部层：仅承载背景图和滤镜 -->
+                    <div
+                      class="filter-preview-inner"
+                      :style="{
+                        backgroundImage: 'url(' + (previewImage || defaultImage) + ')',
+                        filter: 'grayscale(100%) contrast(110%) brightness(95%)',
+                      }"
+                    ></div>
+                  </div>
                   <span class="filter-name">黑白</span>
                 </div>
 
                 <!-- 模糊滤镜 -->
                 <div class="filter-item" @click="selectFilter('blur')">
-                  <div
-                    class="filter-preview"
-                    :class="{ active: selectedFilter === 'blur' }"
-                    :style="{
-                      backgroundImage: 'url(' + (previewImage || defaultImage) + ')',
-                      filter: 'blur(8px) brightness(98%) opacity(95%)',
-                    }"
-                  ></div>
+                  <div class="filter-preview" :class="{ active: selectedFilter === 'blur' }">
+                    <!-- 新增内部层：仅承载背景图和滤镜 -->
+                    <div
+                      class="filter-preview-inner"
+                      :style="{
+                        backgroundImage: 'url(' + (previewImage || defaultImage) + ')',
+                        filter: 'blur(5px) brightness(98%) opacity(95%)',
+                      }"
+                    ></div>
+                  </div>
                   <span class="filter-name">模糊</span>
                 </div>
 
                 <!-- 复古滤镜 -->
                 <div class="filter-item" @click="selectFilter('vintage')">
-                  <div
-                    class="filter-preview"
-                    :class="{ active: selectedFilter === 'vintage' }"
-                    :style="{
-                      backgroundImage: 'url(' + (previewImage || defaultImage) + ')',
-                      filter:
-                        'sepia(60%) contrast(115%) brightness(95%) saturate(85%) hue-rotate(-10deg) ',
-                    }"
-                  ></div>
+                  <div class="filter-preview" :class="{ active: selectedFilter === 'vintage' }">
+                    <!-- 新增内部层：仅承载背景图和滤镜 -->
+                    <div
+                      class="filter-preview-inner"
+                      :style="{
+                        backgroundImage: 'url(' + (previewImage || defaultImage) + ')',
+                        filter:
+                          'sepia(60%) contrast(115%) brightness(95%) saturate(85%) hue-rotate(-10deg) ',
+                      }"
+                    ></div>
+                  </div>
                   <span class="filter-name">复古</span>
                 </div>
 
                 <!-- 重置滤镜 -->
                 <div class="filter-item" @click="selectFilter('reset')">
-                  <div
-                    class="filter-preview"
-                    :class="{ active: selectedFilter === 'reset' }"
-                    :style="{
-                      backgroundImage: 'url(' + (previewImage || defaultImage) + ')',
-                      filter: 'none',
-                    }"
-                  ></div>
+                  <div class="filter-preview" :class="{ active: selectedFilter === 'reset' }">
+                    <!-- 新增内部层：仅承载背景图和滤镜 -->
+                    <div
+                      class="filter-preview-inner"
+                      :style="{
+                        backgroundImage: 'url(' + (previewImage || defaultImage) + ')',
+                        filter: 'none',
+                      }"
+                    ></div>
+                  </div>
                   <span class="filter-name">重置</span>
                 </div>
               </div>
@@ -853,12 +861,6 @@ const resetFilter = () => {
   align-items: center;
 }
 
-/* FIXME:该方法提示从未使用，如后续确认无误，请删除
-.filter-selector {
-  margin: 10px 0;
-}
-*/
-
 .filter-options {
   display: flex;
   gap: 10px;
@@ -878,10 +880,22 @@ const resetFilter = () => {
   width: 60px;
   height: 60px;
   border-radius: 8px;
+  border: 2px solid #e5e5e5; /* 边框保留在父层，无滤镜 */
+  transition: all 0.2s ease;
+  position: relative; /* 作为内部层的定位容器 */
+  overflow: hidden; /* 裁剪内部层的圆角，和父层保持一致 */
+}
+
+/* 新增：承载背景图和滤镜的内部层 */
+.filter-preview-inner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   background-size: cover;
   background-position: center;
-  border: 2px solid #e5e5e5;
-  transition: all 0.2s ease;
+  /* 滤镜仅作用于这个内部层，边框层不受影响 */
 }
 
 .filter-preview.active {
