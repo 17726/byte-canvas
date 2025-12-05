@@ -250,8 +250,13 @@ export function useNodeActions() {
 
     const selectedIds = Array.from(store.activeElementIds);
 
-    // 过滤掉不在 nodeOrder 中的 ID（可能是子节点）
-    const validIds = selectedIds.filter((id) => store.nodeOrder.includes(id));
+    // 过滤掉不在 nodeOrder 中的 ID（可能是子节点）。
+    // 也可能是新添加但未加入 nodeOrder 的节点。更明确地检查 parent 属性。
+    const validIds = selectedIds.filter((id) => {
+      const node = store.nodes[id];
+      // 只允许顶层节点（parent 为 null 或 undefined），且在 nodeOrder 中
+      return store.nodeOrder.includes(id) || (node && (node.parent === null || node.parent === undefined));
+    });
 
     if (validIds.length === 0) {
       Notification.warning({
