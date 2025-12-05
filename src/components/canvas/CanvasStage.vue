@@ -31,7 +31,7 @@
         :node="node"
         @mousedown="handleNodeDown($event, node!.id)"
         @dblclick="handleNodeDoubleClick($event, node!.id)"
-        @contextmenu="(e) => handleNodeContextMenu(e, node!.id)"
+        @contextmenu="handleNodeContextMenu($event, node!.id)"
       />
 
       <!-- 选中覆盖层 (处理拖拽缩放) -->
@@ -270,7 +270,7 @@ const handleNodeContextMenu = (e: MouseEvent, id: string) => {
 
   // 转发到ToolManager处理
   if (toolManagerRef.value) {
-    toolManagerRef.value.handleNodeContextMenu(e, id);
+    toolManagerRef.value.handleNodeContextMenu(e);
   }
 };
 

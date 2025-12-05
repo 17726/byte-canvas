@@ -529,7 +529,6 @@ export class TransformHandler {
     // 步骤3：执行等比缩放计算 (如果需要，并保证最小尺寸和翻转已经被上方“最小尺寸/翻转吸附预检测”逻辑预修正)
     if (shouldEnforceRatio) {
       const safeStartHeight = Math.abs(startHeight) < 1e-6 ? MIN_NODE_SIZE : startHeight;
-      const baseRatio = startWidth / safeStartHeight;
 
       let ratioBasedWidth = newWidth;
       let ratioBasedHeight = newHeight;
@@ -541,14 +540,14 @@ export class TransformHandler {
       let scaleRatio = 1;
       if (isHorizontal && isVertical) {
         const widthRatio = newWidth / startWidth;
-        const heightRatio = newHeight / startHeight;
+        const heightRatio = newHeight / safeStartHeight;
         scaleRatio = Math.abs(widthRatio) > Math.abs(heightRatio) ? widthRatio : heightRatio;
       } else if (isHorizontal) {
         // 仅水平拖拽，但被强制等比，以水平为基准
         scaleRatio = newWidth / startWidth;
       } else if (isVertical) {
         // 仅垂直拖拽，但被强制等比，以垂直为基准
-        scaleRatio = newHeight / startHeight;
+        scaleRatio = newHeight / safeStartHeight;
       }
 
       ratioBasedWidth = startWidth * scaleRatio;
@@ -931,12 +930,10 @@ export class TransformHandler {
 
     // 步骤2&3：等比缩放计算
     const isAltPressed = e.altKey;
-    const isCorner = handle === 'nw' || handle === 'ne' || handle === 'se' || handle === 'sw';
 
     if (shouldEnforceBoundsRatio) {
       const safeStartHeight =
         Math.abs(startBounds.height) < 1e-6 ? MIN_NODE_SIZE : startBounds.height;
-      const originalRatio = startBounds.width / safeStartHeight;
 
       let ratioBasedWidth = newBounds.width;
       let ratioBasedHeight = newBounds.height;
@@ -1033,7 +1030,7 @@ export class TransformHandler {
       const node = this.store.nodes[id] as BaseNodeState;
       if (!node || !startState) return;
 
-      const nodeType = node.type;
+      // const nodeType = node.type; // deprecated: no per-node special handling in multi-resize
 
       // 使用带符号的比例计算原始新尺寸和位置
       let newNodeWidth = startState.width * finalScaleX;
