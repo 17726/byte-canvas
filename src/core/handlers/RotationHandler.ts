@@ -108,10 +108,16 @@ export class RotationHandler {
       const node = this.store.nodes[nodeId] as BaseNodeState;
       if (!node || node.isLocked) return;
 
-      // 计算新角度（取模360，避免数值溢出）
+      // 计算新角度
       let newRotation = initialRotation + angleDelta;
-      newRotation = newRotation % 360;
-      newRotation = newRotation < 0 ? newRotation + 360 : newRotation;
+
+      // 核心修改：将角度归一化到 -180 ~ +180° 范围
+      newRotation = newRotation % 360; // 先取模360，得到 -360~360 范围
+      if (newRotation > 180) {
+        newRotation -= 360; // 大于180时，减360（如 270° → -90°）
+      } else if (newRotation < -180) {
+        newRotation += 360; // 小于-180时，加360（如 -270° → 90°）
+      }
 
       // 更新节点旋转角度
       this.store.updateNode(nodeId, {
