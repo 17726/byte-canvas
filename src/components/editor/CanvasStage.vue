@@ -247,7 +247,8 @@ const handleContextMenu = (e: MouseEvent) => {
   e.preventDefault(); // 阻止默认右键菜单
 
   // 如果没有选中任何节点，则取消选中
-  if (!store.activeElementIds.has(e.target.closest('.node-layer')?.id)) {
+  const nodeLayer = (e.target as Element).closest('.node-layer');
+  if (!nodeLayer || !store.activeElementIds.has(nodeLayer.id)) {
     store.setActive([]);
   }
 
