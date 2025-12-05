@@ -3,12 +3,29 @@
    处理文本选区相关的交互细节，维护编辑状态和选区状态，响应连续 DOM 事件流。
  */
 
-import { NodeType, type InlineStyleProps, type TextState } from '@/types/state';
+import {
+  NodeType,
+  type InlineStyleProps,
+  type TextDecorationValue,
+  type TextState,
+} from '@/types/state';
 import { useCanvasStore } from '@/store/canvasStore';
 import { nextTick } from 'vue';
 import type { TransformHandler } from './TransformHandler';
 import type { ViewportHandler } from './ViewportHandler';
 type CanvasStore = ReturnType<typeof useCanvasStore>;
+type TextGlobalStyleProps = Partial<
+  Pick<
+    TextState['props'],
+    | 'fontFamily'
+    | 'fontSize'
+    | 'fontWeight'
+    | 'fontStyle'
+    | 'color'
+    | 'lineHeight'
+    | 'textDecoration'
+  >
+>;
 
 // 有状态处理器：维护交互过程中的中间状态
 export class TextSelectionHandler {
@@ -242,6 +259,12 @@ export class TextSelectionHandler {
       // 强制让文本框失焦（兜底，避免意外聚焦）
       this.editor?.blur();
     } else {
+      if (this.currentSelection && this.currentSelection.end - this.currentSelection.start > 0) {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('拦截了选中文本导致的错误click');
+        return;
+      }
       // 编辑状态下，正常响应点击（选中文本、输入等）
       console.log('处于编辑态 正常响应点击');
       e.stopPropagation();
@@ -492,12 +515,80 @@ export class TextSelectionHandler {
   }
 
   /**
-   * 通用方法：修改部分文本的内联样式（完全适配你的 TextState 定义）
-   * @param id 文本节点ID
-   * @param store Pinia存储（用于获取/更新节点）
-   * @param styleKey 要修改的样式属性（必须是 InlineStyleProps 中的属性，如 'color'、'fontWeight'）
-   * @param styleValue 样式值（如 'red'、'bold'、16、'underline'）
-   * @param toggle 是否切换样式（true：有则移除，无则添加；false：强制设置样式）
+   * 辅助函数：拆分重叠的样式范围（核心解决部分重叠问题）
+   * @param originalStyle 原有样式对象（如 {start:0, end:6, styles:{fontWeight:'bold'}}）
+   * @param targetStart 要修改的起始位置（如 3）
+   * @param targetEnd 要修改的结束位置（如 6）
+   * @param styleKey 要移除的样式属性（如 'fontWeight'）
+   * @returns 拆分后的样式对象数组
+   */
+  private splitOverlappingStyle(
+    originalStyle: { start: number; end: number; styles: InlineStyleProps },
+    targetStart: number,
+    targetEnd: number,
+    styleKey: keyof InlineStyleProps,
+    styleValue: InlineStyleProps[keyof InlineStyleProps] // 新增：接收styleValue
+  ): Array<{ start: number; end: number; styles: InlineStyleProps }> {
+    const { start: origStart, end: origEnd, styles: origStyles } = originalStyle;
+    const newStyles = [];
+
+    // 情况1：原有范围左侧有不重叠部分（如 origStart=0, targetStart=3 → 0-3 保留原样式）
+    if (origStart < targetStart) {
+      newStyles.push({
+        start: origStart,
+        end: targetStart,
+        styles: { ...origStyles }, // 保留原样式
+      });
+    }
+
+    // 情况2：重叠部分（如 3-6）→ 移除目标样式属性
+    if (targetStart < origEnd && targetEnd > origStart) {
+      const overlapStart = Math.max(origStart, targetStart);
+      const overlapEnd = Math.min(origEnd, targetEnd);
+      // 移除目标属性，保留其他样式
+      const remainingStyles = { ...origStyles };
+
+      // 处理textDecoration多值移除
+      if (styleKey === 'textDecoration' && styleValue) {
+        const targetValue = styleValue.toString().trim();
+        const origValues = remainingStyles.textDecoration?.split(/\s+/) || [];
+        // 只过滤掉目标值，保留其他值（如移除underline，保留line-through）
+        const newValues = origValues.filter((v) => v !== targetValue);
+        if (newValues.length > 0) {
+          remainingStyles.textDecoration = newValues.join(' ') as TextDecorationValue;
+        } else {
+          // 无剩余值则删除整个属性
+          delete remainingStyles.textDecoration;
+        }
+      } else {
+        // 非textDecoration：删除整个属性（原有逻辑）
+        delete remainingStyles[styleKey];
+      }
+
+      if (Object.keys(remainingStyles).length > 0) {
+        newStyles.push({
+          start: overlapStart,
+          end: overlapEnd,
+          styles: remainingStyles,
+        });
+      }
+      // 若剩余样式为空，则不添加该范围（相当于移除重叠部分的样式）
+    }
+
+    // 情况3：原有范围右侧有不重叠部分（如 origEnd=6, targetEnd=6 → 无右侧部分；若 origEnd=8, targetEnd=6 → 6-8 保留原样式）
+    if (origEnd > targetEnd) {
+      newStyles.push({
+        start: targetEnd,
+        end: origEnd,
+        styles: { ...origStyles }, // 保留原样式
+      });
+    }
+
+    return newStyles;
+  }
+
+  /**
+   * 修复后：支持范围重叠的行内样式修改（核心函数）
    */
   updatePartialInlineStyle(
     id: string,
@@ -513,98 +604,107 @@ export class TextSelectionHandler {
     const { content, inlineStyles = [] } = node.props;
     const contentLength = content.length;
 
-    // 2. 获取并处理选中范围（遵循你的规则：越界修正 + 空范围过滤）
+    // 2. 获取并处理选中范围（越界修正 + 空范围过滤）
     const selection = this.currentSelection;
-
-    console.log(selection); //???(6,7)
-
     if (!selection || selection.start >= selection.end) return;
 
-    // 越界处理：start < 0 按 0 算，end > 文本长度按文本长度算
     let { start: selectionStart, end: selectionEnd } = selection;
     selectionStart = Math.max(0, selectionStart);
     selectionEnd = Math.min(contentLength, selectionEnd);
+    if (selectionStart >= selectionEnd) return;
 
-    if (selectionStart >= selectionEnd) return; // 修正后仍为空范围，直接退出
-    console.log('开始设置');
-    // 3. 预处理现有样式：过滤空范围（start >= end），保留有效样式
+    // 3. 预处理现有样式：过滤空范围，保留有效样式
     const validInlineStyles = inlineStyles.filter((style) => style.start < style.end);
 
-    // 4. 核心逻辑：找到目标样式对象（同一范围+包含目标属性），处理添加/移除
-    // 目标：只修改当前样式属性，不影响其他属性（如已有fontWeight，只改color）
-    const updatedStyles = [...validInlineStyles];
-    const targetStyleIndex = updatedStyles.findIndex(
-      (style) =>
-        // 范围完全匹配（同一文本片段）
-        style.start === selectionStart &&
-        style.end === selectionEnd &&
-        // 包含要修改的样式属性（用于切换）
-        style.styles.hasOwnProperty(styleKey)
-    );
+    // 4. 核心重构：先处理范围重叠，再修改样式
+    let targetStyleExistsInRange = false;
+    const updatedStyles: Array<{ start: number; end: number; styles: InlineStyleProps }> = [];
 
-    if (toggle) {
-      // 场景1：切换样式（有则移除，无则添加）
-      if (targetStyleIndex > -1) {
-        // 存在目标样式：移除该属性（不删除整个样式对象，保留其他属性）
-        const targetStyle = updatedStyles[targetStyleIndex] as {
-          start: number;
-          end: number;
-          styles: InlineStyleProps;
-        };
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { [styleKey]: _, ...remainingStyles } = targetStyle!.styles;
-
-        if (Object.keys(remainingStyles).length > 0) {
-          // 还有其他样式属性：更新样式对象
-          updatedStyles[targetStyleIndex] = {
-            ...targetStyle,
-            styles: remainingStyles,
-          };
+    // 遍历原有样式，处理范围重叠
+    for (const style of validInlineStyles) {
+      // 跳过与选中范围无重叠的样式（直接保留）
+      if (style.end <= selectionStart || style.start >= selectionEnd) {
+        updatedStyles.push(style);
+        continue;
+      }
+      console.log('到这了');
+      // 有重叠：拆分原有样式范围（核心修复点）
+      // underline line-through的stylekey相同 不能直接看范围内有没有已存在的textDecoration 要特判
+      if (style.styles[styleKey] !== undefined) {
+        // 针对textDecoration做特判：区分不同值（underline/line-through）
+        if (styleKey === 'textDecoration') {
+          // 步骤1：处理styleValue（确保是字符串，兼容多值）
+          const targetValue = styleValue?.toString().trim() || '';
+          if (targetValue) {
+            // 步骤2：拆分原有textDecoration的值（支持多值，如"underline line-through"）
+            const origValues = style.styles.textDecoration?.toString().split(/\s+/) || [];
+            // 步骤3：判断目标值是否已存在（核心：只判断对应值，而非整个styleKey）
+            targetStyleExistsInRange = origValues.includes(targetValue);
+          } else {
+            // 若目标值为空（取消），则认为已存在
+            targetStyleExistsInRange = true;
+          }
         } else {
-          // 无其他样式属性：删除整个样式对象
-          updatedStyles.splice(targetStyleIndex, 1);
+          // 非textDecoration样式：原有逻辑（判断styleKey是否存在）
+          targetStyleExistsInRange = true;
         }
-      } else {
-        // 不存在目标样式：添加新的样式对象（遵循优先级规则：后添加的在数组后面，优先级更高）
-        updatedStyles.push({
-          start: selectionStart,
-          end: selectionEnd,
-          styles: { [styleKey]: styleValue } as InlineStyleProps,
-        });
       }
-    } else {
-      // 场景2：强制设置样式（不管是否存在，直接覆盖/添加）
-      if (targetStyleIndex > -1) {
-        const targetStyle = updatedStyles[targetStyleIndex] as {
-          start: number;
-          end: number;
-          styles: InlineStyleProps;
-        };
-        // 存在目标样式：更新该属性（保留其他属性）
-        updatedStyles[targetStyleIndex] = {
-          start: targetStyle.start,
-          end: targetStyle.end,
-          styles: {
-            ...targetStyle.styles,
-            [styleKey]: styleValue,
-          },
-        };
-      } else {
-        // 不存在目标样式：添加新样式对象
-        updatedStyles.push({
-          start: selectionStart,
-          end: selectionEnd,
-          styles: { [styleKey]: styleValue } as InlineStyleProps,
-        });
-      }
+
+      const splitStyles = this.splitOverlappingStyle(
+        style,
+        selectionStart,
+        selectionEnd,
+        styleKey,
+        styleValue
+      );
+      updatedStyles.push(...splitStyles);
     }
 
-    // 5. 最终更新节点（同步到 store，视图自动刷新）
+    // 5. 处理样式的添加/切换逻辑
+    if (toggle) {
+      // 场景1：切换样式 → 只有目标styleKey不存在时，才添加
+      if (!targetStyleExistsInRange) {
+        updatedStyles.push({
+          start: selectionStart,
+          end: selectionEnd,
+          styles: { [styleKey]: styleValue } as InlineStyleProps,
+        });
+      }
+      // 场景2：目标styleKey已存在 → 拆分时已移除，无需额外操作
+    } else {
+      // 场景3：强制设置 → 直接添加（覆盖/合并）
+      updatedStyles.push({
+        start: selectionStart,
+        end: selectionEnd,
+        styles: { [styleKey]: styleValue } as InlineStyleProps,
+      });
+    }
+
+    // 6. 去重+排序：保证样式范围不重叠、按start升序排列（可选，优化渲染）
+    const finalStyles = updatedStyles
+      .filter((style) => style.start < style.end) // 过滤空范围
+      .sort((a, b) => a.start - b.start || a.end - b.end); // 按起始位置排序
+
+    // 7. 更新节点
     store.updateNode(id, {
       props: {
         ...node.props,
-        inlineStyles: updatedStyles, // 覆盖原有 inlineStyles
+        inlineStyles: finalStyles,
       },
     });
+  }
+
+  /**
+   * 更新文本节点的全局样式属性（不影响inlineStyles和content）
+   * @param id 文本节点ID
+   * @param styles 要更新的全局样式（仅支持TextState的全局样式属性）
+   */
+  updateGlobalStyles(id: string, store: CanvasStore, styles: TextGlobalStyleProps) {
+    // 1. 安全校验：获取有效文本节点
+    const node = store.nodes[id] as TextState | undefined;
+    if (!node || node.type !== NodeType.TEXT) return;
+
+    // 2. 调用已有updateNode函数更新节点
+    store.updateNode(id, { props: styles } as Partial<TextState>);
   }
 }

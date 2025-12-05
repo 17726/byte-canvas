@@ -6,17 +6,19 @@ export class DomTextRenderer implements INodeRenderer<string> {
     const { content, inlineStyles = [], ...globalStyles } = node.props;
     if (!content) return '<span>&nbsp;</span>'; // 空内容返回占位
 
+    // 无行内样式：直接处理全局样式（原有逻辑，已包含CSS转换）
     if (inlineStyles.length === 0) {
-      // 处理全局颜色（如果有）
+      // 全局样式 → CSS 转换（关键步骤）
       const globalStyleStr = this.convertStylesToCss(globalStyles);
       return globalStyleStr
         ? `<span style="${globalStyleStr}">${this.escapeHtml(content)}</span>`
         : this.escapeHtml(content);
     }
 
+    // 有行内样式：先分组行内样式
     const groupedStyles = this.groupStylesByRange(inlineStyles);
     const splitPoints = new Set<number>([0, content.length]);
-    groupedStyles.forEach(style => {
+    groupedStyles.forEach((style) => {
       splitPoints.add(style.start!);
       splitPoints.add(style.end!);
     });
@@ -29,22 +31,22 @@ export class DomTextRenderer implements INodeRenderer<string> {
       if (start! >= end!) continue;
 
       const textFragment = this.escapeHtml(content.slice(start, end));
-      const matchedStyles = groupedStyles.filter(style => {
+      const matchedStyles = groupedStyles.filter((style) => {
         return style.start! <= start! && style.end! >= end!;
       });
 
-      if (matchedStyles.length > 0) {
-        const combinedStyle = matchedStyles.reduce((acc, cur) => {
-          return { ...acc, ...cur.combinedStyles };
-        }, {});
+      // 步骤1：以全局样式为基础（JS对象）
+      const baseStyle = { ...globalStyles };
+      // 步骤2：合并行内样式（行内覆盖全局）
+      const finalStyleObj = matchedStyles.reduce((acc, cur) => {
+        return { ...acc, ...cur.combinedStyles };
+      }, baseStyle);
 
-        // 转换样式（包含颜色的显式处理）
-        const styleStr = this.convertStylesToCss(combinedStyle);
+      // 步骤3：核心！将「全局+行内」的合并样式对象 → 转换为CSS字符串
+      const finalStyleStr = this.convertStylesToCss(finalStyleObj);
 
-        html += `<span style="${styleStr}">${textFragment}</span>`;
-      } else {
-        html += textFragment;
-      }
+      // 步骤4：拼接带CSS样式的span
+      html += `<span style="${finalStyleStr}">${textFragment}</span>`;
     }
 
     return html;
@@ -64,18 +66,20 @@ export class DomTextRenderer implements INodeRenderer<string> {
         case 'color':
           cssEntries.push(`color:${value}`);
           break;
-        // 下划线处理
-        case 'underline':
-          if (value) textDecorations.push('underline');
+        //显式处理字号
+        case 'fontSize':
+          cssEntries.push(`font-size:${value}px`);
           break;
-        // 删除线处理
-        case 'strikethrough':
-          if (value) textDecorations.push('line-through');
+        // 下划线、删除线处理
+        case 'textDecoration':
+          if (value) textDecorations.push(value as string);
+          console.log('!!!!!!!!push了 textDecorations=', textDecorations);
           break;
         // 其他样式（保持驼峰转连字符）
         default:
-          const cssKey = key.replace(/[A-Z]/g, letter => `-${letter.toLowerCase()}`);
+          const cssKey = key.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
           cssEntries.push(`${cssKey}:${value}`);
+          console.log('push了', cssKey, ':', value);
           break;
       }
     });
@@ -90,13 +94,15 @@ export class DomTextRenderer implements INodeRenderer<string> {
   }
 
   // 原有方法保持不变
-  groupStylesByRange = (styles: Array<{
-    start: number;
-    end: number;
-    styles: Record<string, unknown>;
-  }>) => {
+  groupStylesByRange = (
+    styles: Array<{
+      start: number;
+      end: number;
+      styles: Record<string, unknown>;
+    }>
+  ) => {
     const rangeMap = new Map<string, Record<string, unknown>>();
-    styles.forEach(style => {
+    styles.forEach((style) => {
       const key = `${style.start}-${style.end}`;
       // 合并样式时，后添加的颜色会覆盖先添加的（符合 CSS 优先级）
       rangeMap.set(key, { ...rangeMap.get(key), ...style.styles });
