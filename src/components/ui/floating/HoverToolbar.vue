@@ -381,8 +381,8 @@ const isBold = computed(() => {
   if (hasInlineBold) return true;
 
   // 2. 检查全局样式：若没有行内样式覆盖，且全局是加粗，则返回 true
-  // 全局样式的 fontWeight 是 number 类型（700 对应加粗）
-  const isGlobalBold = globalFontWeight === 700;
+  // 全局样式的 fontWeight 可能是 'bold' 或 number 类型（700 对应加粗）
+  const isGlobalBold = globalFontWeight === 'bold' || globalFontWeight === 700;
 
   // 检查选中范围是否被行内样式覆盖（只要有行内样式修改 fontWeight，就不算全局生效）
   const hasInlineOverride = inlineStyles.some(
