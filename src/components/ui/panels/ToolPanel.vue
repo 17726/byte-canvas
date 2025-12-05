@@ -14,7 +14,11 @@
           </div>
           <div class="prop-item">
             <span class="label">样式</span>
-            <a-radio-group v-model="store.viewport.gridStyle" size="mini" :disabled="!store.viewport.isGridVisible">
+            <a-radio-group
+              v-model="store.viewport.gridStyle"
+              size="mini"
+              :disabled="!store.viewport.isGridVisible"
+            >
               <a-radio value="none">无</a-radio>
               <a-radio value="dot">点</a-radio>
               <a-radio value="line">线</a-radio>

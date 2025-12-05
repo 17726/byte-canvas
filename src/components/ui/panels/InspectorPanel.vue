@@ -60,7 +60,7 @@ import { Square, Round } from '@icon-park/vue-next';
 import { useCanvasStore } from '@/store/canvasStore';
 import { NodeFactory } from '@/core/services/NodeFactory';
 import { Notification } from '@arco-design/web-vue';
-import ImageMenu from './ImageMenu.vue';
+import ImageMenu from '../common/ImageMenu.vue';
 
 //NOTE：按钮返回值需提前在MenuKey进行注册
 enum MenuKey {
