@@ -317,7 +317,7 @@ const rotateHandleStyle = computed(() => {
   // 定位：水平居中 + 垂直在选中框底部外侧1/4高度处（可根据需求调整）
   return {
     transform: `translateX(-50%) rotate(${-rotation}deg) scale(${scale})`,
-    bottom: `${0.3 * quarterHeight}px`, // 核心：动态1/4高度（外部），内部则改为 `${3 * quarterHeight}px`
+    bottom: `${0.3 * quarterHeight}px`, // Position the rotation handle slightly below the selection box (30% of quarter height)
     left: '50%',
   };
 });
