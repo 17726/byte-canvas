@@ -56,26 +56,26 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, provide, type CSSProperties } from 'vue';
-import { useCanvasStore } from '@/store/canvasStore';
-import { NodeType } from '@/types/state';
-import RectLayer from './layers/RectLayer.vue';
-import TextLayer from './layers/TextLayer.vue';
-import CircleLayer from './layers/CircleLayer.vue';
-import ImageLayer from './layers/ImageLayer.vue';
-import GroupLayer from './layers/GroupLayer.vue';
-import SelectionOverlay from './SelectionOverlay.vue';
-import ContextToolbar from '../ui/floating/HoverToolbar.vue';
-import GroupToolbar from '../ui/floating/GroupActions.vue';
-import { ToolManager } from '@/core/ToolManager';
-import { NodeFactory } from '@/core/services/NodeFactory';
-import { GroupService } from '@/core/services/GroupService';
 import {
-  DEFAULT_VIEWPORT,
   DEFAULT_CANVAS_BG,
   DEFAULT_GRID_DOT_COLOR,
   DEFAULT_GRID_DOT_SIZE,
+  DEFAULT_VIEWPORT,
 } from '@/config/defaults';
+import { GroupService } from '@/core/services/GroupService';
+import { NodeFactory } from '@/core/services/NodeFactory';
+import { ToolManager } from '@/core/ToolManager';
+import { useCanvasStore } from '@/store/canvasStore';
+import { NodeType } from '@/types/state';
+import { computed, onMounted, onUnmounted, provide, ref, type CSSProperties } from 'vue';
+import GroupToolbar from '../ui/floating/GroupActions.vue';
+import ContextToolbar from '../ui/floating/HoverToolbar.vue';
+import CircleLayer from './layers/CircleLayer.vue';
+import GroupLayer from './layers/GroupLayer.vue';
+import ImageLayer from './layers/ImageLayer.vue';
+import RectLayer from './layers/RectLayer.vue';
+import TextLayer from './layers/TextLayer.vue';
+import SelectionOverlay from './SelectionOverlay.vue';
 
 const store = useCanvasStore();
 const stageRef = ref<HTMLElement | null>(null);

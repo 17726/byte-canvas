@@ -56,14 +56,14 @@
  */
 import { useCanvasStore } from '@/store/canvasStore';
 import { useUIStore } from '@/store/uiStore';
-import { NodeType, type BaseNodeState } from '@/types/state';
 import type { ResizeHandle } from '@/types/editor';
-import { ViewportHandler } from './handlers/ViewportHandler';
-import { TransformHandler } from './handlers/TransformHandler';
+import { NodeType, type BaseNodeState } from '@/types/state';
 import { RotationHandler } from './handlers/RotationHandler';
 import { SelectionHandler } from './handlers/SelectionHandler';
-import { GroupService } from './services/GroupService';
 import { TextSelectionHandler } from './handlers/TextSelectionHandler';
+import { TransformHandler } from './handlers/TransformHandler';
+import { ViewportHandler } from './handlers/ViewportHandler';
+import { GroupService } from './services/GroupService';
 import { TextService } from './services/TextService';
 
 /**
@@ -650,6 +650,14 @@ export class ToolManager {
       'line-through',
       true
     );
+  }
+
+  handleColorChange(id: string, newColor: string) {
+    this.textSelectionHandler.updatePartialInlineStyle(id, this.store, 'color', newColor, false);
+  }
+
+  handleFontSizeChange(id: string, newFontSize: number) {
+    this.textSelectionHandler.updateGlobalStyles(id, this.store, { fontSize: newFontSize });
   }
   /**
    * 处理文本节点鼠标抬起（供文本组件调用，内部转发给 TextSelectionHandler）
