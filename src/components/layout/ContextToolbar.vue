@@ -235,15 +235,15 @@ const isVisible = computed(() => !!activeNode.value && !store.isInteracting && !
 const positionStyle = computed(() => {
   if (!activeNode.value) return {};
 
-  const node = activeNode.value;
   // 使用绝对坐标，保证组合编辑模式下子元素位置正确
-  const absTransform = store.getAbsoluteTransform(node.id) || node.transform;
+  const absTransform =
+    store.getAbsoluteTransform(activeNode.value.id) || activeNode.value.transform;
   const { x, y, width } = absTransform;
 
   // 计算节点在屏幕上的位置（相对于 CanvasStage 容器）
   const worldCenter = {
     x: x + width / 2,
-    y,
+    y: y,
   };
 
   const clientPos = worldToClient(store.viewport, worldCenter.x, worldCenter.y);
