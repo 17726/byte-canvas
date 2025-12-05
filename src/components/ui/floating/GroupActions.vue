@@ -1,7 +1,13 @@
 <template>
   <div v-if="isVisible" class="group-toolbar" :style="positionStyle" @mousedown.stop>
     <!-- 组合按钮 -->
-    <a-button v-if="canGroup" size="mini" type="primary" @click="handleGroup" title="组合 (Ctrl+G)">
+    <a-button
+      v-if="showGroupButton"
+      size="mini"
+      type="primary"
+      @click="handleGroup"
+      title="组合 (Ctrl+G)"
+    >
       <template #icon>
         <icon-group />
       </template>
@@ -29,9 +35,10 @@ import { computed } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
 import { worldToClient } from '@/core/utils/geometry';
 import { Group as IconGroup, Ungroup as IconUngroup } from '@icon-park/vue-next';
-import { GroupService } from '@/core/services/GroupService';
+import { useNodeActions } from '@/composables/useNodeActions';
 
 const store = useCanvasStore();
+const { canGroup, canUngroup, groupSelected, ungroupSelected } = useNodeActions();
 
 // 显示条件：选中多个元素时显示组合按钮，选中组合时显示解组合按钮
 const hasChildSelection = computed(() => {
@@ -42,14 +49,11 @@ const hasChildSelection = computed(() => {
   });
 });
 
-const canGroup = computed(() => store.canGroup && !hasChildSelection.value);
+const showGroupButton = computed(() => canGroup.value && !hasChildSelection.value);
 
 const isVisible = computed(() => {
-  return (canGroup.value || store.canUngroup) && !store.isInteracting;
+  return (showGroupButton.value || canUngroup.value) && !store.isInteracting;
 });
-
-// 是否可以解组合
-const canUngroup = computed(() => store.canUngroup);
 
 // 计算工具栏位置：在选中区域的上方中央
 const positionStyle = computed(() => {
@@ -76,12 +80,12 @@ const positionStyle = computed(() => {
 
 // 组合操作
 const handleGroup = () => {
-  GroupService.groupSelected(store);
+  groupSelected();
 };
 
 // 解组合操作
 const handleUngroup = () => {
-  GroupService.ungroupSelected(store);
+  ungroupSelected();
 };
 </script>
 

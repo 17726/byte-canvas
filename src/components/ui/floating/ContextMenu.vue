@@ -30,24 +30,25 @@
       </a-menu>
     </div>
   </teleport>
-
-  <!-- 确认删除弹窗 -->
-  <a-modal
-    v-model:visible="delModalVisible"
-    @ok="onDeleteConfirm"
-    @cancel="delModalVisible = false"
-  >
-    <template #title>确认删除</template>
-    <div>确定要删除选中的元素吗？</div>
-  </a-modal>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue';
-import { useCanvasStore } from '@/store/canvasStore';
-import { Notification } from '@arco-design/web-vue';
+import { useNodeActions } from '@/composables/useNodeActions';
 
-const store = useCanvasStore();
+const {
+  hasSelection,
+  copy,
+  cut,
+  paste,
+  deleteSelected,
+  groupSelected,
+  ungroupSelected,
+  bringToFront,
+  sendToBack,
+  selectAll,
+  clearSelection,
+} = useNodeActions();
 
 // 监听来自 ToolManager 的右键菜单事件
 function handleShowContextMenu(e: CustomEvent) {
@@ -70,8 +71,7 @@ function handleKeyDown(e: KeyboardEvent) {
 /* ---------- 状态 ---------- */
 const pos = ref({ x: 0, y: 0 });
 const visible = ref(false);
-const menuRef = ref<HTMLDivElement | null>(null); // ← 唯一改动：精确类型
-const delModalVisible = ref(false);
+const menuRef = ref<HTMLDivElement | null>(null);
 
 /* ---------- 计算属性 ---------- */
 const menuStyle = computed(() => ({
@@ -80,8 +80,6 @@ const menuStyle = computed(() => ({
   top: `${pos.value.y}px`,
   zIndex: 9999,
 }));
-
-const hasSelection = computed(() => store.activeElementIds.size > 0);
 
 /* ---------- 菜单枚举 ---------- */
 //NOTE：枚举值与菜单项 key 保持一致，使用前注册
@@ -102,74 +100,39 @@ enum MenuKey {
 function handleMenuItemClick(key: string) {
   switch (key) {
     case MenuKey.Copy:
-      if (!hasSelection.value) return;
-      store.copySelected();
-      Notification.success({ content: '已复制到剪贴板', closable: true, duration: 2000 });
+      copy();
       break;
     case MenuKey.Paste:
-      store.paste();
-      Notification.success({ content: '粘贴成功', closable: true, duration: 2000 });
+      paste();
       break;
     case MenuKey.Cut:
-      if (!hasSelection.value) return;
-      store.cutSelected();
-      Notification.success({ content: '已剪切到剪贴板', closable: true, duration: 2000 });
+      cut();
       break;
     case MenuKey.Delete:
-      if (!hasSelection.value) return;
-      delModalVisible.value = true;
+      deleteSelected();
       break;
     case MenuKey.MoveToFront:
-      //TODO：待MoveToFront方法实现
-      if (!hasSelection.value) return;
-      Notification.success({ content: '已置于顶层', closable: true, duration: 2000 });
+      bringToFront();
       break;
     case MenuKey.MoveToBack:
-      //TODO：待MoveToBack方法实现
-      if (!hasSelection.value) return;
-      Notification.success({ content: '已置于底层', closable: true, duration: 2000 });
+      sendToBack();
       break;
     case MenuKey.Group:
-      //TODO：待Group方法实现
-      if (!hasSelection.value || store.activeElementIds.size < 2) {
-        Notification.warning({
-          content: '至少需要选择两个元素才能进行组合',
-          closable: true,
-          duration: 2000,
-        });
-        return;
-      }
-      Notification.success({ content: '已组合选中元素', closable: true, duration: 2000 });
+      groupSelected();
       break;
     case MenuKey.Ungroup:
-      //TODO：待Ungroup方法实现
-      if (!hasSelection.value) return;
-      Notification.success({ content: '已取消组合', closable: true, duration: 2000 });
+      ungroupSelected();
       break;
     case MenuKey.SelectAll:
-      // Select all non-locked nodes
-      const allNodeIds = store.nodeOrder.filter((id) => {
-        const node = store.nodes[id];
-        return node && !node.isLocked;
-      });
-      store.setActive(allNodeIds);
-      Notification.success({ content: '已全选', closable: true, duration: 2000 });
+      selectAll();
       break;
     case MenuKey.ClearSelection:
-      store.setActive([]);
-      Notification.success({ content: '已取消选择', closable: true, duration: 2000 });
+      clearSelection();
       break;
     default:
       console.warn(`未处理的菜单项: ${key}`);
   }
   close();
-}
-
-/* ---------- 删除确认 ---------- */
-function onDeleteConfirm() {
-  store.activeElementIds.forEach((id) => store.deleteNode(id));
-  Notification.success({ content: '删除成功！', closable: true, duration: 3000 });
-  delModalVisible.value = false;
 }
 
 /* ---------- 打开/关闭 ---------- */

@@ -396,27 +396,38 @@
 import { ref, computed, watch, nextTick } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
 import { useUIStore } from '@/store/uiStore';
+import { useStyleSync } from '@/composables/useStyleSync';
 import {
   NodeType,
   type GroupState,
   type ImageState,
   type NodeState,
-  type ShapeState,
   type TextState,
 } from '@/types/state';
 import { DEFAULT_CANVAS_THEMES, DEFAULT_IMAGE_FILTERS, DEFAULT_IMAGE_URL } from '@/config/defaults';
 
 const store = useCanvasStore();
 const ui = useUIStore();
+
+// 使用 useStyleSync 进行属性绑定（基础变换和通用属性）
+const {
+  activeNode,
+  isShape,
+  isText,
+  isImage,
+  isGroup,
+  isRect,
+  x: transformX,
+  y: transformY,
+  width: transformW,
+  height: transformH,
+  rotation: transformRotation,
+  opacity,
+  cornerRadius,
+} = useStyleSync();
+
 // 说明：PropertyPanel 有两种模式：'canvas' (显示画布设置) 与 'node' (显示节点属性)
 // 由 store.activePanel 决定，store.isPanelExpanded 控制面板折叠/展开
-
-const activeNode = computed(() => {
-  const ids = Array.from(store.activeElementIds);
-  if (ids.length !== 1) return null;
-  const id = ids[0]!;
-  return store.nodes[id];
-});
 
 const isCanvas = computed(() => ui.activePanel === 'canvas');
 const presets = DEFAULT_CANVAS_THEMES as {
@@ -441,18 +452,7 @@ function applyPreset(theme: {
 }
 
 // --- Helpers ---
-const isShape = computed(
-  () => activeNode.value?.type === NodeType.RECT || activeNode.value?.type === NodeType.CIRCLE
-);
-const isRect = computed(
-  () => isShape.value && (activeNode.value as ShapeState)?.shapeType === 'rect'
-);
-const isText = computed(() => activeNode.value?.type === NodeType.TEXT);
-// const isRect = computed(
-//   () => isShape.value && (activeNode.value as ShapeState)?.shapeType === 'rect'
-// );
-const isImage = computed(() => activeNode.value?.type === NodeType.IMAGE);
-const isGroup = computed(() => activeNode.value?.type === NodeType.GROUP);
+// isShape, isText, isImage, isGroup 已从 useStyleSync 导入
 
 function collectGroupDescendants(group: GroupState): NodeState[] {
   const result: NodeState[] = [];
@@ -501,46 +501,7 @@ function applyTextProps(propsPatch: Partial<TextState['props']>) {
 }
 
 // --- Transform Bindings ---
-const transformX = computed({
-  get: () => activeNode.value?.transform.x || 0,
-  set: (val) =>
-    activeNode.value &&
-    store.updateNode(activeNode.value.id, {
-      transform: { ...activeNode.value.transform, x: val as number },
-    }),
-});
-const transformY = computed({
-  get: () => activeNode.value?.transform.y || 0,
-  set: (val) =>
-    activeNode.value &&
-    store.updateNode(activeNode.value.id, {
-      transform: { ...activeNode.value.transform, y: val as number },
-    }),
-});
-const transformW = computed({
-  get: () => activeNode.value?.transform.width || 0,
-  set: (val) =>
-    activeNode.value &&
-    store.updateNode(activeNode.value.id, {
-      transform: { ...activeNode.value.transform, width: val as number },
-    }),
-});
-const transformH = computed({
-  get: () => activeNode.value?.transform.height || 0,
-  set: (val) =>
-    activeNode.value &&
-    store.updateNode(activeNode.value.id, {
-      transform: { ...activeNode.value.transform, height: val as number },
-    }),
-});
-const transformRotation = computed({
-  get: () => activeNode.value?.transform.rotation || 0,
-  set: (val) =>
-    activeNode.value &&
-    store.updateNode(activeNode.value.id, {
-      transform: { ...activeNode.value.transform, rotation: val as number },
-    }),
-});
+// transformX, transformY, transformW, transformH, transformRotation 已从 useStyleSync 导入
 
 const resetRotationToZero = () => {
   if (!activeNode.value) return;
@@ -753,14 +714,7 @@ const handleStrokeWidthChange = (value: unknown) => {
   const width = extractNumericValue(value, strokeWidthTemp.value);
   applyStrokeStyle({ width });
 };
-const opacity = computed({
-  get: () => activeNode.value?.style.opacity ?? 1,
-  set: (val) =>
-    activeNode.value &&
-    store.updateNode(activeNode.value.id, {
-      style: { ...activeNode.value.style, opacity: val as number },
-    }),
-});
+// opacity 已从 useStyleSync 导入
 
 const zIndex = computed({
   get: () => activeNode.value?.style.zIndex ?? 1,
@@ -803,15 +757,7 @@ const textColor = computed({
 });
 
 // Shape
-const cornerRadius = computed({
-  get: () => (activeNode.value as ShapeState)?.props.cornerRadius || 0,
-
-  set: (val) =>
-    activeNode.value &&
-    store.updateNode(activeNode.value.id, {
-      props: { cornerRadius: val as number },
-    } as Partial<ShapeState>),
-});
+// cornerRadius 已从 useStyleSync 导入
 
 //Image
 // 选中的滤镜
