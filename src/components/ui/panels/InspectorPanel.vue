@@ -913,53 +913,30 @@ const hueRotate = computed({
   },
 });
 // 滤镜透明度
-const filterOpacity = computed({
-  get: () => (activeNode.value as ImageState)?.props?.filters?.filterOpacity ?? 100,
-  set: (val) => {
-    if (!activeNode.value || activeNode.value.type !== NodeType.IMAGE) return;
-    store.updateNode(activeNode.value.id, {
-      props: {
-        ...activeNode.value.props,
-        filters: {
-          ...activeNode.value.props.filters,
-          filterOpacity: val as number,
+// Helper to create filter computed properties
+function createFilterComputed(filterKey: keyof ImageState['props']['filters'], defaultValue: number) {
+  return computed({
+    get: () => (activeNode.value as ImageState)?.props?.filters?.[filterKey] ?? defaultValue,
+    set: (val) => {
+      if (!activeNode.value || activeNode.value.type !== NodeType.IMAGE) return;
+      store.updateNode(activeNode.value.id, {
+        props: {
+          ...activeNode.value.props,
+          filters: {
+            ...activeNode.value.props.filters,
+            [filterKey]: val as number,
+          },
         },
-      },
-    } as Partial<ImageState>);
-  },
-});
+      } as Partial<ImageState>);
+    },
+  });
+}
+
+const filterOpacity = createFilterComputed('filterOpacity', 100);
 // 反相
-const invert = computed({
-  get: () => (activeNode.value as ImageState)?.props?.filters?.invert ?? 0,
-  set: (val) => {
-    if (!activeNode.value || activeNode.value.type !== NodeType.IMAGE) return;
-    store.updateNode(activeNode.value.id, {
-      props: {
-        ...activeNode.value.props,
-        filters: {
-          ...activeNode.value.props.filters,
-          invert: val as number,
-        },
-      },
-    } as Partial<ImageState>);
-  },
-});
+const invert = createFilterComputed('invert', 0);
 // 棕褐色调
-const sepia = computed({
-  get: () => (activeNode.value as ImageState)?.props?.filters?.sepia ?? 0,
-  set: (val) => {
-    if (!activeNode.value || activeNode.value.type !== NodeType.IMAGE) return;
-    store.updateNode(activeNode.value.id, {
-      props: {
-        ...activeNode.value.props,
-        filters: {
-          ...activeNode.value.props.filters,
-          sepia: val as number,
-        },
-      },
-    } as Partial<ImageState>);
-  },
-});
+const sepia = createFilterComputed('sepia', 0);
 // 选择滤镜
 const selectFilter = (filterType: string) => {
   selectedFilter.value = filterType;
