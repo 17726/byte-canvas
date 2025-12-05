@@ -299,8 +299,7 @@ const sendToBack = () => {
 // --- Text Actions ---
 // fontSize, textColor 已从 useStyleSync 导入
 
-// textColor 已从 useStyleSync 导入
-// NOTE: textColor 现在直接更新 store，不再通过 ToolManager
+// textColor 已从 useStyleSync 导入；现在直接更新 store，不再通过 ToolManager
 
 // --- 样式开关 (Toggle) ---
 
