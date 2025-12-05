@@ -416,6 +416,7 @@ const {
   isText,
   isImage,
   isGroup,
+  isRect,
   x: transformX,
   y: transformY,
   width: transformW,

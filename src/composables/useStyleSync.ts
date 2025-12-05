@@ -23,7 +23,7 @@
  * 包含辅助状态：
  * - activeNode: 当前选中的单个节点
  * - isSingleSelection: 是否单选
- * - isShape, isText, isImage, isGroup: 节点类型判断
+ * - isShape,isRect, isCircle, isText, isImage, isGroup: 节点类型判断
  */
 
 import { computed, type WritableComputedRef } from 'vue';
@@ -55,6 +55,10 @@ export function useStyleSync() {
   const isShape = computed(
     () => activeNode.value?.type === NodeType.RECT || activeNode.value?.type === NodeType.CIRCLE
   );
+
+  // 单独区分矩形/圆形，用于处理类型特有属性（例如 rect 的 cornerRadius）
+  const isRect = computed(() => activeNode.value?.type === NodeType.RECT);
+  const isCircle = computed(() => activeNode.value?.type === NodeType.CIRCLE);
 
   const isText = computed(() => activeNode.value?.type === NodeType.TEXT);
 
@@ -272,6 +276,8 @@ export function useStyleSync() {
 
     // 类型判断
     isShape,
+    isRect,
+    isCircle,
     isText,
     isImage,
     isGroup,
