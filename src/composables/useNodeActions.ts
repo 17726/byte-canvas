@@ -255,7 +255,10 @@ export function useNodeActions() {
     const validIds = selectedIds.filter((id) => {
       const node = store.nodes[id];
       // 只允许顶层节点（parent 为 null 或 undefined），且在 nodeOrder 中
-      return store.nodeOrder.includes(id) || (node && (node.parent === null || node.parent === undefined));
+      return (
+        store.nodeOrder.includes(id) ||
+        (node && (node.parentId === null || node.parentId === undefined))
+      );
     });
 
     if (validIds.length === 0) {

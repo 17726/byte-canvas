@@ -273,7 +273,7 @@ const handleNodeContextMenu = (e: MouseEvent, id: string) => {
 
   // 转发到ToolManager处理
   if (toolManagerRef.value) {
-    toolManagerRef.value.handleNodeContextMenu(e, id);
+    toolManagerRef.value.handleNodeContextMenu(e);
   }
 };
 
