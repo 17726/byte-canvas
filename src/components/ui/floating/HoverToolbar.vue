@@ -199,7 +199,8 @@
 <script setup lang="ts">
 import { computed, inject, type Ref } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
-import { NodeType, type ShapeState, type TextDecorationValue, type TextState } from '@/types/state';
+import { useStyleSync } from '@/composables/useStyleSync';
+import { type TextDecorationValue, type TextState } from '@/types/state';
 import { worldToClient } from '@/core/utils/geometry';
 // import { DEFAULT_IMAGE_FILTERS, DEFAULT_IMAGE_URL } from '@/config/defaults';
 import {
@@ -218,13 +219,20 @@ import { ToolManager } from '@/core/ToolManager';
 const store = useCanvasStore();
 const toolManagerRef = inject<Ref<ToolManager>>('toolManager');
 
-// 获取当前选中的第一个节点（ContextToolbar 仅在单选时显示）
-const activeNode = computed(() => {
-  const ids = Array.from(store.activeElementIds);
-  if (ids.length !== 1) return null;
-  return store.nodes[ids[0]!];
-});
-const isGroup = computed(() => activeNode.value?.type === NodeType.GROUP);
+// 使用 useStyleSync 进行属性绑定
+const {
+  activeNode,
+  isShape,
+  isText,
+  isImage,
+  isGroup,
+  opacity,
+  fillColor,
+  strokeColor,
+  strokeWidth,
+  fontSize,
+  textColor,
+} = useStyleSync();
 
 // 显示条件：有且仅有一个选中节点，并且不在其他交互中（如拖拽）
 const isVisible = computed(() => !!activeNode.value && !store.isInteracting && !isGroup.value);
@@ -253,30 +261,9 @@ const positionStyle = computed(() => {
   };
 });
 
-// 类型判断
-const isShape = computed(() => {
-  return activeNode.value?.type === NodeType.RECT || activeNode.value?.type === NodeType.CIRCLE;
-});
-
-const isText = computed(() => {
-  return activeNode.value?.type === NodeType.TEXT;
-});
-
-const isImage = computed(() => {
-  return activeNode.value?.type === NodeType.IMAGE;
-});
+// 类型判断和基础属性已从 useStyleSync 导入
 
 // --- Common Actions (对选中节点的操作，例如置于最前 / 置于最底 / 删除) ---
-const opacity = computed({
-  get: () => activeNode.value?.style.opacity ?? 1,
-  set: (val) => {
-    if (activeNode.value) {
-      store.updateNode(activeNode.value.id, {
-        style: { ...activeNode.value.style, opacity: val as number },
-      });
-    }
-  },
-});
 
 const bringToFront = () => {
   if (!activeNode.value) return;
@@ -305,56 +292,13 @@ const sendToBack = () => {
 };
 
 // --- Shape Actions ---
-const fillColor = computed({
-  get: () => (activeNode.value as ShapeState)?.style.backgroundColor || '#000000',
-  set: (val) =>
-    store.updateNode(activeNode.value!.id, {
-      style: { ...activeNode.value!.style, backgroundColor: val },
-    }),
-});
-
-const strokeColor = computed({
-  get: () => (activeNode.value as ShapeState)?.style.borderColor || '#000000',
-  set: (val) =>
-    store.updateNode(activeNode.value!.id, {
-      style: { ...activeNode.value!.style, borderColor: val },
-    }),
-});
-
-const strokeWidth = computed({
-  get: () => (activeNode.value as ShapeState)?.style.borderWidth || 0,
-  set: (val) =>
-    store.updateNode(activeNode.value!.id, {
-      style: { ...activeNode.value!.style, borderWidth: val as number },
-    }),
-});
+// fillColor, strokeColor, strokeWidth 已从 useStyleSync 导入
 
 // --- Text Actions ---
-// 1. 安全获取当前文本节点 (Computed)
-// 这样后面就不用每次都写 (activeNode.value as TextState) 了
-const activeTextNode = computed(() => {
-  const node = store.activeElements[0];
-  if (node?.type === NodeType.TEXT) {
-    return node as TextState;
-  }
-  return null;
-});
+// fontSize, textColor 已从 useStyleSync 导入
 
-// --- 具体的属性绑定 ---
-
-const fontSize = computed({
-  get: () => activeTextNode.value?.props.fontSize || 14,
-  set: (val) =>
-    activeTextNode.value &&
-    toolManagerRef?.value.handleFontSizeChange(activeTextNode.value.id, val),
-});
-
-const textColor = computed({
-  //NOTE: 关于调色板图标样式的响应还有待商榷 这个响应逻辑是错的但先不改（可画不变）
-  get: () => activeTextNode.value?.props.color || '#000000',
-  set: (val) =>
-    activeTextNode.value && toolManagerRef?.value.handleColorChange(activeTextNode.value.id, val),
-});
+// textColor 已从 useStyleSync 导入
+// NOTE: textColor 现在直接更新 store，不再通过 ToolManager
 
 // --- 样式开关 (Toggle) ---
 
