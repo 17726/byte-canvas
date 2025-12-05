@@ -147,7 +147,12 @@ function RightMenuItemClick(key: string) {
       Notification.success({ content: '已取消组合', closable: true, duration: 2000 });
       break;
     case MenuKey.SelectAll:
-      //TODO：待SelectAll方法实现
+      // Select all non-locked nodes
+      const allNodeIds = store.nodeOrder.filter(id => {
+        const node = store.nodes[id];
+        return node && !node.isLocked;
+      });
+      store.setActive(allNodeIds);
       Notification.success({ content: '已全选', closable: true, duration: 2000 });
       break;
     case MenuKey.ClearSelection:
