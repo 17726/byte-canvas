@@ -66,6 +66,10 @@ export class DomTextRenderer implements INodeRenderer<string> {
         case 'color':
           cssEntries.push(`color:${value}`);
           break;
+        //显式处理字号
+        case 'fontSize':
+          cssEntries.push(`font-size:${value}px`);
+          break;
         // 下划线、删除线处理
         case 'textDecoration':
           if (value) textDecorations.push(value as string);

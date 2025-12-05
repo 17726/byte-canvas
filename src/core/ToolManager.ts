@@ -658,7 +658,6 @@ export class ToolManager {
 
   handleFontSizeChange(id: string, newFontSize: number) {
     this.textSelectionHandler.updateGlobalStyles(id, this.store, { fontSize: newFontSize });
-    console.log('已处理字号');
   }
   /**
    * 处理文本节点鼠标抬起（供文本组件调用，内部转发给 TextSelectionHandler）
