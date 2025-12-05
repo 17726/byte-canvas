@@ -14,14 +14,10 @@
           </div>
           <div class="prop-item">
             <span class="label">样式</span>
-            <a-radio-group
-              v-model="store.viewport.gridStyle"
-              size="mini"
-              :disabled="!store.viewport.isGridVisible"
-            >
-              <a-radio value="none">无</a-radio>
+            <a-radio-group v-model="store.viewport.gridStyle" size="mini">
               <a-radio value="dot">点</a-radio>
               <a-radio value="line">线</a-radio>
+              <a-radio value="none">无</a-radio>
             </a-radio-group>
           </div>
           <div class="prop-item">
@@ -60,7 +56,6 @@
         </div>
       </div>
     </div>
-
     <!-- Node Property Mode -->
     <div v-else>
       <div v-if="!activeNode" class="empty-state">
@@ -71,7 +66,6 @@
           <span class="node-type">{{ activeNode?.type?.toUpperCase() }}</span>
           <span class="node-id">#{{ activeNode?.id?.slice(-4) }}</span>
         </div>
-
         <!-- Section 1: 变换 (Transform) -->
         <div class="panel-section">
           <div class="section-title">变换</div>
@@ -118,13 +112,10 @@
             </a-col>
           </a-row>
         </div>
-
         <a-divider style="margin: 12px 0" />
-
         <!-- Section 2: 外观 (Appearance) -->
         <div class="panel-section">
           <div class="label">外观</div>
-
           <!-- Fill -->
           <div class="prop-item" v-if="canEditShapeStyle && !isImage">
             <span class="label">填充</span>
@@ -132,7 +123,6 @@
               <a-color-picker v-model="fillColorTemp" size="small" @change="applyFillColor" />
             </div>
           </div>
-
           <!-- Stroke -->
           <div class="prop-item" v-if="canEditShapeStyle">
             <span class="label">描边</span>
@@ -155,10 +145,10 @@
           </div>
           <!-- Opacity -->
           <div class="prop-item">
-            <div class="section-title">透明度</div>
+            <div class="section-title">不透明度</div>
             <a-slider v-model="opacity" :min="0" :max="1" :step="0.01" show-input size="small" />
           </div>
-          <template v-if="isShape">
+          <template v-if="isRect">
             <div class="prop-item">
               <span class="label">圆角 (%)</span>
               <a-slider
@@ -172,9 +162,7 @@
             </div>
           </template>
         </div>
-
         <a-divider style="margin: 12px 0" />
-
         <!-- Section 3: 特有属性 (Specific) -->
         <div class="panel-section" v-if="isText || isShape || isImage || isGroup">
           <div class="section-title">属性</div>
@@ -205,7 +193,6 @@
               <a-color-picker v-model="textColor" show-text size="small" />
             </div>
           </template>
-
           <!-- Image Specific -->
           <template v-if="isImage">
             <div class="prop-item">
@@ -225,7 +212,6 @@
                   </div>
                   <span class="filter-name">黑白</span>
                 </div>
-
                 <!-- 模糊滤镜 -->
                 <div class="filter-item" @click="selectFilter('blur')">
                   <div class="filter-preview" :class="{ active: selectedFilter === 'blur' }">
@@ -240,7 +226,6 @@
                   </div>
                   <span class="filter-name">模糊</span>
                 </div>
-
                 <!-- 复古滤镜 -->
                 <div class="filter-item" @click="selectFilter('vintage')">
                   <div class="filter-preview" :class="{ active: selectedFilter === 'vintage' }">
@@ -256,7 +241,6 @@
                   </div>
                   <span class="filter-name">复古</span>
                 </div>
-
                 <!-- 重置滤镜 -->
                 <div class="filter-item" @click="selectFilter('reset')">
                   <div class="filter-preview" :class="{ active: selectedFilter === 'reset' }">
@@ -273,13 +257,141 @@
                 </div>
               </div>
             </div>
+            <!-- 滤镜参数调节 -->
+            <div class="prop-item">
+              <div class="section-title">滤镜参数</div>
+              <!-- 灰度 -->
+              <div class="filter-param-item">
+                <div class="filter-param-label">灰度</div>
+                <a-slider
+                  v-model="grayscale"
+                  :min="0"
+                  :max="100"
+                  :step="1"
+                  show-input
+                  size="small"
+                  @dblclick="grayscale = 0"
+                />
+              </div>
+
+              <!-- 模糊 -->
+              <div class="filter-param-item">
+                <div class="filter-param-label">模糊</div>
+                <a-slider
+                  v-model="blur"
+                  :min="0"
+                  :max="20"
+                  :step="0.1"
+                  show-input
+                  size="small"
+                  @dblclick="blur = 0"
+                />
+              </div>
+
+              <!-- 亮度 -->
+              <div class="filter-param-item">
+                <div class="filter-param-label">亮度</div>
+                <a-slider
+                  v-model="brightness"
+                  :min="0"
+                  :max="200"
+                  :step="1"
+                  show-input
+                  size="small"
+                  @dblclick="brightness = 100"
+                />
+              </div>
+
+              <!-- 对比度 -->
+              <div class="filter-param-item">
+                <div class="filter-param-label">对比度</div>
+                <a-slider
+                  v-model="contrast"
+                  :min="0"
+                  :max="200"
+                  :step="1"
+                  show-input
+                  size="small"
+                  @dblclick="contrast = 100"
+                />
+              </div>
+
+              <!-- 饱和度 -->
+              <div class="filter-param-item">
+                <div class="filter-param-label">饱和度</div>
+                <a-slider
+                  v-model="saturate"
+                  :min="0"
+                  :max="200"
+                  :step="1"
+                  show-input
+                  size="small"
+                  @dblclick="saturate = 100"
+                />
+              </div>
+
+              <!-- 色相旋转 -->
+              <div class="filter-param-item">
+                <div class="filter-param-label">色相旋转</div>
+                <a-slider
+                  v-model="hueRotate"
+                  :min="0"
+                  :max="360"
+                  :step="1"
+                  show-input
+                  size="small"
+                  @dblclick="hueRotate = 0"
+                />
+              </div>
+
+              <!-- 滤镜透明度 -->
+              <div class="filter-param-item">
+                <div class="filter-param-label">滤镜透明度</div>
+                <a-slider
+                  v-model="filterOpacity"
+                  :min="0"
+                  :max="100"
+                  :step="1"
+                  show-input
+                  size="small"
+                  @dblclick="filterOpacity = 100"
+                />
+              </div>
+
+              <!-- 反转 -->
+              <div class="filter-param-item">
+                <div class="filter-param-label">反转</div>
+                <a-slider
+                  v-model="invert"
+                  :min="0"
+                  :max="100"
+                  :step="1"
+                  show-input
+                  size="small"
+                  @dblclick="invert = 0"
+                />
+              </div>
+
+              <!-- 棕褐色 -->
+              <div class="filter-param-item">
+                <div class="filter-param-label">棕褐色</div>
+                <a-slider
+                  v-model="sepia"
+                  :min="0"
+                  :max="100"
+                  :step="1"
+                  show-input
+                  size="small"
+                  @dblclick="sepia = 0"
+                />
+              </div>
+            </div>
           </template>
         </div>
       </div>
     </div>
   </div>
 </template>
-
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
@@ -331,6 +443,9 @@ function applyPreset(theme: {
 // --- Helpers ---
 const isShape = computed(
   () => activeNode.value?.type === NodeType.RECT || activeNode.value?.type === NodeType.CIRCLE
+);
+const isRect = computed(
+  () => isShape.value && (activeNode.value as ShapeState)?.shapeType === 'rect'
 );
 const isText = computed(() => activeNode.value?.type === NodeType.TEXT);
 // const isRect = computed(
@@ -699,19 +814,140 @@ const cornerRadius = computed({
 });
 
 //Image
-
 // 选中的滤镜
 const selectedFilter = ref<string | null>(null);
-
 // 预览图片（可以使用当前选中图片的缩略图）
 const previewImage = computed(() => {
   // 这里可以返回当前选中图片的URL
   return (activeNode.value as ImageState)?.props?.imageUrl || DEFAULT_IMAGE_URL;
 });
-
 // 默认预览图片（当没有选中图片时使用）
 const defaultImage = DEFAULT_IMAGE_URL;
+// 滤镜参数计算属性
+// 灰度
+const grayscale = computed({
+  get: () => (activeNode.value as ImageState)?.props?.filters?.grayscale ?? 0,
+  set: (val) => {
+    if (!activeNode.value || activeNode.value.type !== NodeType.IMAGE) return;
+    store.updateNode(activeNode.value.id, {
+      props: {
+        ...activeNode.value.props,
+        filters: {
+          ...activeNode.value.props.filters,
+          grayscale: val as number,
+        },
+      },
+    } as Partial<ImageState>);
+  },
+});
+// 模糊
+const blur = computed({
+  get: () => (activeNode.value as ImageState)?.props?.filters?.blur ?? 0,
+  set: (val) => {
+    if (!activeNode.value || activeNode.value.type !== NodeType.IMAGE) return;
+    store.updateNode(activeNode.value.id, {
+      props: {
+        ...activeNode.value.props,
+        filters: {
+          ...activeNode.value.props.filters,
+          blur: val as number,
+        },
+      },
+    } as Partial<ImageState>);
+  },
+});
+// 亮度
+const brightness = computed({
+  get: () => (activeNode.value as ImageState)?.props?.filters?.brightness ?? 100,
+  set: (val) => {
+    if (!activeNode.value || activeNode.value.type !== NodeType.IMAGE) return;
+    store.updateNode(activeNode.value.id, {
+      props: {
+        ...activeNode.value.props,
+        filters: {
+          ...activeNode.value.props.filters,
+          brightness: val as number,
+        },
+      },
+    } as Partial<ImageState>);
+  },
+});
+// 对比度
+const contrast = computed({
+  get: () => (activeNode.value as ImageState)?.props?.filters?.contrast ?? 100,
+  set: (val) => {
+    if (!activeNode.value || activeNode.value.type !== NodeType.IMAGE) return;
+    store.updateNode(activeNode.value.id, {
+      props: {
+        ...activeNode.value.props,
+        filters: {
+          ...activeNode.value.props.filters,
+          contrast: val as number,
+        },
+      },
+    } as Partial<ImageState>);
+  },
+});
+// 饱和度
+const saturate = computed({
+  get: () => (activeNode.value as ImageState)?.props?.filters?.saturate ?? 100,
+  set: (val) => {
+    if (!activeNode.value || activeNode.value.type !== NodeType.IMAGE) return;
+    store.updateNode(activeNode.value.id, {
+      props: {
+        ...activeNode.value.props,
+        filters: {
+          ...activeNode.value.props.filters,
+          saturate: val as number,
+        },
+      },
+    } as Partial<ImageState>);
+  },
+});
+// 色相旋转
+const hueRotate = computed({
+  get: () => (activeNode.value as ImageState)?.props?.filters?.hueRotate ?? 0,
+  set: (val) => {
+    if (!activeNode.value || activeNode.value.type !== NodeType.IMAGE) return;
+    store.updateNode(activeNode.value.id, {
+      props: {
+        ...activeNode.value.props,
+        filters: {
+          ...activeNode.value.props.filters,
+          hueRotate: val as number,
+        },
+      },
+    } as Partial<ImageState>);
+  },
+});
+// 滤镜透明度
+// Helper to create filter computed properties
+function createFilterComputed(
+  filterKey: keyof ImageState['props']['filters'],
+  defaultValue: number
+) {
+  return computed({
+    get: () => (activeNode.value as ImageState)?.props?.filters?.[filterKey] ?? defaultValue,
+    set: (val) => {
+      if (!activeNode.value || activeNode.value.type !== NodeType.IMAGE) return;
+      store.updateNode(activeNode.value.id, {
+        props: {
+          ...activeNode.value.props,
+          filters: {
+            ...activeNode.value.props.filters,
+            [filterKey]: val as number,
+          },
+        },
+      } as Partial<ImageState>);
+    },
+  });
+}
 
+const filterOpacity = createFilterComputed('filterOpacity', 100);
+// 反相
+const invert = createFilterComputed('invert', 0);
+// 棕褐色调
+const sepia = createFilterComputed('sepia', 0);
 // 选择滤镜
 const selectFilter = (filterType: string) => {
   selectedFilter.value = filterType;
@@ -850,15 +1086,19 @@ const resetFilter = () => {
 .label {
   display: block;
   font-size: 12px;
-  margin-bottom: 8px;
   font-weight: bold;
   color: var(--color-text-2);
+  margin-bottom: 4px;
 }
 
 .flex-row {
   display: flex;
   gap: 8px;
   align-items: center;
+}
+
+.filter-selector {
+  margin: 10px 0;
 }
 
 .filter-options {
@@ -911,5 +1151,18 @@ const resetFilter = () => {
   margin-top: 4px;
   font-size: 12px;
   color: #666;
+}
+
+/* 滤镜参数调节样式 */
+.filter-param-item {
+  margin-bottom: 12px;
+}
+
+.filter-param-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-3);
+  margin-bottom: 6px;
+  display: block;
 }
 </style>
