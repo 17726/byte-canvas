@@ -3,7 +3,12 @@
    处理文本选区相关的交互细节，维护编辑状态和选区状态，响应连续 DOM 事件流。
  */
 
-import { NodeType, type InlineStyleProps, type TextState } from '@/types/state';
+import {
+  NodeType,
+  type InlineStyleProps,
+  type TextDecorationValue,
+  type TextState,
+} from '@/types/state';
 import { useCanvasStore } from '@/store/canvasStore';
 import { nextTick } from 'vue';
 import type { TransformHandler } from './TransformHandler';
@@ -521,7 +526,8 @@ export class TextSelectionHandler {
     originalStyle: { start: number; end: number; styles: InlineStyleProps },
     targetStart: number,
     targetEnd: number,
-    styleKey: keyof InlineStyleProps
+    styleKey: keyof InlineStyleProps,
+    styleValue: InlineStyleProps[keyof InlineStyleProps] // 新增：接收styleValue
   ): Array<{ start: number; end: number; styles: InlineStyleProps }> {
     const { start: origStart, end: origEnd, styles: origStyles } = originalStyle;
     const newStyles = [];
@@ -540,8 +546,25 @@ export class TextSelectionHandler {
       const overlapStart = Math.max(origStart, targetStart);
       const overlapEnd = Math.min(origEnd, targetEnd);
       // 移除目标属性，保留其他样式
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { [styleKey]: _, ...remainingStyles } = origStyles;
+      const remainingStyles = { ...origStyles };
+
+      // 处理textDecoration多值移除
+      if (styleKey === 'textDecoration' && styleValue) {
+        const targetValue = styleValue.toString().trim();
+        const origValues = remainingStyles.textDecoration?.split(/\s+/) || [];
+        // 只过滤掉目标值，保留其他值（如移除underline，保留line-through）
+        const newValues = origValues.filter((v) => v !== targetValue);
+        if (newValues.length > 0) {
+          remainingStyles.textDecoration = newValues.join(' ') as TextDecorationValue;
+        } else {
+          // 无剩余值则删除整个属性
+          delete remainingStyles.textDecoration;
+        }
+      } else {
+        // 非textDecoration：删除整个属性（原有逻辑）
+        delete remainingStyles[styleKey];
+      }
+
       if (Object.keys(remainingStyles).length > 0) {
         newStyles.push({
           start: overlapStart,
@@ -594,8 +617,8 @@ export class TextSelectionHandler {
     const validInlineStyles = inlineStyles.filter((style) => style.start < style.end);
 
     // 4. 核心重构：先处理范围重叠，再修改样式
+    let targetStyleExistsInRange = false;
     const updatedStyles: Array<{ start: number; end: number; styles: InlineStyleProps }> = [];
-    let hasOverlappingStyle = false;
 
     // 遍历原有样式，处理范围重叠
     for (const style of validInlineStyles) {
@@ -604,28 +627,52 @@ export class TextSelectionHandler {
         updatedStyles.push(style);
         continue;
       }
-
+      console.log('到这了');
       // 有重叠：拆分原有样式范围（核心修复点）
-      hasOverlappingStyle = true;
-      const splitStyles = this.splitOverlappingStyle(style, selectionStart, selectionEnd, styleKey);
+      // underline line-through的stylekey相同 不能直接看范围内有没有已存在的textDecoration 要特判
+      if (style.styles[styleKey] !== undefined) {
+        // 针对textDecoration做特判：区分不同值（underline/line-through）
+        if (styleKey === 'textDecoration') {
+          // 步骤1：处理styleValue（确保是字符串，兼容多值）
+          const targetValue = styleValue?.toString().trim() || '';
+          if (targetValue) {
+            // 步骤2：拆分原有textDecoration的值（支持多值，如"underline line-through"）
+            const origValues = style.styles.textDecoration?.toString().split(/\s+/) || [];
+            // 步骤3：判断目标值是否已存在（核心：只判断对应值，而非整个styleKey）
+            targetStyleExistsInRange = origValues.includes(targetValue);
+          } else {
+            // 若目标值为空（取消），则认为已存在
+            targetStyleExistsInRange = true;
+          }
+        } else {
+          // 非textDecoration样式：原有逻辑（判断styleKey是否存在）
+          targetStyleExistsInRange = true;
+        }
+      }
+
+      const splitStyles = this.splitOverlappingStyle(
+        style,
+        selectionStart,
+        selectionEnd,
+        styleKey,
+        styleValue
+      );
       updatedStyles.push(...splitStyles);
     }
 
     // 5. 处理样式的添加/切换逻辑
     if (toggle) {
-      // 场景1：切换样式（取消/添加）
-      if (hasOverlappingStyle) {
-        // 已有重叠样式 → 拆分后已移除目标范围的样式（无需额外操作）
-      } else {
-        // 无重叠样式 → 添加新样式（原有逻辑）
+      // 场景1：切换样式 → 只有目标styleKey不存在时，才添加
+      if (!targetStyleExistsInRange) {
         updatedStyles.push({
           start: selectionStart,
           end: selectionEnd,
           styles: { [styleKey]: styleValue } as InlineStyleProps,
         });
       }
+      // 场景2：目标styleKey已存在 → 拆分时已移除，无需额外操作
     } else {
-      // 场景2：强制设置样式（不管是否重叠，直接添加）
+      // 场景3：强制设置 → 直接添加（覆盖/合并）
       updatedStyles.push({
         start: selectionStart,
         end: selectionEnd,

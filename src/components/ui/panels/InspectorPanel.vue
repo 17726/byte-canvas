@@ -1,213 +1,901 @@
 <template>
-  <!-- 使用 Arco Design 菜单 -->
-  <div class="tool-menu">
-    <a-menu
-      mode="pop"
-      showCollapseButton
-      :default-collapsed="true"
-      :selected-keys="selectedKeys"
-      @menu-item-click="onMenuItemClick"
-    >
-      <!-- 元素创建列表 -->
-      <a-sub-menu key="addGraphics">
-        <template #icon><icon-plus /></template>
-        <template #title>图形</template>
-        <!-- 创建矩形 -->
-        <a-menu-item key="addRect">
-          <template #icon><square /></template>
-          矩形
-        </a-menu-item>
-        <!-- 创建圆形 -->
-        <a-menu-item key="addCircle">
-          <template #icon><round /></template>
-          圆形
-        </a-menu-item>
-      </a-sub-menu>
-      <!-- 文本创建按钮 -->
-      <a-menu-item key="addText">
-        <template #icon><icon-edit /></template>
-        文本
-      </a-menu-item>
+  <div class="property-panel">
+    <!-- Canvas Settings Mode -->
+    <div v-if="isCanvas" class="panel-content">
+      <div class="panel-header">
+        <span class="node-type">画布设置</span>
+      </div>
+      <div class="panel-section">
+        <div class="panel-section">
+          <div class="section-title">网格</div>
+          <div class="prop-item">
+            <span class="label">显示网格</span>
+            <a-switch v-model:checked="store.viewport.isGridVisible" />
+          </div>
+          <div class="prop-item">
+            <span class="label">样式</span>
+            <a-radio-group
+              v-model="store.viewport.gridStyle"
+              size="mini"
+              :disabled="!store.viewport.isGridVisible"
+            >
+              <a-radio value="none">无</a-radio>
+              <a-radio value="dot">点</a-radio>
+              <a-radio value="line">线</a-radio>
+            </a-radio-group>
+          </div>
+          <div class="prop-item">
+            <span class="label">网格颜色</span>
+            <a-color-picker v-model="store.viewport.gridDotColor" size="small" show-text />
+          </div>
+          <div class="prop-item">
+            <span class="label">间距</span>
+            <a-input-number v-model="store.viewport.gridSize" size="small" :min="8" :max="200" />
+          </div>
+          <div class="prop-item">
+            <span class="label">粗细</span>
+            <a-input-number v-model="store.viewport.gridDotSize" size="small" :min="1" :max="8" />
+          </div>
+        </div>
+      </div>
+      <a-divider style="margin: 12px 0" />
+      <div class="panel-section">
+        <div class="section-title">背景与主题</div>
+        <div class="prop-item">
+          <span class="label">背景色</span>
+          <a-color-picker v-model="store.viewport.backgroundColor" size="small" show-text />
+        </div>
+        <div class="prop-item">
+          <span class="label">主题</span>
+          <div class="preset-buttons">
+            <a-button
+              v-for="theme in presets"
+              :key="theme.name"
+              size="mini"
+              type="text"
+              @click="applyPreset(theme)"
+              >{{ theme.name }}</a-button
+            >
+          </div>
+        </div>
+      </div>
+    </div>
 
-      <!-- 图片创建按钮 -->
-      <ImageMenu />
+    <!-- Node Property Mode -->
+    <div v-else>
+      <div v-if="!activeNode" class="empty-state">
+        <a-empty description="未选中元素" />
+      </div>
+      <div v-else class="panel-content">
+        <div class="panel-header">
+          <span class="node-type">{{ activeNode?.type?.toUpperCase() }}</span>
+          <span class="node-id">#{{ activeNode?.id?.slice(-4) }}</span>
+        </div>
 
-      <!-- 元素删除按钮 -->
-      <a-menu-item key="deleteSelected" :disabled="!hasSelection">
-        <template #icon><icon-delete /></template>
-        删除
-      </a-menu-item>
-      <!-- Canvas Settings moved to top-right header -->
-    </a-menu>
+        <!-- Section 1: 变换 (Transform) -->
+        <div class="panel-section">
+          <div class="section-title">变换</div>
+          <a-row :gutter="8" class="prop-row">
+            <a-col :span="12">
+              <a-input-number v-model="transformX" size="small" :precision="2">
+                <template #prefix>X</template>
+              </a-input-number>
+            </a-col>
+            <a-col :span="12">
+              <a-input-number v-model="transformY" size="small" :precision="2">
+                <template #prefix>Y</template>
+              </a-input-number>
+            </a-col>
+          </a-row>
+          <a-row :gutter="8" class="prop-row">
+            <a-col :span="12">
+              <a-input-number v-model="transformW" size="small" :min="1" :precision="2">
+                <template #prefix>W</template>
+              </a-input-number>
+            </a-col>
+            <a-col :span="12">
+              <a-input-number v-model="transformH" size="small" :min="1" :precision="2">
+                <template #prefix>H</template>
+              </a-input-number>
+            </a-col>
+          </a-row>
+          <a-row :gutter="8" class="prop-row">
+            <a-col :span="24">
+              <a-input-number v-model="transformRotation" size="small">
+                <template #prefix>∠</template>
+                <template #suffix>°</template>
+              </a-input-number>
+              <span class="section-title">旋转角度</span>
+              <a-slider
+                v-model="transformRotation"
+                :min="-180"
+                :max="180"
+                :step="0.1"
+                show-input
+                size="small"
+                @dblclick="resetRotationToZero"
+              />
+            </a-col>
+          </a-row>
+        </div>
+
+        <a-divider style="margin: 12px 0" />
+
+        <!-- Section 2: 外观 (Appearance) -->
+        <div class="panel-section">
+          <div class="label">外观</div>
+
+          <!-- Fill -->
+          <div class="prop-item" v-if="canEditShapeStyle && !isImage">
+            <span class="label">填充</span>
+            <div class="flex-row">
+              <a-color-picker v-model="fillColorTemp" size="small" @change="applyFillColor" />
+            </div>
+          </div>
+
+          <!-- Stroke -->
+          <div class="prop-item" v-if="canEditShapeStyle">
+            <span class="label">描边</span>
+            <div class="flex-row">
+              <a-color-picker
+                v-model="strokeColorTemp"
+                size="small"
+                @change="handleStrokeColorChange"
+              />
+              <a-input-number
+                v-model="strokeWidthTemp"
+                size="small"
+                style="width: 80px"
+                :min="0"
+                @change="handleStrokeWidthChange"
+              >
+                <template #suffix>px</template>
+              </a-input-number>
+            </div>
+          </div>
+          <!-- Opacity -->
+          <div class="prop-item">
+            <div class="section-title">透明度</div>
+            <a-slider v-model="opacity" :min="0" :max="1" :step="0.01" show-input size="small" />
+          </div>
+          <template v-if="isShape">
+            <div class="prop-item">
+              <span class="label">圆角 (%)</span>
+              <a-slider
+                v-model="cornerRadius"
+                :min="0"
+                :max="50"
+                :step="1"
+                show-input
+                size="small"
+              />
+            </div>
+          </template>
+        </div>
+
+        <a-divider style="margin: 12px 0" />
+
+        <!-- Section 3: 特有属性 (Specific) -->
+        <div class="panel-section" v-if="isText || isShape || isImage || isGroup">
+          <div class="section-title">属性</div>
+          <div class="common">
+            <span class="label">z-Index</span>
+            <a-input-number v-model="zIndex" size="small" :min="1" mode="button" />
+          </div>
+          <br />
+          <!-- Text Specific -->
+          <template v-if="canEditText">
+            <div class="prop-item">
+              <div class="section-title">内容</div>
+              <a-textarea v-model="textContent" :auto-size="{ minRows: 2, maxRows: 5 }" />
+            </div>
+            <div class="prop-item">
+              <div class="section-title">字号</div>
+              <a-input-number v-model="fontSize" size="small" :min="1" />
+            </div>
+            <div class="prop-item">
+              <div class="section-title">字重</div>
+              <a-select v-model="fontWeight" size="small">
+                <a-option :value="400">Normal</a-option>
+                <a-option :value="700">Bold</a-option>
+              </a-select>
+            </div>
+            <div class="prop-item">
+              <div class="section-title">颜色</div>
+              <a-color-picker v-model="textColor" show-text size="small" />
+            </div>
+          </template>
+
+          <!-- Image Specific -->
+          <template v-if="isImage">
+            <div class="prop-item">
+              <span class="label">滤镜</span>
+              <div class="filter-options">
+                <!-- 黑白滤镜 -->
+                <div class="filter-item" @click="selectFilter('grayscale')">
+                  <div
+                    class="filter-preview"
+                    :class="{ active: selectedFilter === 'grayscale' }"
+                    :style="{
+                      backgroundImage: 'url(' + (previewImage || defaultImage) + ')',
+                      filter: 'grayscale(100%) contrast(110%) brightness(95%)',
+                    }"
+                  ></div>
+                  <span class="filter-name">黑白</span>
+                </div>
+
+                <!-- 模糊滤镜 -->
+                <div class="filter-item" @click="selectFilter('blur')">
+                  <div
+                    class="filter-preview"
+                    :class="{ active: selectedFilter === 'blur' }"
+                    :style="{
+                      backgroundImage: 'url(' + (previewImage || defaultImage) + ')',
+                      filter: 'blur(8px) brightness(98%) opacity(95%)',
+                    }"
+                  ></div>
+                  <span class="filter-name">模糊</span>
+                </div>
+
+                <!-- 复古滤镜 -->
+                <div class="filter-item" @click="selectFilter('vintage')">
+                  <div
+                    class="filter-preview"
+                    :class="{ active: selectedFilter === 'vintage' }"
+                    :style="{
+                      backgroundImage: 'url(' + (previewImage || defaultImage) + ')',
+                      filter:
+                        'sepia(60%) contrast(115%) brightness(95%) saturate(85%) hue-rotate(-10deg) ',
+                    }"
+                  ></div>
+                  <span class="filter-name">复古</span>
+                </div>
+
+                <!-- 重置滤镜 -->
+                <div class="filter-item" @click="selectFilter('reset')">
+                  <div
+                    class="filter-preview"
+                    :class="{ active: selectedFilter === 'reset' }"
+                    :style="{
+                      backgroundImage: 'url(' + (previewImage || defaultImage) + ')',
+                      filter: 'none',
+                    }"
+                  ></div>
+                  <span class="filter-name">重置</span>
+                </div>
+              </div>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
   </div>
-
-  <!-- 确认删除弹窗 -->
-  <a-modal
-    v-model:visible="delModalVisible"
-    @ok="onDeleteConfirm"
-    @cancel="delModalVisible = false"
-  >
-    <template #title>确认删除</template>
-    <div>确定要删除选中的元素吗？</div>
-  </a-modal>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
-import { IconPlus, IconEdit, IconDelete } from '@arco-design/web-vue/es/icon';
-//TODO：UI开发完成后优化icon-park库的导入，针对按需导入减小打包体积
-import { Square, Round } from '@icon-park/vue-next';
+import { ref, computed, watch, nextTick } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
-import { NodeFactory } from '@/core/services/NodeFactory';
-import { Notification } from '@arco-design/web-vue';
-import ImageMenu from '../common/ImageMenu.vue';
-
-//NOTE：按钮返回值需提前在MenuKey进行注册
-enum MenuKey {
-  AddRect = 'addRect',
-  AddCircle = 'addCircle',
-  AddText = 'addText',
-  AddImage = 'addImage',
-  Delete = 'deleteSelected',
-}
+import { useUIStore } from '@/store/uiStore';
+import {
+  NodeType,
+  type GroupState,
+  type ImageState,
+  type NodeState,
+  type ShapeState,
+  type TextState,
+} from '@/types/state';
+import { DEFAULT_CANVAS_THEMES, DEFAULT_IMAGE_FILTERS, DEFAULT_IMAGE_URL } from '@/config/defaults';
 
 const store = useCanvasStore();
-const hasSelection = computed(() => store.activeElementIds.size > 0);
+const ui = useUIStore();
+// 说明：PropertyPanel 有两种模式：'canvas' (显示画布设置) 与 'node' (显示节点属性)
+// 由 store.activePanel 决定，store.isPanelExpanded 控制面板折叠/展开
 
-// 高亮控制
-const selectedKeys = ref<string[]>([]);
+const activeNode = computed(() => {
+  const ids = Array.from(store.activeElementIds);
+  if (ids.length !== 1) return null;
+  const id = ids[0]!;
+  return store.nodes[id];
+});
 
-// 弹窗确认-弹窗开关
-const delModalVisible = ref(false);
+const isCanvas = computed(() => ui.activePanel === 'canvas');
+const presets = DEFAULT_CANVAS_THEMES as {
+  name: string;
+  background: string;
+  gridColor: string;
+  gridSize: number;
+}[];
 
-function onMenuItemClick(key: string) {
-  switch (key) {
-    case MenuKey.AddRect:
-      console.log('矩形被点击');
-      {
-        const node = NodeFactory.createRect();
-        store.addNode(node);
-        store.setActive([node.id]);
+/**
+ * 应用预设主题到视口：包括背景色、网格颜色与间距
+ */
+function applyPreset(theme: {
+  name: string;
+  background: string;
+  gridColor: string;
+  gridSize: number;
+}) {
+  store.viewport.backgroundColor = theme.background;
+  store.viewport.gridDotColor = theme.gridColor;
+  store.viewport.gridSize = theme.gridSize;
+}
+
+// --- Helpers ---
+const isShape = computed(
+  () => activeNode.value?.type === NodeType.RECT || activeNode.value?.type === NodeType.CIRCLE
+);
+const isText = computed(() => activeNode.value?.type === NodeType.TEXT);
+// const isRect = computed(
+//   () => isShape.value && (activeNode.value as ShapeState)?.shapeType === 'rect'
+// );
+const isImage = computed(() => activeNode.value?.type === NodeType.IMAGE);
+const isGroup = computed(() => activeNode.value?.type === NodeType.GROUP);
+
+function collectGroupDescendants(group: GroupState): NodeState[] {
+  const result: NodeState[] = [];
+  const traverse = (childIds: string[]) => {
+    childIds.forEach((childId) => {
+      const child = store.nodes[childId];
+      if (!child) return;
+      result.push(child);
+      if (child.type === NodeType.GROUP) {
+        traverse((child as GroupState).children);
       }
-      selectedKeys.value = [key];
-      break;
-    case MenuKey.AddCircle:
-      console.log('圆被点击');
-      {
-        const node = NodeFactory.createCircle();
-        store.addNode(node);
-        store.setActive([node.id]);
+    });
+  };
+  traverse(group.children);
+  return result;
+}
+
+const groupDescendants = computed(() => {
+  if (!isGroup.value || !activeNode.value) return [];
+  return collectGroupDescendants(activeNode.value as GroupState);
+});
+
+const groupTextNodes = computed(() =>
+  groupDescendants.value.filter((node): node is TextState => node.type === NodeType.TEXT)
+);
+
+const canEditShapeStyle = computed(() => isShape.value || isGroup.value);
+
+const textTargets = computed<TextState[]>(() => {
+  if (isText.value && activeNode.value?.type === NodeType.TEXT) {
+    return [activeNode.value as TextState];
+  }
+  if (isGroup.value) {
+    return groupTextNodes.value;
+  }
+  return [];
+});
+
+const primaryTextNode = computed(() => textTargets.value[0] ?? null);
+const canEditText = computed(() => textTargets.value.length > 0);
+
+function applyTextProps(propsPatch: Partial<TextState['props']>) {
+  textTargets.value.forEach((node) => {
+    store.updateNode(node.id, { props: propsPatch } as Partial<TextState>);
+  });
+}
+
+// --- Transform Bindings ---
+const transformX = computed({
+  get: () => activeNode.value?.transform.x || 0,
+  set: (val) =>
+    activeNode.value &&
+    store.updateNode(activeNode.value.id, {
+      transform: { ...activeNode.value.transform, x: val as number },
+    }),
+});
+const transformY = computed({
+  get: () => activeNode.value?.transform.y || 0,
+  set: (val) =>
+    activeNode.value &&
+    store.updateNode(activeNode.value.id, {
+      transform: { ...activeNode.value.transform, y: val as number },
+    }),
+});
+const transformW = computed({
+  get: () => activeNode.value?.transform.width || 0,
+  set: (val) =>
+    activeNode.value &&
+    store.updateNode(activeNode.value.id, {
+      transform: { ...activeNode.value.transform, width: val as number },
+    }),
+});
+const transformH = computed({
+  get: () => activeNode.value?.transform.height || 0,
+  set: (val) =>
+    activeNode.value &&
+    store.updateNode(activeNode.value.id, {
+      transform: { ...activeNode.value.transform, height: val as number },
+    }),
+});
+const transformRotation = computed({
+  get: () => activeNode.value?.transform.rotation || 0,
+  set: (val) =>
+    activeNode.value &&
+    store.updateNode(activeNode.value.id, {
+      transform: { ...activeNode.value.transform, rotation: val as number },
+    }),
+});
+
+const resetRotationToZero = () => {
+  if (!activeNode.value) return;
+  transformRotation.value = 0;
+};
+
+// --- Appearance Bindings ---
+const fillColorTemp = ref('#ffffff');
+const strokeColorTemp = ref('#000000');
+const strokeWidthTemp = ref(0);
+const isSyncingShapeStyle = ref(false);
+const ignoreFillChange = ref(false);
+const ignoreStrokeColorChange = ref(false);
+
+const extractColorValue = (input: unknown, fallback: string) => {
+  if (typeof input === 'string') return input;
+  if (typeof input === 'object' && input) {
+    if ('hex' in input && typeof (input as { hex?: string }).hex === 'string') {
+      return (input as { hex: string }).hex;
+    }
+    if ('value' in input && typeof (input as { value?: string }).value === 'string') {
+      return (input as { value: string }).value;
+    }
+  }
+  return fallback;
+};
+
+const extractNumericValue = (input: unknown, fallback: number) => {
+  if (typeof input === 'number' && !Number.isNaN(input)) return input;
+  if (typeof input === 'string' && input.trim() !== '' && !Number.isNaN(Number(input))) {
+    return Number(input);
+  }
+  if (typeof input === 'object' && input) {
+    if ('value' in input) {
+      const candidate = (input as { value?: number | string }).value;
+      if (typeof candidate === 'number' && !Number.isNaN(candidate)) return candidate;
+      if (
+        typeof candidate === 'string' &&
+        candidate.trim() !== '' &&
+        !Number.isNaN(Number(candidate))
+      ) {
+        return Number(candidate);
       }
-      selectedKeys.value = [key];
-      break;
-    case MenuKey.AddText:
-      console.log('文本被点击');
-      {
-        const node = NodeFactory.createText();
-        store.addNode(node);
-        store.setActive([node.id]);
+    }
+  }
+  return fallback;
+};
+
+// 记录最后选中的子节点ID（用于退出编辑模式时读取正确的样式）
+const lastSelectedChildId = ref<string | null>(null);
+
+// Reset lastSelectedChildId when active node changes to a different group, to null, or to a non-shape/non-group node
+watch(
+  () => activeNode.value?.id,
+  (newId, oldId) => {
+    if (newId !== oldId) {
+      const node = activeNode.value;
+      // Reset if switching groups or to non-shape/non-group nodes
+      if (
+        !node ||
+        (node.type !== NodeType.RECT &&
+          node.type !== NodeType.CIRCLE &&
+          node.type !== NodeType.GROUP)
+      ) {
+        lastSelectedChildId.value = null;
       }
-      selectedKeys.value = [key];
+    }
+  }
+);
+const syncShapeStyleTemps = () => {
+  if (!activeNode.value || !canEditShapeStyle.value) return;
+  // 对于组合节点，不读取组合节点本身的 style，而是读取最后选中的形状子节点的 style
+  // 如果没有最后选中的子节点，则读取第一个形状子节点的 style
+  // 这样可以避免在退出编辑模式时触发样式同步
+  if (isGroup.value) {
+    const groupNode = activeNode.value as GroupState;
+    // 优先使用最后选中的子节点
+    let targetChild: NodeState | null = null;
+    if (lastSelectedChildId.value) {
+      const child = store.nodes[lastSelectedChildId.value];
+      if (
+        child &&
+        (child.type === NodeType.RECT || child.type === NodeType.CIRCLE) &&
+        groupNode.children.includes(child.id)
+      ) {
+        targetChild = child;
+      }
+    }
+    // 如果没有最后选中的子节点，或者最后选中的子节点不是形状节点，则使用第一个形状子节点
+    if (!targetChild) {
+      targetChild =
+        groupNode.children
+          .map((id) => store.nodes[id])
+          .find(
+            (child) => child && (child.type === NodeType.RECT || child.type === NodeType.CIRCLE)
+          ) || null;
+    }
+
+    if (targetChild) {
+      isSyncingShapeStyle.value = true;
+      ignoreFillChange.value = true;
+      ignoreStrokeColorChange.value = true;
+      fillColorTemp.value = targetChild.style.backgroundColor || '#ffffff';
+      strokeColorTemp.value = targetChild.style.borderColor || '#000000';
+      strokeWidthTemp.value = targetChild.style.borderWidth || 0;
+      nextTick(() => {
+        ignoreFillChange.value = false;
+        ignoreStrokeColorChange.value = false;
+        isSyncingShapeStyle.value = false;
+      });
+    } else {
+      // 如果没有形状子节点，使用默认值
+      ignoreFillChange.value = true;
+      ignoreStrokeColorChange.value = true;
+      fillColorTemp.value = '#ffffff';
+      strokeColorTemp.value = '#000000';
+      strokeWidthTemp.value = 0;
+      nextTick(() => {
+        ignoreFillChange.value = false;
+        ignoreStrokeColorChange.value = false;
+      });
+    }
+    return;
+  }
+  // 对于非组合节点，记录当前节点ID（可能是子节点）
+  if (activeNode.value.type === NodeType.RECT || activeNode.value.type === NodeType.CIRCLE) {
+    lastSelectedChildId.value = activeNode.value.id;
+  }
+  isSyncingShapeStyle.value = true;
+  ignoreFillChange.value = true;
+  ignoreStrokeColorChange.value = true;
+  fillColorTemp.value = activeNode.value.style.backgroundColor || '#ffffff';
+  strokeColorTemp.value = activeNode.value.style.borderColor || '#000000';
+  strokeWidthTemp.value = activeNode.value.style.borderWidth || 0;
+  nextTick(() => {
+    ignoreFillChange.value = false;
+    ignoreStrokeColorChange.value = false;
+    isSyncingShapeStyle.value = false;
+  });
+};
+
+watch(
+  () => ({
+    id: activeNode.value?.id,
+    bg: activeNode.value?.style.backgroundColor,
+    borderColor: activeNode.value?.style.borderColor,
+    borderWidth: activeNode.value?.style.borderWidth,
+    canEdit: canEditShapeStyle.value,
+  }),
+  () => {
+    syncShapeStyleTemps();
+  },
+  { immediate: true }
+);
+
+const applyFillColor = (newColor?: unknown) => {
+  if (!activeNode.value || !canEditShapeStyle.value) return;
+  if (newColor !== undefined && ignoreFillChange.value) {
+    ignoreFillChange.value = false;
+    return;
+  }
+  if (isSyncingShapeStyle.value && newColor !== undefined) return;
+  const color = extractColorValue(newColor, fillColorTemp.value);
+  fillColorTemp.value = color;
+  if (activeNode.value.style.backgroundColor === color) return;
+  store.updateNode(activeNode.value.id, {
+    style: { ...activeNode.value.style, backgroundColor: color },
+  });
+};
+
+const applyStrokeStyle = (options?: { color?: unknown; width?: number }) => {
+  if (!activeNode.value || !canEditShapeStyle.value) return;
+  if (options?.color !== undefined) {
+    if (ignoreStrokeColorChange.value) {
+      ignoreStrokeColorChange.value = false;
+      return;
+    }
+    if (isSyncingShapeStyle.value) return;
+    strokeColorTemp.value = extractColorValue(options.color, strokeColorTemp.value);
+  } else if (isSyncingShapeStyle.value) {
+    return;
+  }
+  if (typeof options?.width === 'number') {
+    strokeWidthTemp.value = options.width;
+  }
+
+  const nextColor = strokeColorTemp.value;
+  const nextWidth = strokeWidthTemp.value;
+
+  const colorChanged = activeNode.value.style.borderColor !== nextColor;
+  const widthChanged = activeNode.value.style.borderWidth !== nextWidth;
+
+  if (!colorChanged && !widthChanged) return;
+
+  store.updateNode(activeNode.value.id, {
+    style: {
+      ...activeNode.value.style,
+      borderColor: nextColor,
+      borderWidth: nextWidth,
+    },
+  });
+};
+
+const handleStrokeColorChange = (value: unknown) => {
+  applyStrokeStyle({ color: value });
+};
+
+const handleStrokeWidthChange = (value: unknown) => {
+  if (isSyncingShapeStyle.value) return;
+  const width = extractNumericValue(value, strokeWidthTemp.value);
+  applyStrokeStyle({ width });
+};
+const opacity = computed({
+  get: () => activeNode.value?.style.opacity ?? 1,
+  set: (val) =>
+    activeNode.value &&
+    store.updateNode(activeNode.value.id, {
+      style: { ...activeNode.value.style, opacity: val as number },
+    }),
+});
+
+const zIndex = computed({
+  get: () => activeNode.value?.style.zIndex ?? 1,
+  set: (val) =>
+    activeNode.value &&
+    store.updateNode(activeNode.value.id, {
+      style: { ...activeNode.value.style, zIndex: val as number },
+    }),
+});
+
+// --- Specific Bindings ---
+// Text
+const textContent = computed({
+  get: () => primaryTextNode.value?.props.content || '',
+  set: (val) => {
+    if (!canEditText.value) return;
+    applyTextProps({ content: val as string });
+  },
+});
+const fontSize = computed({
+  get: () => primaryTextNode.value?.props.fontSize || 12,
+  set: (val) => {
+    if (!canEditText.value) return;
+    applyTextProps({ fontSize: val as number });
+  },
+});
+const fontWeight = computed({
+  get: () => primaryTextNode.value?.props.fontWeight || 400,
+  set: (val) => {
+    if (!canEditText.value) return;
+    applyTextProps({ fontWeight: val as number });
+  },
+});
+const textColor = computed({
+  get: () => primaryTextNode.value?.props.color || '#000000',
+  set: (val) => {
+    if (!canEditText.value) return;
+    applyTextProps({ color: val as string });
+  },
+});
+
+// Shape
+const cornerRadius = computed({
+  get: () => (activeNode.value as ShapeState)?.props.cornerRadius || 0,
+
+  set: (val) =>
+    activeNode.value &&
+    store.updateNode(activeNode.value.id, {
+      props: { cornerRadius: val as number },
+    } as Partial<ShapeState>),
+});
+
+//Image
+
+// 选中的滤镜
+const selectedFilter = ref<string | null>(null);
+
+// 预览图片（可以使用当前选中图片的缩略图）
+const previewImage = computed(() => {
+  // 这里可以返回当前选中图片的URL
+  return (activeNode.value as ImageState)?.props?.imageUrl || DEFAULT_IMAGE_URL;
+});
+
+// 默认预览图片（当没有选中图片时使用）
+const defaultImage = DEFAULT_IMAGE_URL;
+
+// 选择滤镜
+const selectFilter = (filterType: string) => {
+  selectedFilter.value = filterType;
+
+  switch (filterType) {
+    case 'grayscale':
+      grayscaleFilter();
       break;
-    //NOTE: 菜单项不支持预览图 故创建图片独立出去处理(ImageMenu.vue)
-    // case MenuKey.AddImage:
-    //   console.log('图片被点击');
-    //   toolManager.createImage(imageUrl);
-    //   selectedKeys.value = [key];
-    //   break;
-    case MenuKey.Delete:
-      if (!hasSelection.value) return;
-      delModalVisible.value = true;
+    case 'blur':
+      blurFilter();
       break;
-    default:
-      console.warn(`未处理的菜单项: ${key}`);
+    case 'vintage':
+      vintageFilter();
+      break;
+    case 'reset':
+      resetFilter();
       break;
   }
-}
+};
 
-function onDeleteConfirm() {
-  // 直接调用 store 删除选中节点
-  store.activeElementIds.forEach((id) => {
-    store.deleteNode(id);
+const grayscaleFilter = () => {
+  store.activeElements.forEach((element) => {
+    if (element && element.id && element.type === 'image') {
+      store.updateNode(element.id, {
+        props: {
+          ...element.props,
+          filters: {
+            grayscale: 100,
+            contrast: 110,
+            brightness: 95,
+          },
+        },
+      });
+    }
   });
-  Notification.success({
-    content: '删除成功！',
-    closable: true,
-    duration: 3000,
+};
+
+const blurFilter = () => {
+  store.activeElements.forEach((element) => {
+    if (element && element.id && element.type === 'image') {
+      store.updateNode(element.id, {
+        props: {
+          ...element.props,
+          filters: {
+            blur: 8,
+            brightness: 98,
+            filterOpacity: 95,
+          },
+        },
+      });
+    }
   });
-  selectedKeys.value = []; // 清空选中状态
-  delModalVisible.value = false; // 关闭弹窗
-}
+};
+
+const vintageFilter = () => {
+  store.activeElements.forEach((element) => {
+    if (element && element.id && element.type === 'image') {
+      store.updateNode(element.id, {
+        props: {
+          ...element.props,
+          filters: {
+            sepia: 60, // 棕褐色调
+            contrast: 115, // 增强对比度
+            brightness: 95, // 降低亮度
+            saturate: 85, // 降低饱和度
+            hueRotate: -10, // 轻微色相偏移
+          },
+        },
+      });
+    }
+  });
+};
+
+const resetFilter = () => {
+  store.activeElements.forEach((element) => {
+    if (element && element.id && element.type === 'image') {
+      store.updateNode(element.id, {
+        props: {
+          ...element.props,
+          filters: DEFAULT_IMAGE_FILTERS,
+        },
+      });
+    }
+  });
+};
 </script>
 
 <style scoped>
-.tool-menu {
-  width: 250px;
-  height: 500px;
-  padding: 40px;
-  position: fixed;
-  left: 0;
-  top: 80px;
-  pointer-events: none;
-  z-index: 1002;
+.property-panel {
+  height: 100%;
+  background-color: var(--color-bg-2);
+  border-left: 1px solid var(--color-border);
+  overflow-y: auto;
+  padding: 16px;
 }
 
-.tool-menu .arco-menu {
-  width: 150px;
-  height: 400px;
-  box-shadow: 0 0 1px rgba(0, 0, 0, 0.3);
-  pointer-events: auto;
-  border-radius: 22px 22px 0 22px;
+.empty-state {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--color-text-3);
 }
 
-.tool-menu .arco-menu :deep(.arco-menu-collapse-button) {
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  font-weight: bold;
+  color: var(--color-text-1);
 }
 
-.tool-menu .arco-menu:not(.arco-menu-collapsed) :deep(.arco-menu-collapse-button) {
-  right: 0;
-  bottom: 8px;
-  transform: translateX(50%);
+.node-id {
+  color: var(--color-text-3);
+  font-size: 12px;
+  font-weight: normal;
 }
 
-.tool-menu .arco-menu:not(.arco-menu-collapsed)::before {
-  content: '';
-  position: absolute;
-  right: 0;
-  bottom: 0;
-  width: 48px;
-  height: 48px;
-  background-color: inherit;
-  border-radius: 50%;
-  box-shadow:
-    -4px 0 2px var(--color-bg-2),
-    0 0 1px rgba(0, 0, 0, 0.3);
-  transform: translateX(50%);
+.section-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--color-text-3);
+  margin-bottom: 8px;
+  text-transform: uppercase;
 }
 
-.tool-menu .arco-menu.arco-menu-collapsed {
-  width: 48px;
-  height: 400px;
-  padding-top: 24px;
-  padding-bottom: 138px;
-  border-radius: 22px;
+.prop-row {
+  margin-bottom: 8px;
 }
 
-.tool-menu .arco-menu.arco-menu-collapsed :deep(.arco-menu-collapse-button) {
-  right: 8px;
-  bottom: 8px;
+.prop-item {
+  margin-bottom: 12px;
 }
 
-.tool-menu .arco-menu:not(.arco-menu-collapsed) :deep(.arco-menu-inner) {
-  padding-top: 28px;
+.label {
+  display: block;
+  font-size: 12px;
+  margin-bottom: 8px;
+  font-weight: bold;
+  color: var(--color-text-2);
 }
 
-:deep(.arco-menu-item[key='deleteSelected'].arco-menu-item-selected) {
-  background-color: transparent !important;
+.flex-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 
-/* canvas settings is now a menu item; remove absolute popover container */
-/* canvas settings styles moved to header */
+/* FIXME:该方法提示从未使用，如后续确认无误，请删除
+.filter-selector {
+  margin: 10px 0;
+}
+*/
+
+.filter-options {
+  display: flex;
+  gap: 10px;
+  max-width: 100%; /* 或者固定宽度 */
+  overflow-x: auto; /* 水平方向滚动 */
+  padding: 5px;
+}
+
+.filter-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+}
+
+.filter-preview {
+  width: 60px;
+  height: 60px;
+  border-radius: 8px;
+  background-size: cover;
+  background-position: center;
+  border: 2px solid #e5e5e5;
+  transition: all 0.2s ease;
+}
+
+.filter-preview.active {
+  border-color: #1890ff;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.2);
+}
+
+.filter-preview:hover {
+  transform: scale(1.05);
+}
+
+.filter-name {
+  margin-top: 4px;
+  font-size: 12px;
+  color: #666;
+}
 </style>

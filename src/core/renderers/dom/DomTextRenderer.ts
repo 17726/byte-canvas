@@ -73,7 +73,7 @@ export class DomTextRenderer implements INodeRenderer<string> {
         // 下划线、删除线处理
         case 'textDecoration':
           if (value) textDecorations.push(value as string);
-          console.log('!!!!!!!!push了', value);
+          console.log('!!!!!!!!push了 textDecorations=', textDecorations);
           break;
         // 其他样式（保持驼峰转连字符）
         default:
