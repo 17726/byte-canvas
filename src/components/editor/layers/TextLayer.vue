@@ -39,6 +39,7 @@ import {
   onMounted,
   onUnmounted,
   inject,
+  nextTick,
 } from 'vue';
 import type { TextState } from '@/types/state';
 import { getDomStyle } from '@/core/renderers/dom';
@@ -128,14 +129,35 @@ watch(
   { immediate: true, deep: true }
 );
 
+// 组件内定义执行锁
+const isSettingActive = ref(false);
+
 watch(
-  () => Array.from(store.activeElementIds),
-  (newActiveIds) => {
+  () => store.activeElementIds,
+  async (newActiveSet) => {
+    // 加锁：如果正在设置，直接返回
+    if (isSettingActive.value) return;
+
+    const newActiveIds = [...newActiveSet];
     if (isEditing.value && !newActiveIds.includes(props.node.id)) {
-      store.setActive([props.node.id]);
+      const targetId = [props.node.id];
+      const isSame =
+        targetId.length === newActiveSet.size && targetId.every((id) => newActiveSet.has(id));
+
+      if (!isSame) {
+        isSettingActive.value = true;
+        try {
+          // 延迟执行，避免和响应式更新竞态
+          await nextTick();
+          store.setActive(targetId);
+        } finally {
+          // 解锁
+          isSettingActive.value = false;
+        }
+      }
     }
   },
-  { deep: true }
+  { flush: 'post' }
 );
 
 // 监听选区变化（同步到全局，通过 ToolManager 转发）
