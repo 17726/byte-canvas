@@ -3,11 +3,11 @@ import { watch, computed, onMounted } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
 import { useUIStore } from '@/store/uiStore';
 import { Left as IconLeft, Right as IconRight } from '@icon-park/vue-next';
-import CanvasStage from '@/components/editor/CanvasStage.vue';
-import CanvasHeader from '@/components/layout/CanvasHeader.vue';
-import CanvasToolbar from '@/components/layout/CanvasToolbar.vue';
-import PropertyPanel from '@/components/layout/PropertyPanel.vue';
-import RightClickmenu from '@/components/layout/RightClickmenu.vue';
+import CanvasStage from '@/components/canvas/CanvasStage.vue';
+import CanvasHeader from '@/components/ui/panels/AppHeader.vue';
+import CanvasToolbar from '@/components/ui/panels/ToolPanel.vue';
+import PropertyPanel from '@/components/ui/panels/InspectorPanel.vue';
+import RightClickmenu from '@/components/ui/floating/ContextMenu.vue';
 
 const store = useCanvasStore();
 const ui = useUIStore();
