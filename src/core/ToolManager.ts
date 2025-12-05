@@ -694,6 +694,52 @@ export class ToolManager {
     this.rotationHandler.startRotate(e);
   }
 
+  // ==================== 右键菜单事件处理 =====================
+  /**
+   * 处理画布右键菜单事件
+   * @param e - 鼠标事件
+   */
+  handleContextMenu(e: MouseEvent) {
+    // 防护逻辑：过滤外部干扰
+    if (!this.stageEl?.contains(e.target as Node)) return;
+
+    // 显示右键菜单
+    this.showContextMenu(e.clientX, e.clientY);
+  }
+
+  /**
+   * 处理节点右键菜单事件
+   * @param e - 鼠标事件
+   */
+  handleNodeContextMenu(e: MouseEvent) {
+    // 防护逻辑：过滤外部干扰
+    if (!this.stageEl?.contains(e.target as Node)) return;
+
+    // 显示右键菜单
+    this.showContextMenu(e.clientX, e.clientY);
+  }
+
+  /**
+   * 显示右键菜单
+   * @param x - 菜单位置 X 坐标
+   * @param y - 菜单位置 Y 坐标
+   */
+  private showContextMenu(x: number, y: number) {
+    // 创建自定义事件，将右键菜单信息发送到应用
+    const contextMenuEvent = new CustomEvent('showContextMenu', {
+      detail: {
+        x,
+        y,
+        hasSelection: this.store.activeElementIds.size > 0,
+      },
+      bubbles: true,
+      cancelable: true,
+    });
+
+    // 触发事件
+    document.dispatchEvent(contextMenuEvent);
+  }
+
   // ==================== 组合/解组合功能（已迁移至 GroupService）====================
 
   // ==================== 节点拖拽/缩放方法（已迁移到 TransformHandler） ====================

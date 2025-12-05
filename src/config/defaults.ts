@@ -7,12 +7,12 @@ export const DEFAULT_VIEWPORT = {
   offsetX: 0,
   offsetY: 0,
   rotation: 0,
-  backgroundColor: '#ffffff',
+  backgroundColor: 'rgba(234,234,239,1)',
   isGridVisible: true,
   gridSize: 20,
   isSnapToGrid: true,
   gridStyle: 'dot' as const, // 'dot' | 'line' | 'none'
-  gridDotColor: 'rgba(0,0,0,0.04)',
+  gridDotColor: 'rgba(255,255,255,1)',
   gridDotSize: 1,
 };
 
