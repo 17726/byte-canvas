@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { watch, onMounted } from 'vue';
+import { watch, computed, onMounted } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
 import { useUIStore } from '@/store/uiStore';
 import { Left as IconLeft, Right as IconRight } from '@icon-park/vue-next';
@@ -7,6 +7,7 @@ import CanvasStage from '@/components/editor/CanvasStage.vue';
 import CanvasHeader from '@/components/layout/CanvasHeader.vue';
 import CanvasToolbar from '@/components/layout/CanvasToolbar.vue';
 import PropertyPanel from '@/components/layout/PropertyPanel.vue';
+import RightClickmenu from '@/components/layout/RightClickmenu.vue';
 
 const store = useCanvasStore();
 const ui = useUIStore();
@@ -33,6 +34,8 @@ watch(
 const togglePanel = () => {
   ui.setPanelExpanded(!ui.isPanelExpanded);
 };
+
+const showPopover = computed(() => !ui.isPanelExpanded);
 </script>
 
 <template>
@@ -51,9 +54,19 @@ const togglePanel = () => {
         <CanvasStage />
 
         <!-- 展开/折叠按钮 -->
-        <div class="panel-toggle-btn" @click="togglePanel" title="Toggle Property Panel">
+        <template v-if="showPopover">
+          <a-tooltip content="属性" position="left">
+            <div class="panel-toggle-btn" @click="togglePanel">
+              <component :is="ui.isPanelExpanded ? IconRight : IconLeft" size="16" fill="#333" />
+            </div>
+          </a-tooltip>
+        </template>
+
+        <div v-else class="panel-toggle-btn" @click="togglePanel">
           <component :is="ui.isPanelExpanded ? IconRight : IconLeft" size="16" fill="#333" />
         </div>
+
+        <RightClickmenu />
       </a-layout-content>
 
       <!-- 右侧属性面板 (固定宽度) -->
@@ -62,7 +75,6 @@ const togglePanel = () => {
         class="right-sider"
         :collapsed="!ui.isPanelExpanded"
         :collapsed-width="0"
-        collapsible
         :trigger="null"
         breakpoint="xl"
       >

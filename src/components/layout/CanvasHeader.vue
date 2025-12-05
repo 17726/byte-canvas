@@ -7,9 +7,11 @@
       :show-back="false"
     >
       <template #extra>
-        <a-button size="medium" type="text" class="canvas-settings-btn" @click="openSettings">
-          <template #icon><icon-settings /></template>
-        </a-button>
+        <a-tooltip content="画布设置" :mini="true" position="br">
+          <a-button size="medium" type="text" class="canvas-settings-btn" @click="openSettings">
+            <template #icon><icon-settings /></template>
+          </a-button>
+        </a-tooltip>
       </template>
     </a-page-header>
   </div>

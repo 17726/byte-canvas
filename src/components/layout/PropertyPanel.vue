@@ -14,10 +14,10 @@
           </div>
           <div class="prop-item">
             <span class="label">样式</span>
-            <a-radio-group v-model="store.viewport.gridStyle" size="mini">
+            <a-radio-group v-model="store.viewport.gridStyle" size="mini" :disabled="!store.viewport.isGridVisible">
+              <a-radio value="none">无</a-radio>
               <a-radio value="dot">点</a-radio>
               <a-radio value="line">线</a-radio>
-              <a-radio value="none">无</a-radio>
             </a-radio-group>
           </div>
           <div class="prop-item">
@@ -841,7 +841,6 @@ const resetFilter = () => {
   margin-bottom: 8px;
   font-weight: bold;
   color: var(--color-text-2);
-  margin-bottom: 4px;
 }
 
 .flex-row {
@@ -850,9 +849,11 @@ const resetFilter = () => {
   align-items: center;
 }
 
+/* FIXME:该方法提示从未使用，如后续确认无误，请删除
 .filter-selector {
   margin: 10px 0;
 }
+*/
 
 .filter-options {
   display: flex;
