@@ -156,7 +156,7 @@ function RightMenuItemClick(key: string) {
       Notification.success({ content: '已全选', closable: true, duration: 2000 });
       break;
     case MenuKey.ClearSelection:
-      //TODO：待ClearSelection方法实现
+      store.setActive([]);
       Notification.success({ content: '已取消选择', closable: true, duration: 2000 });
       break;
     default:
