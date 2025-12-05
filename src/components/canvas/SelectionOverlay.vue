@@ -302,7 +302,7 @@ const onHandleDown = (e: MouseEvent, handle: ResizeHandle) => {
   }
 };
 
-//旋转样式计算
+// 旋转样式计算：将旋转按钮定位在选中框底部外侧1/4高度处，水平居中，并根据缩放和旋转动态调整，避免与属性栏重叠
 const rotateHandleStyle = computed(() => {
   const bounds = selectionBounds.value;
   if (!bounds) return {};
