@@ -97,11 +97,11 @@
           </a-row>
           <a-row :gutter="8" class="prop-row">
             <a-col :span="24">
+              <div class="section-title">旋转角度</div>
               <a-input-number v-model="transformRotation" size="small">
                 <template #prefix>∠</template>
                 <template #suffix>°</template>
               </a-input-number>
-              <span class="section-title">旋转角度</span>
               <a-slider
                 v-model="transformRotation"
                 :min="-180"
