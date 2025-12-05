@@ -3,24 +3,28 @@
     <!-- Shape Controls -->
     <template v-if="isShape">
       <div class="tool-item">
-        <a-color-picker
-          :popup-offset="-150"
-          :popup-translate="[-100, -160]"
-          size="mini"
-          v-model="fillColor"
-          trigger="hover"
-          disabled-alpha
-        />
+        <a-tooltip position="bottom" content="填充色">
+          <a-color-picker
+            :popup-offset="-150"
+            :popup-translate="[-100, -160]"
+            size="mini"
+            v-model="fillColor"
+            trigger="hover"
+            disabled-alpha
+          />
+        </a-tooltip>
       </div>
       <div class="divider"></div>
       <div class="tool-item">
-        <a-color-picker
-          :popup-offset="-150"
-          :popup-translate="[-100, -160]"
-          size="mini"
-          v-model="strokeColor"
-          trigger="hover"
-        />
+        <a-tooltip position="bottom" content="边框色">
+          <a-color-picker
+            :popup-offset="-150"
+            :popup-translate="[-100, -160]"
+            size="mini"
+            v-model="strokeColor"
+            trigger="hover"
+          />
+        </a-tooltip>
       </div>
       <div class="divider"></div>
       <div class="tool-item">
@@ -38,12 +42,12 @@
 
     <!-- Text Controls -->
     <template v-if="isText">
-      <div class="tool-item" style="width: 100px">
-        字号：
+      <div class="tool-item" style="width: 85px">
+        字号:
         <a-input-number
           size="mini"
           v-model="fontSize"
-          style="width: 55px; margin-left: 2px"
+          style="width: 50px; margin-left: 2px"
           class="input-demo"
           :min="12"
           :max="100"
@@ -93,13 +97,15 @@
       </div>
       <div class="divider"></div>
       <div class="tool-item">
-        <a-color-picker
-          :popup-offset="-150"
-          :popup-translate="[-100, -160]"
-          size="mini"
-          v-model="textColor"
-          trigger="hover"
-        />
+        <a-tooltip position="bottom" content="文本颜色">
+          <a-color-picker
+            :popup-offset="-150"
+            :popup-translate="[-100, -160]"
+            size="mini"
+            v-model="textColor"
+            trigger="hover"
+          />
+        </a-tooltip>
       </div>
     </template>
 
@@ -229,8 +235,10 @@ const isVisible = computed(() => !!activeNode.value && !store.isInteracting && !
 const positionStyle = computed(() => {
   if (!activeNode.value) return {};
 
-  const node = activeNode.value;
-  const { x, y, width } = node.transform;
+  // 使用绝对坐标，保证组合编辑模式下子元素位置正确
+  const absTransform =
+    store.getAbsoluteTransform(activeNode.value.id) || activeNode.value.transform;
+  const { x, y, width } = absTransform;
 
   // 计算节点在屏幕上的位置（相对于 CanvasStage 容器）
   const worldCenter = {
