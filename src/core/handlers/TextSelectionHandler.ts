@@ -718,7 +718,11 @@ export class TextSelectionHandler {
 
     // 5. 处理样式的添加/切换逻辑（仅全局无属性时生效）
     if (toggle) {
-      if (globalSplitStyles === undefined || globalStyleValue !== styleValue) {
+      if (
+        !targetStyleExistsInRange ||
+        globalSplitStyles === undefined ||
+        globalStyleValue !== styleValue
+      ) {
         updatedStyles.push({
           start: selectionStart,
           end: selectionEnd,
