@@ -63,7 +63,14 @@
 // stores/canvasStore.ts
 import { defineStore } from 'pinia';
 import { ref, reactive, computed, watch } from 'vue';
-import type { NodeState, ShapeState, TextState, ImageState, ViewportState } from '@/types/state';
+import type {
+  NodeState,
+  ShapeState,
+  TextState,
+  ImageState,
+  ViewportState,
+  GroupState,
+} from '@/types/state';
 import { NodeType } from '@/types/state';
 import { DEFAULT_VIEWPORT } from '@/config/defaults';
 import { calculateBounds } from '@/core/utils/geometry';
@@ -189,6 +196,147 @@ export const useCanvasStore = defineStore('canvas', () => {
   });
 
   // Actions - 操作函数
+
+  // ==================== 节点更新辅助函数 ====================
+
+  /**
+   * 同步组合节点的 transform 变更到子节点
+   * 当组合缩放时，子节点的位置和尺寸需要等比例缩放
+   */
+  function syncGroupTransform(
+    groupNode: GroupState,
+    oldTransform: NodeState['transform'],
+    newTransform: NodeState['transform']
+  ) {
+    // 计算缩放比例
+    const scaleX = oldTransform.width > 0 ? newTransform.width / oldTransform.width : 1;
+    const scaleY = oldTransform.height > 0 ? newTransform.height / oldTransform.height : 1;
+
+    // 只有当尺寸发生变化时才需要更新子节点
+    if (scaleX === 1 && scaleY === 1) return;
+
+    // 递归更新所有后代节点
+    const updateDescendants = (childIds: string[]) => {
+      childIds.forEach((childId) => {
+        const child = nodes.value[childId];
+        if (!child) return;
+
+        // 等比例缩放子节点的位置和尺寸
+        const childNewX = child.transform.x * scaleX;
+        const childNewY = child.transform.y * scaleY;
+        const childNewWidth = Math.max(1, child.transform.width * scaleX);
+        const childNewHeight = Math.max(1, child.transform.height * scaleY);
+
+        child.transform = {
+          ...child.transform,
+          x: childNewX,
+          y: childNewY,
+          width: childNewWidth,
+          height: childNewHeight,
+        };
+
+        // 如果子节点也是组合，递归处理其子节点
+        if (child.type === NodeType.GROUP) {
+          updateDescendants((child as GroupState).children);
+        }
+      });
+    };
+
+    updateDescendants(groupNode.children);
+  }
+
+  /**
+   * 同步组合节点的 style 变更到子节点
+   * 只同步 opacity、backgroundColor、borderColor、borderWidth 到形状节点
+   */
+  function syncGroupStyle(groupNode: GroupState, stylePatch: Partial<NodeState['style']>) {
+    const currentStyle = groupNode.style;
+
+    const opacityChanged =
+      stylePatch.opacity !== undefined && stylePatch.opacity !== currentStyle.opacity;
+    const backgroundChanged =
+      stylePatch.backgroundColor !== undefined &&
+      stylePatch.backgroundColor !== currentStyle.backgroundColor;
+    const borderColorChanged =
+      stylePatch.borderColor !== undefined && stylePatch.borderColor !== currentStyle.borderColor;
+    const borderWidthChanged =
+      stylePatch.borderWidth !== undefined && stylePatch.borderWidth !== currentStyle.borderWidth;
+
+    const shouldSyncChildren =
+      opacityChanged || backgroundChanged || borderColorChanged || borderWidthChanged;
+
+    if (!shouldSyncChildren) return;
+
+    const updateChildrenStyle = (childIds: string[]) => {
+      childIds.forEach((childId) => {
+        const child = nodes.value[childId];
+        if (!child) return;
+
+        const childStylePatch: Record<string, unknown> = {};
+        const isShapeNode = child.type === NodeType.RECT || child.type === NodeType.CIRCLE;
+
+        if (opacityChanged) {
+          childStylePatch.opacity = stylePatch.opacity;
+        }
+
+        if (backgroundChanged && isShapeNode) {
+          childStylePatch.backgroundColor = stylePatch.backgroundColor;
+        }
+
+        if (borderColorChanged && isShapeNode) {
+          childStylePatch.borderColor = stylePatch.borderColor;
+        }
+
+        if (borderWidthChanged && isShapeNode) {
+          childStylePatch.borderWidth = stylePatch.borderWidth;
+        }
+
+        if (Object.keys(childStylePatch).length > 0) {
+          child.style = { ...child.style, ...childStylePatch };
+        }
+
+        if (child.type === NodeType.GROUP) {
+          updateChildrenStyle((child as GroupState).children);
+        }
+      });
+    };
+
+    updateChildrenStyle(groupNode.children);
+  }
+
+  /**
+   * 合并节点的 props（深度合并，避免覆盖未传入的值）
+   */
+  function mergeNodeProps(node: NodeState, patch: Partial<NodeState>): Partial<NodeState> {
+    if (!('props' in patch) || !patch.props) {
+      return patch;
+    }
+
+    const currentNode = node as NodeState & { props?: Record<string, unknown> };
+    const patchProps = patch.props as Record<string, unknown>;
+
+    // 合并 props
+    currentNode.props = {
+      ...(currentNode.props as Record<string, unknown>),
+      ...patchProps,
+    };
+
+    // 返回除 props 外的其他属性
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { props, ...rest } = patch as Partial<ShapeState | TextState | ImageState>;
+    return rest;
+  }
+
+  /**
+   * 应用节点更新补丁（基础更新逻辑）
+   */
+  function applyNodePatch(node: NodeState, patch: Partial<NodeState>) {
+    const finalPatch = mergeNodeProps(node, patch);
+    Object.assign(node, finalPatch);
+  }
+
+  // ==================== 节点更新主函数 ====================
+
   // 1. 更新节点
   /**
    * 更新节点：强制合并 props（浅合并）以避免覆盖未传入的值
@@ -204,148 +352,30 @@ export const useCanvasStore = defineStore('canvas', () => {
       pushSnapshot();
     }
 
-    // ==================== 组合节点特殊处理 ====================
+    // 组合节点特殊处理：同步 transform 和 style 到子节点
     // 注意：只有在非编辑模式下才触发子节点同步更新
     // 编辑模式下，用户直接操作子节点，组合边框由 expandGroupToFitChildren 单独处理
-    if (node.type === NodeType.GROUP && editingGroupId.value !== id) {
-      const groupNode = node as import('@/types/state').GroupState;
+    const isGroupInEditMode = node.type === NodeType.GROUP && editingGroupId.value !== id;
+    if (isGroupInEditMode) {
+      const groupNode = node as GroupState;
 
-      // 处理组合的 transform 变更：同步更新子节点
-      // 注意：子节点坐标是相对于组合的，所以：
-      // - 组合移动时：子节点不需要更新（相对位置不变）
-      // - 组合缩放时：子节点的位置和尺寸需要等比例缩放
+      // 处理 transform 变更：同步缩放到子节点
       if ('transform' in patch && patch.transform) {
         const oldTransform = node.transform;
         const newTransform = { ...oldTransform, ...patch.transform };
-
-        // 计算缩放比例
-        const scaleX = oldTransform.width > 0 ? newTransform.width / oldTransform.width : 1;
-        const scaleY = oldTransform.height > 0 ? newTransform.height / oldTransform.height : 1;
-
-        // 只有当尺寸发生变化时才需要更新子节点
-        if (scaleX !== 1 || scaleY !== 1) {
-          // 递归更新所有后代节点
-          const updateDescendants = (childIds: string[]) => {
-            childIds.forEach((childId) => {
-              const child = nodes.value[childId];
-              if (!child) return;
-
-              // 等比例缩放子节点的位置和尺寸
-              const childNewX = child.transform.x * scaleX;
-              const childNewY = child.transform.y * scaleY;
-              const childNewWidth = Math.max(1, child.transform.width * scaleX);
-              const childNewHeight = Math.max(1, child.transform.height * scaleY);
-
-              child.transform = {
-                ...child.transform,
-                x: childNewX,
-                y: childNewY,
-                width: childNewWidth,
-                height: childNewHeight,
-              };
-
-              // 如果子节点也是组合，递归处理其子节点
-              if (child.type === NodeType.GROUP) {
-                const childGroup = child as import('@/types/state').GroupState;
-                updateDescendants(childGroup.children);
-              }
-            });
-          };
-
-          updateDescendants(groupNode.children);
-        }
+        syncGroupTransform(groupNode, oldTransform, newTransform);
       }
 
-      // 处理组合的 style 变更：同步更新子节点的相应样式
-      // 注意：只有在非编辑模式下，且样式值真正发生变化时，才同步到子节点。
-      // 编辑模式下，用户直接修改子节点，组合的样式同步由 expandGroupToFitChildren 单独处理（见第75行的注释）。
+      // 处理 style 变更：同步样式到子节点
       if ('style' in patch && patch.style) {
-        const stylePatch = patch.style;
-        const currentStyle = node.style;
-
-        const opacityChanged =
-          stylePatch.opacity !== undefined && stylePatch.opacity !== currentStyle.opacity;
-        const backgroundChanged =
-          stylePatch.backgroundColor !== undefined &&
-          stylePatch.backgroundColor !== currentStyle.backgroundColor;
-        const borderColorChanged =
-          stylePatch.borderColor !== undefined &&
-          stylePatch.borderColor !== currentStyle.borderColor;
-        const borderWidthChanged =
-          stylePatch.borderWidth !== undefined &&
-          stylePatch.borderWidth !== currentStyle.borderWidth;
-
-        const shouldSyncChildren =
-          opacityChanged || backgroundChanged || borderColorChanged || borderWidthChanged;
-
-        // 只有在样式值真正发生变化时才同步，避免在退出编辑模式时触发不必要的同步
-        if (shouldSyncChildren) {
-          const updateChildrenStyle = (childIds: string[]) => {
-            childIds.forEach((childId) => {
-              const child = nodes.value[childId];
-              if (!child) return;
-
-              const childStylePatch: Record<string, unknown> = {};
-              const isShapeNode = child.type === NodeType.RECT || child.type === NodeType.CIRCLE;
-
-              if (opacityChanged) {
-                childStylePatch.opacity = stylePatch.opacity;
-              }
-
-              if (backgroundChanged && isShapeNode) {
-                childStylePatch.backgroundColor = stylePatch.backgroundColor;
-              }
-
-              if (borderColorChanged && isShapeNode) {
-                childStylePatch.borderColor = stylePatch.borderColor;
-              }
-
-              if (borderWidthChanged && isShapeNode) {
-                childStylePatch.borderWidth = stylePatch.borderWidth;
-              }
-
-              if (Object.keys(childStylePatch).length > 0) {
-                child.style = { ...child.style, ...childStylePatch };
-              }
-
-              if (child.type === NodeType.GROUP) {
-                const childGroup = child as import('@/types/state').GroupState;
-                updateChildrenStyle(childGroup.children);
-              }
-            });
-          };
-
-          updateChildrenStyle(groupNode.children);
-        }
+        syncGroupStyle(groupNode, patch.style);
       }
     }
-    // ==================== 组合节点特殊处理结束 ====================
 
-    // 核心优化：处理 props 的深度合并 (Deep Merge for props)
-    // 防止 updateNode(id, { props: { fontSize: 20 } }) 导致 content 等其他属性丢失
-    // 使用类型守卫或 'in' 操作符检查 props 是否存在于 patch 中
-    if ('props' in patch && patch.props) {
-      // 这里需要断言，因为 TS 无法确定 node 的具体子类型（rect/text/image)
-      const currentNode = node as NodeState & { props?: Record<string, unknown> };
-      const patchProps = patch.props as Record<string, unknown>;
-
-      currentNode.props = {
-        ...(currentNode.props as Record<string, unknown>),
-        ...patchProps,
-      };
-
-      // 合并除 props 外的其他属性 (transform, style, etc.)
-      // 使用解构赋值分离 props，避免使用 delete 和 any
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      const { props, ...rest } = patch as Partial<ShapeState | TextState | ImageState>;
-      Object.assign(node, rest);
-    } else {
-      // 普通更新
-      Object.assign(node, patch);
-    }
+    // 应用节点更新补丁（包含 props 深度合并）
+    applyNodePatch(node, patch);
 
     // 每次修改数据，手动触发版本号自增，外部可通过监听 version 做缓存/网络保存等优化
-    // 这样外部监听 version 就能知道数据变了
     version.value++;
   }
 
@@ -369,7 +399,7 @@ export const useCanvasStore = defineStore('canvas', () => {
 
     // 如果是组合节点，先递归删除所有子节点
     if (node.type === NodeType.GROUP) {
-      const groupNode = node as import('@/types/state').GroupState;
+      const groupNode = node as GroupState;
       groupNode.children.forEach((childId) => {
         deleteNode(childId); // 递归删除子节点
       });
@@ -410,7 +440,7 @@ export const useCanvasStore = defineStore('canvas', () => {
 
       // 如果是组合，递归收集子节点
       if (node.type === NodeType.GROUP) {
-        const groupNode = node as import('@/types/state').GroupState;
+        const groupNode = node as GroupState;
         groupNode.children.forEach((childId) => collectIds(childId));
       }
     }
@@ -672,9 +702,7 @@ export const useCanvasStore = defineStore('canvas', () => {
      * 关键：避免两个组合共享同一批子节点，导致缩放/移动互相影响
      */
     const cloneGroupWithChildren = (sourceGroupId: string, rootOffset: number): string | null => {
-      const sourceGroup = nodes.value[sourceGroupId] as
-        | import('@/types/state').GroupState
-        | undefined;
+      const sourceGroup = nodes.value[sourceGroupId] as GroupState | undefined;
       if (!sourceGroup) return null;
 
       const idMap = new Map<string, string>();
@@ -705,20 +733,20 @@ export const useCanvasStore = defineStore('canvas', () => {
 
         // 先占位 children，等递归完子节点后再用新 ID 列表覆盖
         if (isGroup) {
-          (clonedNode as import('@/types/state').GroupState).children = [];
+          (clonedNode as GroupState).children = [];
         }
 
         addNode(clonedNode);
 
         if (isGroup) {
-          const origGroup = original as import('@/types/state').GroupState;
+          const origGroup = original as GroupState;
           const newChildren: string[] = [];
           origGroup.children.forEach((childOrigId) => {
             cloneNodeRecursive(childOrigId, newId);
             const mappedId = idMap.get(childOrigId);
             if (mappedId) newChildren.push(mappedId);
           });
-          (nodes.value[newId] as import('@/types/state').GroupState).children = newChildren;
+          (nodes.value[newId] as GroupState).children = newChildren;
         }
       };
 
