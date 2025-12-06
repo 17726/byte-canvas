@@ -31,7 +31,7 @@
         :node="node"
         @mousedown="handleNodeDown($event, node!.id)"
         @dblclick="handleNodeDoubleClick($event, node!.id)"
-        @contextmenu="(e) => handleNodeContextMenu(e, node!.id)"
+        @contextmenu="handleNodeContextMenu($event, node!.id)"
       />
 
       <!-- 选中覆盖层 (处理拖拽缩放) -->
@@ -56,29 +56,32 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, provide, type CSSProperties } from 'vue';
-import { useCanvasStore } from '@/store/canvasStore';
-import { NodeType } from '@/types/state';
-import RectLayer from './layers/RectLayer.vue';
-import TextLayer from './layers/TextLayer.vue';
-import CircleLayer from './layers/CircleLayer.vue';
-import ImageLayer from './layers/ImageLayer.vue';
-import GroupLayer from './layers/GroupLayer.vue';
-import SelectionOverlay from './SelectionOverlay.vue';
-import ContextToolbar from '../layout/ContextToolbar.vue';
-import GroupToolbar from './GroupToolbar.vue';
-import { ToolManager } from '@/core/ToolManager';
-import { NodeFactory } from '@/core/services/NodeFactory';
-import { GroupService } from '@/core/services/GroupService';
 import {
-  DEFAULT_VIEWPORT,
   DEFAULT_CANVAS_BG,
   DEFAULT_GRID_DOT_COLOR,
   DEFAULT_GRID_DOT_SIZE,
+  DEFAULT_VIEWPORT,
 } from '@/config/defaults';
+import { GroupService } from '@/core/services/GroupService';
+import { ToolManager } from '@/core/ToolManager';
+import { useCanvasStore } from '@/store/canvasStore';
+import { useNodeActions } from '@/composables/useNodeActions';
+import { NodeType } from '@/types/state';
+import { computed, onMounted, onUnmounted, provide, ref, type CSSProperties } from 'vue';
+import GroupToolbar from '../ui/floating/GroupActions.vue';
+import ContextToolbar from '../ui/floating/HoverToolbar.vue';
+import CircleLayer from './layers/CircleLayer.vue';
+import GroupLayer from './layers/GroupLayer.vue';
+import ImageLayer from './layers/ImageLayer.vue';
+import RectLayer from './layers/RectLayer.vue';
+import TextLayer from './layers/TextLayer.vue';
+import SelectionOverlay from './SelectionOverlay.vue';
 
 const store = useCanvasStore();
 const stageRef = ref<HTMLElement | null>(null);
+
+// 使用 useNodeActions 提供的操作方法（带 UI 反馈）
+const { deleteSelected, copy, cut, paste, groupSelected, ungroupSelected } = useNodeActions();
 
 // 空格键状态（迁移自ToolManager，统一在组件内维护）
 const isSpacePressed = ref(false);
@@ -270,39 +273,12 @@ const handleNodeContextMenu = (e: MouseEvent, id: string) => {
 
   // 转发到ToolManager处理
   if (toolManagerRef.value) {
-    toolManagerRef.value.handleNodeContextMenu(e, id);
+    toolManagerRef.value.handleNodeContextMenu(e);
   }
 };
 
-// 暴露创建节点的方法（供父组件/子组件调用）
-const createRect = () => {
-  const node = NodeFactory.createRect();
-  store.addNode(node);
-  store.setActive([node.id]);
-};
-const createCircle = () => {
-  const node = NodeFactory.createCircle();
-  store.addNode(node);
-  store.setActive([node.id]);
-};
-const createText = () => {
-  const node = NodeFactory.createText();
-  store.addNode(node);
-  store.setActive([node.id]);
-};
-const createImageWithUrl = async (imageUrl?: string) => {
-  if (!imageUrl) return;
-  const node = await NodeFactory.createImage(imageUrl);
-  store.addNode(node);
-  store.setActive([node.id]);
-};
-const deleteSelected = () => {
-  const selectedIds = Array.from(store.activeElementIds);
-  selectedIds.forEach((id) => {
-    store.deleteNode(id);
-  });
-  store.setActive([]);
-};
+// 注意：创建节点的逻辑已迁移至 ToolPanel，直接使用 NodeFactory
+// deleteSelected 等操作已由 useNodeActions 提供（带 UI 反馈）
 
 // 键盘事件处理（整合所有键盘逻辑：快捷键 + 空格键）
 const handleKeyDown = (e: KeyboardEvent) => {
@@ -328,42 +304,38 @@ const handleKeyDown = (e: KeyboardEvent) => {
     }
   }
 
-  // Ctrl/Cmd + G: 组合
+  // Ctrl/Cmd + G: 组合（使用 useNodeActions，带 UI 反馈）
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'g') {
     e.preventDefault();
-    if (store.canGroup) {
-      GroupService.groupSelected(store);
-    }
+    groupSelected();
     return;
   }
 
-  // Ctrl/Cmd + Shift + G: 解组合
+  // Ctrl/Cmd + Shift + G: 解组合（使用 useNodeActions，带 UI 反馈）
   if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'G') {
     e.preventDefault();
-    if (store.canUngroup) {
-      GroupService.ungroupSelected(store);
-    }
+    ungroupSelected();
     return;
   }
 
-  // Ctrl/Cmd + C: 复制
+  // Ctrl/Cmd + C: 复制（使用 useNodeActions，带 UI 反馈）
   if ((e.ctrlKey || e.metaKey) && e.key === 'c') {
     e.preventDefault();
-    store.copySelected();
+    copy();
     return;
   }
 
-  // Ctrl/Cmd + X: 剪切
+  // Ctrl/Cmd + X: 剪切（使用 useNodeActions，带 UI 反馈）
   if ((e.ctrlKey || e.metaKey) && e.key === 'x') {
     e.preventDefault();
-    store.cutSelected();
+    cut();
     return;
   }
 
-  // Ctrl/Cmd + V: 粘贴
+  // Ctrl/Cmd + V: 粘贴（使用 useNodeActions，带 UI 反馈）
   if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
     e.preventDefault();
-    store.paste();
+    paste();
     return;
   }
 
@@ -384,7 +356,7 @@ const handleKeyDown = (e: KeyboardEvent) => {
     return;
   }
 
-  // Delete / Backspace: 删除选中元素
+  // Delete / Backspace: 删除选中元素（使用 useNodeActions，带 UI 反馈）
   if (e.key === 'Delete' || e.key === 'Backspace') {
     e.preventDefault();
     deleteSelected();
@@ -409,14 +381,7 @@ onMounted(() => {
   // 1. 初始化 toolManager，传入空格键状态获取函数
   toolManagerRef.value = new ToolManager(stageRef.value, () => isSpacePressed.value);
 
-  // 2. 暴露方法给父组件（可选，若需要外部调用）
-  provide('createRect', createRect);
-  provide('createCircle', createCircle);
-  provide('createText', createText);
-  provide('createImageWithUrl', createImageWithUrl);
-  provide('deleteSelected', deleteSelected);
-
-  // 3. 绑定全局事件（鼠标 + 键盘）
+  // 2. 绑定全局事件（鼠标 + 键盘）
   window.addEventListener('mousemove', handleMouseMove);
   window.addEventListener('mouseup', handleMouseUp);
   window.addEventListener('keydown', handleKeyDown);

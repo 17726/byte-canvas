@@ -40,27 +40,19 @@
       <!-- Canvas Settings moved to top-right header -->
     </a-menu>
   </div>
-
-  <!-- 确认删除弹窗 -->
-  <a-modal
-    v-model:visible="delModalVisible"
-    @ok="onDeleteConfirm"
-    @cancel="delModalVisible = false"
-  >
-    <template #title>确认删除</template>
-    <div>确定要删除选中的元素吗？</div>
-  </a-modal>
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref } from 'vue';
 import { IconPlus, IconEdit, IconDelete } from '@arco-design/web-vue/es/icon';
 //TODO：UI开发完成后优化icon-park库的导入，针对按需导入减小打包体积
 import { Square, Round } from '@icon-park/vue-next';
 import { useCanvasStore } from '@/store/canvasStore';
 import { NodeFactory } from '@/core/services/NodeFactory';
-import { Notification } from '@arco-design/web-vue';
-import ImageMenu from './ImageMenu.vue';
+import { useNodeActions } from '@/composables/useNodeActions';
+import ImageMenu from '../common/ImageMenu.vue';
+
+const { hasSelection, deleteSelected } = useNodeActions();
 
 //NOTE：按钮返回值需提前在MenuKey进行注册
 enum MenuKey {
@@ -72,13 +64,9 @@ enum MenuKey {
 }
 
 const store = useCanvasStore();
-const hasSelection = computed(() => store.activeElementIds.size > 0);
 
 // 高亮控制
 const selectedKeys = ref<string[]>([]);
-
-// 弹窗确认-弹窗开关
-const delModalVisible = ref(false);
 
 function onMenuItemClick(key: string) {
   switch (key) {
@@ -116,27 +104,13 @@ function onMenuItemClick(key: string) {
     //   selectedKeys.value = [key];
     //   break;
     case MenuKey.Delete:
-      if (!hasSelection.value) return;
-      delModalVisible.value = true;
+      deleteSelected();
+      selectedKeys.value = []; // 清空选中状态
       break;
     default:
       console.warn(`未处理的菜单项: ${key}`);
       break;
   }
-}
-
-function onDeleteConfirm() {
-  // 直接调用 store 删除选中节点
-  store.activeElementIds.forEach((id) => {
-    store.deleteNode(id);
-  });
-  Notification.success({
-    content: '删除成功！',
-    closable: true,
-    duration: 3000,
-  });
-  selectedKeys.value = []; // 清空选中状态
-  delModalVisible.value = false; // 关闭弹窗
 }
 </script>
 

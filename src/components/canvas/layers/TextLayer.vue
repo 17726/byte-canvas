@@ -16,6 +16,15 @@
       @dblclick="(e) => enterEditing(e, props.node.id)"
       @blur="() => handleBlur(props.node.id)"
       @click="(e) => handleTextBoxClick(e, props.node.id)"
+      @click.stop
+      @dragstart="handleDragStart"
+      @compositionstart="() => (isComposing = true)"
+      @compositionend="
+        (e) => {
+          isComposing = false;
+          handleContentChange(e, props.node.id);
+        }
+      "
     ></div>
   </div>
 </template>
@@ -30,6 +39,7 @@ import {
   onMounted,
   onUnmounted,
   inject,
+  nextTick,
 } from 'vue';
 import type { TextState } from '@/types/state';
 import { getDomStyle } from '@/core/renderers/dom';
@@ -45,6 +55,7 @@ const toolManagerRef = inject<Ref<ToolManager | null>>('toolManager');
 
 const store = useCanvasStore();
 const editor = ref<HTMLElement | null>(null);
+const isComposing = ref(false);
 
 // 计算属性：文本HTML渲染（不变）
 const HTMLstring = computed(() => getDomStyle(props.node));
@@ -118,14 +129,35 @@ watch(
   { immediate: true, deep: true }
 );
 
+// 组件内定义执行锁
+const isSettingActive = ref(false);
+
 watch(
-  () => Array.from(store.activeElementIds),
-  (newActiveIds) => {
+  () => store.activeElementIds,
+  async (newActiveSet) => {
+    // 加锁：如果正在设置，直接返回
+    if (isSettingActive.value) return;
+
+    const newActiveIds = [...newActiveSet];
     if (isEditing.value && !newActiveIds.includes(props.node.id)) {
-      store.setActive([props.node.id]);
+      const targetId = [props.node.id];
+      const isSame =
+        targetId.length === newActiveSet.size && targetId.every((id) => newActiveSet.has(id));
+
+      if (!isSame) {
+        isSettingActive.value = true;
+        try {
+          // 延迟执行，避免和响应式更新竞态
+          await nextTick();
+          store.setActive(targetId);
+        } finally {
+          // 解锁
+          isSettingActive.value = false;
+        }
+      }
     }
   },
-  { deep: true }
+  { flush: 'post' }
 );
 
 // 监听选区变化（同步到全局，通过 ToolManager 转发）
@@ -144,6 +176,7 @@ watch(
 
 // 2. 所有事件处理：只调用 ToolManager 方法，不直接接触 Handler
 const handleContentChange = (e: Event, id: string) => {
+  if (isComposing.value) return; // 组合态时跳过处理
   toolManagerRef?.value?.handleTextInput(e, id); // 调用 ToolManager 文本输入处理
 };
 
@@ -204,6 +237,11 @@ onMounted(() => {
 onUnmounted(() => {
   toolManagerRef?.value?.destroy(); // 调用 ToolManager 销毁文本编辑器资源
 });
+
+// 核心：禁用拖拽复制/虚影，保留选中文本
+const handleDragStart = (e: DragEvent) => {
+  e.preventDefault(); // 仅拦截dragstart的默认行为
+};
 </script>
 
 <style scoped>
