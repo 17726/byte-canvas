@@ -824,19 +824,20 @@ export class TextSelectionHandler {
     // 3.3 判断内联样式是否用该值覆盖了全部文本
     let isInlineCoversAll = false;
     if (styleRanges.length > 0) {
-      // 合并所有内联范围，判断是否覆盖 [0, contentLength]
-      let mergedStart = Infinity;
-      let mergedEnd = -Infinity;
-
-      styleRanges.forEach((range) => {
-        if (range.value === styleValue) {
-          // 仅匹配相同的styleValue
-          mergedStart = Math.min(mergedStart, range.start);
-          mergedEnd = Math.max(mergedEnd, range.end);
+      // 检查所有内联范围是否无缝覆盖 [0, contentLength]
+      const filteredRanges = styleRanges.filter(r => r.value === styleValue);
+      if (filteredRanges.length > 0) {
+        filteredRanges.sort((a, b) => a.start - b.start);
+        let covered = 0;
+        for (const range of filteredRanges) {
+          if (range.start > covered) {
+            // 存在未覆盖的间隙
+            break;
+          }
+          covered = Math.max(covered, range.end);
         }
-      });
-      // 合并后的范围完全覆盖文本，且有有效范围
-      isInlineCoversAll = mergedStart <= 0 && mergedEnd >= contentLength && mergedEnd > mergedStart;
+        isInlineCoversAll = covered >= contentLength;
+      }
     }
 
     // 3.4 判断全局是否已应用该样式（值完全匹配）
