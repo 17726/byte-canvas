@@ -12,7 +12,7 @@
  * 特点：
  * - 纯交互逻辑：不涉及渲染，仅操作 Store 数据
  * - 状态隔离：不影响其他 Handler 的状态
- * - 坐标转换：使用 geometry.ts 的 clientToWorld 确保视口变换下的精确定位
+ * - 坐标转换：使用 geometry.ts 的 eventToWorld 确保视口变换下的精确定位
  */
 
 import type { useCanvasStore } from '@/store/canvasStore';
