@@ -339,6 +339,26 @@ const handleKeyDown = (e: KeyboardEvent) => {
     return;
   }
 
+  // Ctrl/Cmd + Z: 撤销
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
+    e.preventDefault();
+    store.undo();
+    return;
+  }
+
+  // Ctrl/Cmd + Y: 重做
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'y') {
+    e.preventDefault();
+    store.redo();
+    return;
+  }
+  // Ctrl/Cmd + Shift + Z: 重做
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z') {
+    e.preventDefault();
+    store.redo();
+    return;
+  }
+
   // Delete / Backspace: 删除选中元素（使用 useNodeActions，带 UI 反馈）
   if (e.key === 'Delete' || e.key === 'Backspace') {
     e.preventDefault();
