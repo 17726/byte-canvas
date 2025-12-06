@@ -126,6 +126,8 @@ export const useCanvasStore = defineStore('canvas', () => {
   const MAX_HISTORY = 50;
   let isRestoringSnapshot = false;
   let isHistoryLocked = false;
+  // 防止在 addNode 后立即调用 updateNode 时重复记录快照
+  let isAddingNode = false;
 
   const canUndo = computed(() => historyStack.value.length > 0);
   const canRedo = computed(() => redoStack.value.length > 0);
@@ -138,8 +140,15 @@ export const useCanvasStore = defineStore('canvas', () => {
     editingGroupId: editingGroupId.value,
   });
 
-  const pushSnapshot = () => {
+  const pushSnapshot = (caller?: string) => {
     if (isRestoringSnapshot || isHistoryLocked) return;
+    // 调试：追踪调用来源
+    if (caller) {
+      console.log(`[pushSnapshot] 被调用，来源: ${caller}`);
+    } else {
+      const stack = new Error().stack;
+      console.log('[pushSnapshot] 被调用，调用栈:', stack?.split('\n').slice(1, 6).join('\n'));
+    }
     historyStack.value.push(createSnapshot());
     if (historyStack.value.length > MAX_HISTORY) {
       historyStack.value.shift();
@@ -155,7 +164,11 @@ export const useCanvasStore = defineStore('canvas', () => {
     activeElementIds.value = new Set(snapshot.activeElementIds);
     editingGroupId.value = snapshot.editingGroupId;
     version.value++; // 标记一次变更，触发依赖更新
-    isRestoringSnapshot = false;
+    // 使用 queueMicrotask 延迟重置标志，确保所有响应式更新都完成后再重置
+    // 这样可以避免在恢复快照后触发的异步响应式更新（如 watch 监听器）调用 updateNode 时记录快照
+    queueMicrotask(() => {
+      isRestoringSnapshot = false;
+    });
   };
 
   const undo = () => {
@@ -200,8 +213,9 @@ export const useCanvasStore = defineStore('canvas', () => {
     if (!node) return;
 
     // 非交互态下，记录快照以支持撤销
-    if (!isInteracting.value) {
-      pushSnapshot();
+    // 但如果正在添加节点或恢复快照，则跳过（避免在 addNode 后立即调用 updateNode 时重复记录，或撤销时重复记录）
+    if (!isInteracting.value && !isAddingNode && !isRestoringSnapshot) {
+      pushSnapshot('updateNode');
     }
 
     // ==================== 组合节点特殊处理 ====================
@@ -351,17 +365,23 @@ export const useCanvasStore = defineStore('canvas', () => {
 
   // 2. 添加节点
   function addNode(node: NodeState) {
-    pushSnapshot();
+    isAddingNode = true;
+    pushSnapshot('addNode');
     nodes.value[node.id] = node;
     nodeOrder.value.push(node.id);
     version.value++; // 触发更新
+    // 使用 queueMicrotask 确保在下一个微任务中重置标志
+    // 这样可以避免在同一个同步调用链中的 updateNode 重复记录快照
+    queueMicrotask(() => {
+      isAddingNode = false;
+    });
   }
 
   // 3. 删除节点（如果是组合，递归删除所有子节点）
   function deleteNode(id: string) {
     const wasLocked = isHistoryLocked;
     if (!wasLocked) {
-      pushSnapshot();
+      pushSnapshot('deleteNode');
       isHistoryLocked = true; // 避免递归删除时重复记录
     }
     const node = nodes.value[id];
@@ -395,8 +415,7 @@ export const useCanvasStore = defineStore('canvas', () => {
   // 注意：如果包含组合，会递归删除其子节点
   function deleteNodes(ids: string[]) {
     if (ids.length === 0) return;
-
-    pushSnapshot();
+    pushSnapshot('deleteNodes');
     const idsToDelete = ids.filter((id) => nodes.value[id]);
     if (idsToDelete.length === 0) return;
 
@@ -507,7 +526,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     console.log('[CanvasStore] 状态已从 localStorage 恢复');
     historyStack.value = [];
     redoStack.value = [];
-    pushSnapshot(); // 初始化快照，保证首次撤销可返回到加载状态
+    pushSnapshot('initFromStorage'); // 初始化快照，保证首次撤销可返回到加载状态
     return true;
   }
 
@@ -573,7 +592,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     () => isInteracting.value,
     (next, prev) => {
       if (next && !prev) {
-        pushSnapshot();
+        pushSnapshot('watch-isInteracting');
       }
     }
   );
@@ -664,7 +683,7 @@ export const useCanvasStore = defineStore('canvas', () => {
 
     const newIds: string[] = [];
     const prevLock = isHistoryLocked;
-    pushSnapshot(); // 记录粘贴前的状态
+    pushSnapshot('paste'); // 记录粘贴前的状态
     isHistoryLocked = true; // 避免循环内的 addNode 反复写入历史
 
     /**
@@ -891,8 +910,8 @@ export const useCanvasStore = defineStore('canvas', () => {
     canUndo,
     canRedo,
     // 仅供调试使用(undo/redo栈)
-    // historyStack: readonly(historyStack),
-    // redoStack: readonly(redoStack),
+    historyStack: readonly(historyStack),
+    redoStack: readonly(redoStack),
     // 复制/剪切/粘贴
     copySelected,
     cutSelected,
