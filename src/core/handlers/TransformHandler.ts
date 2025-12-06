@@ -487,7 +487,7 @@ export class TransformHandler {
       let targetHeight = Math.max(startHeight * Math.abs(scale), MIN_SIZE);
 
       // 确保符合比例（以宽为准或以高为准，这里重新对齐比例）
-      if (targetWidth / targetHeight !== startRatio) {
+      if (Math.abs(targetWidth / targetHeight - startRatio) > 1e-6) {
         // 简单逻辑：取较大的一边作为基准，保证另一边也大于 MIN_SIZE
         // 但由于 startWidth/Height 已经保证 > MIN_SIZE (假设)，乘积通常没问题
         // 这里再次校准
