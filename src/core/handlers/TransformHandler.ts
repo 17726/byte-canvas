@@ -213,36 +213,6 @@ export class TransformHandler {
     };
   }
 
-  /**
-   * 根据控制点确定影响的边和顶点
-   */
-  private getAffectedEdges(handle: ResizeHandle): {
-    left: boolean;
-    right: boolean;
-    top: boolean;
-    bottom: boolean;
-  } {
-    switch (handle) {
-      case 'nw':
-        return { left: true, right: false, top: true, bottom: false };
-      case 'n':
-        return { left: false, right: false, top: true, bottom: false };
-      case 'ne':
-        return { left: false, right: true, top: true, bottom: false };
-      case 'e':
-        return { left: false, right: true, top: false, bottom: false };
-      case 'se':
-        return { left: false, right: true, top: false, bottom: true };
-      case 's':
-        return { left: false, right: false, top: false, bottom: true };
-      case 'sw':
-        return { left: true, right: false, top: false, bottom: true };
-      case 'w':
-        return { left: true, right: false, top: false, bottom: false };
-      default:
-        return { left: false, right: false, top: false, bottom: false };
-    }
-  }
 
   /**
    * 计算多个节点的整体包围盒（修正：避免空边界框）
