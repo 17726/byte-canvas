@@ -3,28 +3,24 @@
     <!-- Shape Controls -->
     <template v-if="isShape">
       <div class="tool-item">
-        <a-tooltip position="bottom" content="填充色">
-          <a-color-picker
-            :popup-offset="-150"
-            :popup-translate="[-100, -160]"
-            size="mini"
-            v-model="fillColor"
-            trigger="hover"
-            disabled-alpha
-          />
-        </a-tooltip>
+        <a-color-picker
+          :popup-offset="-150"
+          :popup-translate="[-100, -160]"
+          size="mini"
+          v-model="fillColor"
+          trigger="hover"
+          disabled-alpha
+        />
       </div>
       <div class="divider"></div>
       <div class="tool-item">
-        <a-tooltip position="bottom" content="边框色">
-          <a-color-picker
-            :popup-offset="-150"
-            :popup-translate="[-100, -160]"
-            size="mini"
-            v-model="strokeColor"
-            trigger="hover"
-          />
-        </a-tooltip>
+        <a-color-picker
+          :popup-offset="-150"
+          :popup-translate="[-100, -160]"
+          size="mini"
+          v-model="strokeColor"
+          trigger="hover"
+        />
       </div>
       <div class="divider"></div>
       <div class="tool-item">
@@ -97,15 +93,13 @@
       </div>
       <div class="divider"></div>
       <div class="tool-item">
-        <a-tooltip position="bottom" content="文本颜色">
-          <a-color-picker
-            :popup-offset="-150"
-            :popup-translate="[-100, -160]"
-            size="mini"
-            v-model="textColor"
-            trigger="hover"
-          />
-        </a-tooltip>
+        <a-color-picker
+          :popup-offset="-150"
+          :popup-translate="[-100, -160]"
+          size="mini"
+          v-model="textColor"
+          trigger="hover"
+        />
       </div>
     </template>
 
@@ -117,8 +111,8 @@
     <!-- Common Properties (Opacity & Layer) -->
     <div class="tool-section">
       <div class="tool-item">
-        <a-tooltip placement="top" title="不透明度" :mouseEnterDelay="0.3" content="透明度">
-          <span class="label" style="cursor: help; display: flex; align-items: center">
+        <a-tooltip placement="top" :mouseEnterDelay="0.3" content="不透明度">
+          <span class="label" style="cursor: default; display: flex; align-items: center">
             <svg
               class="icon"
               viewBox="0 0 1024 1024"
