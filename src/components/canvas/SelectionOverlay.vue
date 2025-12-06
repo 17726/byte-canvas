@@ -46,7 +46,6 @@
 
 <script setup lang="ts">
 import { computed, inject, type Ref } from 'vue';
-// 假设这些路径是正确的，您需要确保您的项目中有这些依赖
 import { useCanvasStore } from '@/store/canvasStore';
 import type { ToolManager } from '@/core/ToolManager';
 import type { ResizeHandle } from '@/types/editor';
