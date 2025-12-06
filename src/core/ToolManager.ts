@@ -206,6 +206,7 @@ export class ToolManager {
     // 【修复】空格+左键平移（绝对最高优先级，即使创建模式也可以平移）
     if (this.getIsSpacePressed() && e.button === 0) {
       this.viewportHandler.startPan(e);
+      this.store.isInteracting = true; // 标记交互中，触发光标变为 grabbing
       return;
     }
 
@@ -226,6 +227,7 @@ export class ToolManager {
     // 原有业务逻辑：中键平移
     if (e.button === 1) {
       this.viewportHandler.startPan(e);
+      this.store.isInteracting = true; // 标记交互中
       this.store.setActive([]);
       if (this.store.editingGroupId) {
         GroupService.exitGroupEdit(this.store);
@@ -290,13 +292,8 @@ export class ToolManager {
       if (!this.stageEl?.contains(e.target as Node)) return;
     }
 
-    // 创建模式拦截（次高优先级，允许 Space-Pan 穿透）
+    // 创建模式拦截（最高优先级）
     if (this.creationHandler && this.creationHandler.isCreating()) {
-      // 【修复】Space-Pan 优先级最高，即使在创建模式也能平移画布
-      if (this.viewportHandler.isPanning) {
-        this.viewportHandler.updatePan(e);
-        return;
-      }
       this.creationHandler.handleMouseMove(e);
       return;
     }
@@ -362,6 +359,7 @@ export class ToolManager {
 
     // 重置画布平移状态
     this.viewportHandler.endPan();
+    this.store.isInteracting = false; // 重置交互状态
 
     // 重置旋转状态
     this.rotationHandler.endRotate();

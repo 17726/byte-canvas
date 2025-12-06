@@ -44,8 +44,8 @@
         class="preview-node"
       />
 
-      <!-- 选中覆盖层 (处理拖拽缩放) - 创建模式下隐藏 -->
-      <SelectionOverlay v-if="!isCreating" />
+      <!-- 选中覆盖层 (处理拖拽缩放) -->
+      <SelectionOverlay />
     </div>
 
     <!-- 悬浮属性栏 (Context Toolbar) - 放在视口外，但跟随节点坐标 -->
@@ -116,13 +116,13 @@ const stageStyle = computed(() => {
   // 基础样式：先初始化背景色 + 光标样式
   const style: CSSProperties = {
     backgroundColor: bg,
-    // 光标优先级：创建模式 > 空格平移 > 默认
-    cursor: isCreating.value
-      ? 'crosshair'
-      : isSpacePressed.value
-        ? store.isInteracting
-          ? 'grabbing'
-          : 'grab'
+    // 光标优先级：空格平移 > 创建模式 > 默认
+    cursor: isSpacePressed.value
+      ? store.isInteracting
+        ? 'grabbing'
+        : 'grab'
+      : isCreating.value
+        ? 'crosshair'
         : 'default',
   };
 

@@ -204,6 +204,9 @@ export class CreationHandler {
     this.startPoint = { x: worldPos.x, y: worldPos.y };
     this.isDragging = true;
 
+    // 【修复】同步交互状态，触发 CanvasStage 渲染预览框
+    this.store.isInteracting = true;
+
     e.stopPropagation();
     e.preventDefault();
   }
@@ -243,11 +246,10 @@ export class CreationHandler {
       finalNode.transform.y = this.startPoint.y;
       // 保持原始宽高（NodeFactory.createImage 已设置）
     } else if (isClick) {
-      // 非图片节点：点击创建使用默认尺寸（100x100），位置为点击处（左上角）
+      // 非图片节点：点击创建保留 NodeFactory 默认尺寸，仅更新位置
       finalNode.transform.x = this.startPoint.x;
       finalNode.transform.y = this.startPoint.y;
-      finalNode.transform.width = 100;
-      finalNode.transform.height = 100;
+      // 保持 NodeFactory 初始化的默认宽高（文本160x40，矩形/圆形100x100）
     }
     // 非图片节点的拖拽情况：使用预览节点的尺寸和位置（已在 handleMouseMove 中计算）
 
@@ -260,6 +262,9 @@ export class CreationHandler {
     // 提交到画布
     this.store.addNode(finalNode);
     this.store.setActive([finalNode.id]);
+
+    // 【修复】重置交互状态
+    this.store.isInteracting = false;
 
     // 重置工具为选择模式
     this.reset();
@@ -281,6 +286,8 @@ export class CreationHandler {
     this.startPoint = null;
     this.currentNodeType = null;
     this.hasShownPreview = false;
+    // 【修复】重置交互状态
+    this.store.isInteracting = false;
   }
 
   /**
