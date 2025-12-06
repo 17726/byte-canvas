@@ -122,6 +122,7 @@ export class TextSelectionHandler {
 
   exitEditing() {
     this.isEditing = false;
+    this.setCurrentSelection(null);
     this.updateGlobalSelection(null);
   }
 
@@ -505,9 +506,9 @@ export class TextSelectionHandler {
   }
 
   // 新增：设置选中范围（供外部调用，比如双击全选时）
-  setCurrentSelection(selection: { start: number; end: number }): void {
+  setCurrentSelection(selection: { start: number; end: number } | null): void {
     // 可选：添加范围有效性校验（符合你的 inlineStyles 规则）
-    if (selection.start >= 0 && selection.end > selection.start) {
+    if (selection !== null && selection.start >= 0 && selection.end > selection.start) {
       this.currentSelection = selection;
     } else {
       this.currentSelection = null; // 无效范围则置空
@@ -610,28 +611,25 @@ export class TextSelectionHandler {
     selectionEnd = Math.min(contentLength, selectionEnd);
     if (selectionStart >= selectionEnd) return;
 
-    // ===================== 新增逻辑：全局样式联动处理 =====================
+    // ===================== 修复核心：全局样式联动逻辑 =====================
     // 2.1 提取全局样式当前值
     const globalStyleValue = (node.props as TextGlobalStyleProps)[styleKey];
     // 标记是否需要取消全局样式
     let needClearGlobalStyle = false;
-    // 存储从全局拆分出的内联样式（后续合并到原有行内样式）
+    // 存储从全局拆分出的内联样式（未选中区域+选中区域）
     let globalSplitStyles: Array<{ start: number; end: number; styles: InlineStyleProps }> = [];
 
-    // 仅当全局存在该样式属性时，处理拆分逻辑
+    // 仅当全局存在该样式属性时，执行拆分逻辑
     if (globalStyleValue !== undefined) {
       needClearGlobalStyle = true; // 标记需要取消全局样式
 
-      // 拆分全局范围（0 ~ contentLength）为：选中区域 + 其他区域
-      const globalRanges = [
-        // 其他区域1：0 ~ selectionStart
+      // ========== 步骤1：未选中区域始终保留原全局样式值 ==========
+      const unselectedRanges = [
         { start: 0, end: selectionStart, value: globalStyleValue },
-        // 其他区域2：selectionEnd ~ contentLength
         { start: selectionEnd, end: contentLength, value: globalStyleValue },
       ];
-
-      // 为其他区域创建内联样式（过滤空范围）
-      globalSplitStyles = globalRanges
+      // 为未选中区域创建内联样式（过滤空范围）
+      const unselectedStyles = unselectedRanges
         .filter((range) => range.start < range.end)
         .map((range) => ({
           start: range.start,
@@ -639,48 +637,62 @@ export class TextSelectionHandler {
           styles: { [styleKey]: range.value } as InlineStyleProps,
         }));
 
-      // 根据toggle处理选中区域的样式逻辑
+      // ========== 步骤2：根据 toggle + 全局值与目标值的关系处理选中区域 ==========
+      let selectedStyles: Array<{ start: number; end: number; styles: InlineStyleProps }> = [];
+
       if (toggle) {
-        // toggle=true：选中区域取消该属性（无需添加选中区域的内联样式）
-        console.debug(
-          `updatePartialInlineStyle: 全局存在${styleKey}，toggle=true，选中区域取消该属性`
-        );
+        // Toggle=true 场景：智能切换（核心修复）
+        if (globalStyleValue === styleValue) {
+          // 全局值 = 目标值 → 选中区域取消该样式（不添加）
+          console.debug(
+            `toggle=true：全局${styleKey}=${globalStyleValue}（与目标值相同）→ 选中区域取消该样式`
+          );
+        } else {
+          // 全局值 ≠ 目标值 → 选中区域应用目标值（styleValue）
+          selectedStyles = [
+            {
+              start: selectionStart,
+              end: selectionEnd,
+              styles: { [styleKey]: styleValue } as InlineStyleProps,
+            },
+          ];
+          console.debug(
+            `toggle=true：全局${styleKey}=${globalStyleValue}（与目标值不同）→ 选中区域应用${styleValue}`
+          );
+        }
       } else {
-        // toggle=false：选中区域添加该属性（值为styleValue）
-        globalSplitStyles.push({
-          start: selectionStart,
-          end: selectionEnd,
-          styles: { [styleKey]: styleValue } as InlineStyleProps,
-        });
-        console.debug(
-          `updatePartialInlineStyle: 全局存在${styleKey}，toggle=false，选中区域设为${styleValue}`
-        );
+        // Toggle=false 场景：强制覆盖 → 选中区域应用目标值（无论全局值是什么）
+        selectedStyles = [
+          {
+            start: selectionStart,
+            end: selectionEnd,
+            styles: { [styleKey]: styleValue } as InlineStyleProps,
+          },
+        ];
+        console.debug(`toggle=false：强制覆盖 → 选中区域应用${styleKey}=${styleValue}`);
       }
+
+      // ========== 合并：未选中区域样式 + 选中区域样式 ==========
+      globalSplitStyles = [...unselectedStyles, ...selectedStyles];
     }
 
-    // ===================== 原有逻辑：预处理现有样式 =====================
-    // 3. 预处理现有样式：过滤空范围，保留有效样式 + 合并全局拆分的样式
+    // ===================== 原有逻辑：预处理现有样式（无修改） =====================
     const validInlineStyles = [
-      ...inlineStyles.filter((style) => style.start < style.end), // 原有有效样式
-      ...globalSplitStyles, // 新增：合并从全局拆分的样式
+      ...inlineStyles.filter((style) => style.start < style.end),
+      ...globalSplitStyles,
     ];
 
-    // 4. 核心重构：先处理范围重叠，再修改样式（原有逻辑完全保留）
+    // 4. 核心重构：处理范围重叠（原有逻辑完全保留）
     let targetStyleExistsInRange = false;
     const updatedStyles: Array<{ start: number; end: number; styles: InlineStyleProps }> = [];
 
-    // 遍历原有样式（含全局拆分的样式），处理范围重叠（原有逻辑）
     for (const style of validInlineStyles) {
-      // 跳过与选中范围无重叠的样式（直接保留）
       if (style.end <= selectionStart || style.start >= selectionEnd) {
         updatedStyles.push(style);
         continue;
       }
-      console.log('到这了');
-      // 有重叠：拆分原有样式范围（核心修复点）（原有逻辑）
-      // underline line-through的stylekey相同 不能直接看范围内有没有已存在的textDecoration 要特判
+
       if (style.styles[styleKey] !== undefined) {
-        // 针对textDecoration做特判：区分不同值（underline/line-through）（原有逻辑）
         if (styleKey === 'textDecoration') {
           const targetValue = styleValue?.toString().trim() || '';
           if (targetValue) {
@@ -690,7 +702,6 @@ export class TextSelectionHandler {
             targetStyleExistsInRange = true;
           }
         } else {
-          // 非textDecoration样式：原有逻辑（判断styleKey是否存在）
           targetStyleExistsInRange = true;
         }
       }
@@ -705,10 +716,9 @@ export class TextSelectionHandler {
       updatedStyles.push(...splitStyles);
     }
 
-    // 5. 处理样式的添加/切换逻辑（原有逻辑，仅全局无属性时生效）
+    // 5. 处理样式的添加/切换逻辑（仅全局无属性时生效）
     if (toggle) {
-      // 场景1：切换样式 → 只有目标styleKey不存在时，才添加（仅全局无属性时执行）
-      if (!targetStyleExistsInRange && globalStyleValue === undefined) {
+      if (globalSplitStyles === undefined || globalStyleValue !== styleValue) {
         updatedStyles.push({
           start: selectionStart,
           end: selectionEnd,
@@ -716,8 +726,7 @@ export class TextSelectionHandler {
         });
       }
     } else {
-      // 场景3：强制设置 → 直接添加（仅全局无属性时执行）
-      if (globalStyleValue === undefined) {
+      if (globalSplitStyles === undefined || globalStyleValue !== styleValue) {
         updatedStyles.push({
           start: selectionStart,
           end: selectionEnd,
@@ -726,12 +735,12 @@ export class TextSelectionHandler {
       }
     }
 
-    // 6. 去重+排序：保证样式范围不重叠、按start升序排列（原有逻辑）
+    // 6. 去重+排序（原有逻辑）
     const finalStyles = updatedStyles
-      .filter((style) => style.start < style.end) // 过滤空范围
-      .sort((a, b) => a.start - b.start || a.end - b.end); // 按起始位置排序
+      .filter((style) => style.start < style.end)
+      .sort((a, b) => a.start - b.start || a.end - b.end);
 
-    // 7. 更新节点（原有逻辑 + 新增：取消全局样式）
+    // 7. 更新节点（原有逻辑 + 取消全局样式）
     const updateData: Partial<TextState> = {
       props: {
         ...node.props,
@@ -739,14 +748,12 @@ export class TextSelectionHandler {
       },
     };
 
-    // 新增：如果需要取消全局样式，将全局的该属性设为undefined
     if (needClearGlobalStyle) {
       (updateData.props as TextGlobalStyleProps)[styleKey] = undefined;
     }
 
     store.updateNode(id, updateData);
   }
-
   /**
    * 更新文本节点的全局样式属性（同步处理内联样式）
    * 核心规则：
@@ -825,7 +832,7 @@ export class TextSelectionHandler {
     let isInlineCoversAll = false;
     if (styleRanges.length > 0) {
       // 检查所有内联范围是否无缝覆盖 [0, contentLength]
-      const filteredRanges = styleRanges.filter(r => r.value === styleValue);
+      const filteredRanges = styleRanges.filter((r) => r.value === styleValue);
       if (filteredRanges.length > 0) {
         filteredRanges.sort((a, b) => a.start - b.start);
         let covered = 0;
