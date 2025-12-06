@@ -1,6 +1,44 @@
 /**
  * @file TransformHandler.ts
- * @description 节点变换处理器 - 处理节点的拖拽和缩放（修复多选缩放逻辑 + 增加最小宽高限制及防翻转）
+ * 
+ * 职责 (Responsibilities):
+ *   - 负责处理画布中节点的变换操作，包括单节点和多节点的拖拽、缩放、旋转等。
+ *   - 管理节点变换过程中的状态，确保变换操作的流畅性和正确性。
+ *   - 实现多节点缩放时的坐标变换、比例保持、最小尺寸限制及防止节点翻转。
+ * 
+ * 特点 (Features):
+ *   - 支持单节点和多节点的拖拽与缩放，自动适配不同的变换场景。
+ *   - 多节点缩放时，采用相对中心点的坐标变换算法，保证各节点在缩放过程中的对齐和比例一致。
+ *   - 内置最小宽高限制，防止节点被缩放到不可见或反向（翻转）状态。
+ *   - 支持节点旋转，变换过程中使用旋转矩阵进行坐标转换，确保变换的准确性。
+ *   - 变换逻辑与画布状态解耦，便于维护和扩展。
+ * 
+ * 状态管理 (State Management):
+ *   - 内部维护拖拽状态（InternalDragState）、单节点缩放状态（InternalResizeState）、多节点缩放状态（InternalMultiResizeState）。
+ *   - 记录变换起始点、节点初始位置、尺寸、旋转角度、中心点等信息，用于计算变换后的节点属性。
+ *   - 多节点缩放时，记录每个节点相对于整体边界框的偏移和比例，便于统一缩放和对齐。
+ * 
+ * 包含方法列表 (Method List):
+ *   - startDrag(nodeId: string, ...): 开始节点拖拽
+ *   - onDragMove(event: MouseEvent): 拖拽过程处理
+ *   - endDrag(): 结束拖拽
+ *   - startResize(nodeId: string, handle: ResizeHandle, ...): 开始节点缩放
+ *   - onResizeMove(event: MouseEvent): 缩放过程处理
+ *   - endResize(): 结束缩放
+ *   - startMultiResize(nodeIds: string[], handle: ResizeHandle, ...): 开始多节点缩放
+ *   - onMultiResizeMove(event: MouseEvent): 多节点缩放过程处理
+ *   - endMultiResize(): 结束多节点缩放
+ *   - 其他辅助方法：坐标变换、旋转矩阵计算、最小尺寸判断等
+ * 
+ * 复杂变换逻辑说明 (Complex Transformation Logic):
+ *   - 坐标旋转矩阵：节点旋转时，使用二维旋转矩阵将节点的顶点坐标从本地坐标系转换到全局坐标系，反之亦然。
+ *     公式：x' = cos(θ) * (x - cx) - sin(θ) * (y - cy) + cx
+ *           y' = sin(θ) * (x - cx) + cos(θ) * (y - cy) + cy
+ *     其中 (cx, cy) 为旋转中心，θ 为旋转角度。
+ *   - 多节点缩放算法：以多选边界框的中心为基准，计算每个节点相对于中心的偏移和缩放比例，缩放时保持节点间的相对位置和比例不变。
+ *   - 防翻转与最小尺寸：在缩放过程中，实时判断节点尺寸，防止宽高小于最小值或出现负值（翻转）。
+ * 
+ * 维护者可参考 ToolManager.ts、SelectionHandler.ts、GroupService.ts 的文档风格，便于理解和扩展本文件的变换逻辑。
  */
 
 import { useCanvasStore } from '@/store/canvasStore';
