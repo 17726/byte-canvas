@@ -58,6 +58,7 @@ import { useCanvasStore } from '@/store/canvasStore';
 import { useUIStore } from '@/store/uiStore';
 import type { ResizeHandle } from '@/types/editor';
 import { NodeType, type BaseNodeState } from '@/types/state';
+import { CreationHandler } from './handlers/CreationHandler';
 import { RotationHandler } from './handlers/RotationHandler';
 import { SelectionHandler } from './handlers/SelectionHandler';
 import { TextSelectionHandler } from './handlers/TextSelectionHandler';
@@ -114,16 +115,8 @@ export class ToolManager {
     );
     this.rotationHandler = new RotationHandler(stageEl); // 【修复】传入 stageEl
 
-    // 延迟初始化创建处理器（避免循环依赖）
-    this.initCreationHandler();
-  }
-
-  /**
-   * 延迟初始化创建处理器
-   */
-  private async initCreationHandler() {
-    const { CreationHandler } = await import('./handlers/CreationHandler');
-    this.creationHandler = new CreationHandler(this.store, this.stageEl); // 【修复】传入 stageEl
+    // 【修复】同步实例化创建处理器（解决竞态条件）
+    this.creationHandler = new CreationHandler(this.store, stageEl);
   }
 
   /**

@@ -405,8 +405,10 @@ const handleWindowBlur = () => {
 watch(
   () => store.creationTool,
   (newTool) => {
-    if (toolManagerRef.value?.creationHandler) {
-      toolManagerRef.value.creationHandler.setTool(newTool);
+    // 【修复】增加非空检查
+    const handler = toolManagerRef.value?.creationHandler;
+    if (handler) {
+      handler.setTool(newTool);
     }
   }
 );
@@ -486,8 +488,8 @@ onUnmounted(() => {
   z-index: 100;
 }
 
-/* 创建模式交互锁定 */
-.canvas-stage.is-creating .canvas-viewport > :not(.preview-node) {
+/* 创建模式交互锁定 - 只禁用节点组件 */
+.canvas-stage.is-creating .canvas-viewport > :not(.preview-node):not(.selection-overlay) {
   pointer-events: none !important;
 }
 

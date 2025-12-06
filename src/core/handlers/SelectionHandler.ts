@@ -80,8 +80,10 @@ export class SelectionHandler {
    */
   startBoxSelect(e: MouseEvent): void {
     this.isBoxSelecting = true;
-    this.boxSelectStart = { x: e.clientX, y: e.clientY };
-    this.boxSelectEnd = { x: e.clientX, y: e.clientY };
+    // 【修复】使用 eventToContainer 转换为容器坐标并存储
+    const containerPos = eventToContainer(e, this.stageEl);
+    this.boxSelectStart = { x: containerPos.x, y: containerPos.y };
+    this.boxSelectEnd = { x: containerPos.x, y: containerPos.y };
   }
 
   /**
@@ -93,7 +95,9 @@ export class SelectionHandler {
    */
   updateBoxSelect(e: MouseEvent): void {
     if (!this.isBoxSelecting) return;
-    this.boxSelectEnd = { x: e.clientX, y: e.clientY };
+    // 【修复】使用 eventToContainer 转换为容器坐标
+    const containerPos = eventToContainer(e, this.stageEl);
+    this.boxSelectEnd = { x: containerPos.x, y: containerPos.y };
   }
 
   /**
@@ -105,26 +109,11 @@ export class SelectionHandler {
   finishBoxSelect(): void {
     if (!this.isBoxSelecting) return;
 
-    // 【修复】使用 eventToContainer 替代手动计算 getBoundingClientRect
-    // 注意：boxSelectStart/End 存储的是 Screen 坐标，需要转换为 Container 坐标
-    const startContainerX = this.stageEl
-      ? this.boxSelectStart.x - this.stageEl.getBoundingClientRect().left
-      : this.boxSelectStart.x;
-    const startContainerY = this.stageEl
-      ? this.boxSelectStart.y - this.stageEl.getBoundingClientRect().top
-      : this.boxSelectStart.y;
-    const endContainerX = this.stageEl
-      ? this.boxSelectEnd.x - this.stageEl.getBoundingClientRect().left
-      : this.boxSelectEnd.x;
-    const endContainerY = this.stageEl
-      ? this.boxSelectEnd.y - this.stageEl.getBoundingClientRect().top
-      : this.boxSelectEnd.y;
-
-    // 计算框选矩形（Container 坐标）
-    const minContainerX = Math.min(startContainerX, endContainerX);
-    const maxContainerX = Math.max(startContainerX, endContainerX);
-    const minContainerY = Math.min(startContainerY, endContainerY);
-    const maxContainerY = Math.max(startContainerY, endContainerY);
+    // 【修复】boxSelectStart/End 已在 start/update 中转换为容器坐标，直接使用
+    const minContainerX = Math.min(this.boxSelectStart.x, this.boxSelectEnd.x);
+    const maxContainerX = Math.max(this.boxSelectStart.x, this.boxSelectEnd.x);
+    const minContainerY = Math.min(this.boxSelectStart.y, this.boxSelectEnd.y);
+    const maxContainerY = Math.max(this.boxSelectStart.y, this.boxSelectEnd.y);
 
     // 判断是否为点击（框选面积过小）
     const boxArea = (maxContainerX - minContainerX) * (maxContainerY - minContainerY);

@@ -12,7 +12,7 @@
  * 特点：
  * - 纯交互逻辑：不涉及渲染，仅操作 Store 数据
  * - 状态隔离：不影响其他 Handler 的状态
- * - 坐标转换：使用 geometry.ts 的 clientToWorld 确保视口变换下的精确定位
+ * - 坐标转换：使用 geometry.ts 的 eventToWorld 确保视口变换下的精确定位
  */
 
 import type { useCanvasStore } from '@/store/canvasStore';
@@ -84,15 +84,18 @@ export class CreationHandler {
       case 'image':
         // 从 store 获取图片URL
         const imageUrl = this.store.creationToolOptions.imageUrl;
-        if (imageUrl) {
-          try {
-            previewNode = await NodeFactory.createImage(imageUrl, 0, 0);
-            this.currentNodeType = NodeType.IMAGE;
-          } catch (error) {
-            console.error('创建图片预览节点失败:', error);
-            this.reset();
-            return;
-          }
+        if (!imageUrl) {
+          console.error('创建图片工具失败：缺少 imageUrl');
+          this.reset();
+          return;
+        }
+        try {
+          previewNode = await NodeFactory.createImage(imageUrl, 0, 0);
+          this.currentNodeType = NodeType.IMAGE;
+        } catch (error) {
+          console.error('创建图片预览节点失败:', error);
+          this.reset();
+          return;
         }
         break;
     }
@@ -142,7 +145,7 @@ export class CreationHandler {
     if (this.currentNodeType === NodeType.IMAGE) {
       previewNode.transform.x = worldPos.x;
       previewNode.transform.y = worldPos.y;
-      this.store.setPreviewNode({ ...previewNode });
+      this.store.setPreviewNode(previewNode);
       return;
     }
 
@@ -150,40 +153,54 @@ export class CreationHandler {
       // 悬浮阶段：预览节点跟随鼠标（左上角对齐鼠标，无需偏移）
       previewNode.transform.x = worldPos.x;
       previewNode.transform.y = worldPos.y;
-      // 触发响应式更新
-      this.store.setPreviewNode({ ...previewNode });
+      this.store.setPreviewNode(previewNode);
     } else {
       // 拖拽阶段：计算拖拽矩形
       if (!this.startPoint) return;
 
-      let width = Math.abs(worldPos.x - this.startPoint.x);
-      let height = Math.abs(worldPos.y - this.startPoint.y);
+      const absWidth = Math.abs(worldPos.x - this.startPoint.x);
+      const absHeight = Math.abs(worldPos.y - this.startPoint.y);
 
-      // Shift: 锁定为正方形/圆形
-      if (this.isShiftPressed) {
-        const maxSize = Math.max(width, height);
-        width = maxSize;
-        height = maxSize;
-      }
+      let width: number;
+      let height: number;
+      let x: number;
+      let y: number;
 
-      // 计算实际位置（处理负向拖拽）
-      let x = Math.min(this.startPoint.x, worldPos.x);
-      let y = Math.min(this.startPoint.y, worldPos.y);
-
-      // Alt: 从中心缩放
-      if (this.isAltPressed) {
+      // 四种组合模式
+      if (this.isShiftPressed && this.isAltPressed) {
+        // Shift + Alt: 正方形 + 中心扩展
+        const size = Math.max(absWidth, absHeight);
+        width = size;
+        height = size;
+        x = this.startPoint.x - size / 2;
+        y = this.startPoint.y - size / 2;
+      } else if (this.isShiftPressed) {
+        // Shift: 正方形 + 角点
+        const size = Math.max(absWidth, absHeight);
+        width = size;
+        height = size;
+        x = worldPos.x < this.startPoint.x ? this.startPoint.x - size : this.startPoint.x;
+        y = worldPos.y < this.startPoint.y ? this.startPoint.y - size : this.startPoint.y;
+      } else if (this.isAltPressed) {
+        // Alt: 自由比例 + 中心扩展
+        width = absWidth;
+        height = absHeight;
         x = this.startPoint.x - width / 2;
         y = this.startPoint.y - height / 2;
+      } else {
+        // 默认: 自由比例 + 角点
+        width = absWidth;
+        height = absHeight;
+        x = Math.min(this.startPoint.x, worldPos.x);
+        y = Math.min(this.startPoint.y, worldPos.y);
       }
 
       // 更新预览节点
       previewNode.transform.x = x;
       previewNode.transform.y = y;
-      previewNode.transform.width = Math.max(1, width); // 最小1px
+      previewNode.transform.width = Math.max(1, width);
       previewNode.transform.height = Math.max(1, height);
-
-      // 触发响应式更新
-      this.store.setPreviewNode({ ...previewNode });
+      this.store.setPreviewNode(previewNode);
     }
   }
 
@@ -220,7 +237,7 @@ export class CreationHandler {
    *
    * 坐标转换：使用 eventToWorld 确保最终位置精确
    */
-  handleMouseUp(e?: MouseEvent) {
+  async handleMouseUp(e?: MouseEvent) {
     if (!this.store.previewNode || !this.startPoint) return;
 
     // 如果没有传入事件，使用最后记录的鼠标位置
@@ -237,21 +254,34 @@ export class CreationHandler {
     // 阈值：小于 3px 视为点击，否则视为拖拽
     const isClick = deltaX < 3 && deltaY < 3;
 
-    // 准备最终节点（深拷贝预览节点）
-    const finalNode = { ...this.store.previewNode };
+    let finalNode: NodeState;
 
-    // 图片节点：无论点击还是拖拽，都使用原始尺寸和起始点位置
-    if (this.currentNodeType === NodeType.IMAGE) {
-      finalNode.transform.x = this.startPoint.x;
-      finalNode.transform.y = this.startPoint.y;
-      // 保持原始宽高（NodeFactory.createImage 已设置）
-    } else if (isClick) {
-      // 非图片节点：点击创建保留 NodeFactory 默认尺寸，仅更新位置
-      finalNode.transform.x = this.startPoint.x;
-      finalNode.transform.y = this.startPoint.y;
-      // 保持 NodeFactory 初始化的默认宽高（文本160x40，矩形/圆形100x100）
+    // 点击创建：重新生成纯净的默认节点
+    if (isClick) {
+      switch (this.currentNodeType) {
+        case NodeType.RECT:
+          finalNode = NodeFactory.createRect(this.startPoint.x, this.startPoint.y);
+          break;
+        case NodeType.CIRCLE:
+          finalNode = NodeFactory.createCircle(this.startPoint.x, this.startPoint.y);
+          break;
+        case NodeType.TEXT:
+          finalNode = NodeFactory.createText(this.startPoint.x, this.startPoint.y);
+          break;
+        case NodeType.IMAGE:
+          finalNode = await NodeFactory.createImage(
+            this.store.creationToolOptions.imageUrl!,
+            this.startPoint.x,
+            this.startPoint.y
+          );
+          break;
+        default:
+          return;
+      }
+    } else {
+      // 拖拽创建：使用预览节点的尺寸和位置
+      finalNode = { ...this.store.previewNode };
     }
-    // 非图片节点的拖拽情况：使用预览节点的尺寸和位置（已在 handleMouseMove 中计算）
 
     // 恢复正常透明度
     finalNode.style = {
