@@ -18,20 +18,26 @@
 import type { useCanvasStore } from '@/store/canvasStore';
 import type { CanvasToolType } from '@/types/editor';
 import { NodeFactory } from '../services/NodeFactory';
-import { clientToWorld } from '../utils/geometry';
+import { eventToWorld } from '../utils/geometry';
 import type { NodeState } from '@/types/state';
 import { NodeType } from '@/types/state';
 
 /**
- * 创建交互处理器
+ * 创建交互处理器 - 使用统一坐标转换系统
  *
  * 实现类似 Figma 的交互式绘制功能：
  * - 点击工具后进入创建模式
- * - 鼠标移动时显示半透明预览
+ * - 鼠标移动时显示半透明预览（Ghost Node）
  * - 点击或拖拽完成创建
+ * - 支持图片工具（尺寸锁定，不受拖拽影响）
+ *
+ * 坐标系统：
+ * - 使用 eventToWorld 将鼠标事件直接转换为世界坐标
+ * - 确保左上角精确对齐鼠标位置（修复 Header 高度偏移问题）
  */
 export class CreationHandler {
   private store: ReturnType<typeof useCanvasStore>;
+  private stageEl: HTMLElement | null;
 
   // 拖拽状态
   private isDragging = false;
@@ -42,8 +48,9 @@ export class CreationHandler {
   // 当前创建的节点类型
   private currentNodeType: NodeType | null = null;
 
-  constructor(store: ReturnType<typeof useCanvasStore>) {
+  constructor(store: ReturnType<typeof useCanvasStore>, stageEl: HTMLElement | null) {
     this.store = store;
+    this.stageEl = stageEl;
   }
 
   /**
@@ -103,6 +110,8 @@ export class CreationHandler {
    * - 悬浮阶段：更新预览节点位置（鼠标位置 = 左上角）
    * - 拖拽阶段：计算并更新预览节点的尺寸和位置
    * - 图片特殊处理：始终保持原始尺寸，只更新位置
+   *
+   * 坐标转换：使用 eventToWorld 确保精确对齐，消除 Header 偏移问题
    */
   handleMouseMove(e: MouseEvent) {
     const previewNode = this.store.previewNode;
@@ -115,8 +124,8 @@ export class CreationHandler {
     this.isShiftPressed = e.shiftKey;
     this.isAltPressed = e.altKey;
 
-    // 转换鼠标坐标为世界坐标（关键：直接使用鼠标位置作为左上角）
-    const worldPos = clientToWorld(this.store.viewport, e.clientX, e.clientY);
+    // 【关键修复】使用 eventToWorld 直接转换，消除 DOM 偏移问题
+    const worldPos = eventToWorld(e, this.stageEl, this.store.viewport);
 
     // 图片节点：只更新位置，不参与拖拽缩放
     if (this.currentNodeType === NodeType.IMAGE) {
@@ -170,6 +179,8 @@ export class CreationHandler {
   /**
    * 鼠标按下处理
    * 记录起始点，开始拖拽
+   *
+   * 坐标转换：使用 eventToWorld 确保起始点精确
    */
   handleMouseDown(e: MouseEvent) {
     if (!this.store.previewNode) return;
@@ -177,7 +188,8 @@ export class CreationHandler {
     // 只响应左键
     if (e.button !== 0) return;
 
-    const worldPos = clientToWorld(this.store.viewport, e.clientX, e.clientY);
+    // 【修复】使用 eventToWorld 替代手动计算
+    const worldPos = eventToWorld(e, this.stageEl, this.store.viewport);
     this.startPoint = { x: worldPos.x, y: worldPos.y };
     this.isDragging = true;
 
@@ -191,6 +203,8 @@ export class CreationHandler {
    * - 提交节点到画布
    * - 重置工具为选择模式
    * - 图片特殊处理：忽略拖拽，始终使用原始尺寸
+   *
+   * 坐标转换：使用 eventToWorld 确保最终位置精确
    */
   handleMouseUp(e?: MouseEvent) {
     if (!this.store.previewNode || !this.startPoint) return;
@@ -199,7 +213,8 @@ export class CreationHandler {
     const event = e || this.lastMouseEvent;
     if (!event) return;
 
-    const worldPos = clientToWorld(this.store.viewport, event.clientX, event.clientY);
+    // 【修复】使用 eventToWorld 替代手动计算
+    const worldPos = eventToWorld(event, this.stageEl, this.store.viewport);
 
     // 计算移动距离
     const deltaX = Math.abs(worldPos.x - this.startPoint.x);

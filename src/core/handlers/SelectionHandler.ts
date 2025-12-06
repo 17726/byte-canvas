@@ -25,7 +25,7 @@
  * - reset: 重置所有框选状态
  */
 
-import { isNodeHitRectSAT, clientToWorld } from '@/core/utils/geometry';
+import { isNodeHitRectSAT, containerToWorld, getRelativePos } from '@/core/utils/geometry';
 import type { ViewportState, BaseNodeState } from '@/types/state';
 import type { useCanvasStore } from '@/store/canvasStore';
 
@@ -105,28 +105,29 @@ export class SelectionHandler {
   finishBoxSelect(): void {
     if (!this.isBoxSelecting) return;
 
-    const stageRect = this.stageEl ? this.stageEl.getBoundingClientRect() : { left: 0, top: 0 };
+    // 【修复】使用 getRelativePos 替代手动计算 getBoundingClientRect
+    // 注意：boxSelectStart/End 存储的是 Screen 坐标，需要转换为 Container 坐标
+    const startContainerX = this.stageEl
+      ? this.boxSelectStart.x - this.stageEl.getBoundingClientRect().left
+      : this.boxSelectStart.x;
+    const startContainerY = this.stageEl
+      ? this.boxSelectStart.y - this.stageEl.getBoundingClientRect().top
+      : this.boxSelectStart.y;
+    const endContainerX = this.stageEl
+      ? this.boxSelectEnd.x - this.stageEl.getBoundingClientRect().left
+      : this.boxSelectEnd.x;
+    const endContainerY = this.stageEl
+      ? this.boxSelectEnd.y - this.stageEl.getBoundingClientRect().top
+      : this.boxSelectEnd.y;
 
-    // 计算框选矩形（屏幕坐标）
-    const minScreenX = Math.min(
-      this.boxSelectStart.x - stageRect.left,
-      this.boxSelectEnd.x - stageRect.left
-    );
-    const maxScreenX = Math.max(
-      this.boxSelectStart.x - stageRect.left,
-      this.boxSelectEnd.x - stageRect.left
-    );
-    const minScreenY = Math.min(
-      this.boxSelectStart.y - stageRect.top,
-      this.boxSelectEnd.y - stageRect.top
-    );
-    const maxScreenY = Math.max(
-      this.boxSelectStart.y - stageRect.top,
-      this.boxSelectEnd.y - stageRect.top
-    );
+    // 计算框选矩形（Container 坐标）
+    const minContainerX = Math.min(startContainerX, endContainerX);
+    const maxContainerX = Math.max(startContainerX, endContainerX);
+    const minContainerY = Math.min(startContainerY, endContainerY);
+    const maxContainerY = Math.max(startContainerY, endContainerY);
 
     // 判断是否为点击（框选面积过小）
-    const boxArea = (maxScreenX - minScreenX) * (maxScreenY - minScreenY);
+    const boxArea = (maxContainerX - minContainerX) * (maxContainerY - minContainerY);
     if (boxArea < 4) {
       // 点击空白处：取消所有选中
       this.store.setActive([]);
@@ -134,10 +135,10 @@ export class SelectionHandler {
       return;
     }
 
-    // 转换为世界坐标
+    // 【修复】使用 containerToWorld 转换为世界坐标
     const viewport = this.store.viewport as ViewportState;
-    const worldMin = clientToWorld(viewport, minScreenX, minScreenY);
-    const worldMax = clientToWorld(viewport, maxScreenX, maxScreenY);
+    const worldMin = containerToWorld(viewport, minContainerX, minContainerY);
+    const worldMax = containerToWorld(viewport, maxContainerX, maxContainerY);
 
     // 计算被选中的节点
     const selectedIds: string[] = [];
@@ -247,13 +248,12 @@ export class SelectionHandler {
     const bounds = this.getSelectedNodesBounds();
     if (!bounds) return false;
 
-    // 获取画布偏移
-    const stageRect = this.stageEl?.getBoundingClientRect() || { left: 0, top: 0 };
-    // 转换为世界坐标
-    const worldPos = clientToWorld(
+    // 【修复】使用 getRelativePos + containerToWorld 替代手动计算
+    const containerPos = getRelativePos(e, this.stageEl);
+    const worldPos = containerToWorld(
       this.store.viewport as ViewportState,
-      e.clientX - stageRect.left,
-      e.clientY - stageRect.top
+      containerPos.x,
+      containerPos.y
     );
 
     // 1. 判断是否在选中区域包围盒内

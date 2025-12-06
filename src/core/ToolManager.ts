@@ -103,7 +103,7 @@ export class ToolManager {
     this.stageEl = stageEl;
     this.getIsSpacePressed = getIsSpacePressed;
 
-    // 初始化处理器
+    // 初始化处理器 - 确保所有需要坐标转换的 Handler 都接收 stageEl
     this.viewportHandler = new ViewportHandler(this.store);
     this.transformHandler = new TransformHandler(this.store);
     this.selectionHandler = new SelectionHandler(this.store, stageEl);
@@ -112,7 +112,7 @@ export class ToolManager {
       this.transformHandler,
       this.viewportHandler
     );
-    this.rotationHandler = new RotationHandler(); // 新增：初始化旋转处理器
+    this.rotationHandler = new RotationHandler(stageEl); // 【修复】传入 stageEl
 
     // 延迟初始化创建处理器（避免循环依赖）
     this.initCreationHandler();
@@ -123,7 +123,7 @@ export class ToolManager {
    */
   private async initCreationHandler() {
     const { CreationHandler } = await import('./handlers/CreationHandler');
-    this.creationHandler = new CreationHandler(this.store);
+    this.creationHandler = new CreationHandler(this.store, this.stageEl); // 【修复】传入 stageEl
   }
 
   /**
