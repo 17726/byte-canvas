@@ -62,7 +62,7 @@
 
 // stores/canvasStore.ts
 import { defineStore } from 'pinia';
-import { ref, reactive, computed, watch } from 'vue';
+import { ref, reactive, computed, watch, readonly } from 'vue';
 import type { NodeState, ShapeState, TextState, ImageState, ViewportState } from '@/types/state';
 import { NodeType } from '@/types/state';
 import { DEFAULT_VIEWPORT } from '@/config/defaults';
@@ -890,6 +890,9 @@ export const useCanvasStore = defineStore('canvas', () => {
     redo,
     canUndo,
     canRedo,
+    // 仅供调试使用(undo/redo栈)
+    // historyStack: readonly(historyStack),
+    // redoStack: readonly(redoStack),
     // 复制/剪切/粘贴
     copySelected,
     cutSelected,
