@@ -591,7 +591,7 @@ export class TransformHandler {
           case 'e':
           case 'w': {
             // 仅 X 轴对称
-            let deltaW = handle === 'e' ? unrotatedDx : -unrotatedDx;
+            const deltaW = handle === 'e' ? unrotatedDx : -unrotatedDx;
             const newW = Math.max(startWidth + deltaW * 2, MIN_SIZE);
             fixedX = centerX - newW / 2;
             movableX = centerX + newW / 2;
@@ -603,7 +603,7 @@ export class TransformHandler {
           case 'n':
           case 's': {
             // 仅 Y 轴对称
-            let deltaH = handle === 's' ? unrotatedDy : -unrotatedDy;
+            const deltaH = handle === 's' ? unrotatedDy : -unrotatedDy;
             const newH = Math.max(startHeight + deltaH * 2, MIN_SIZE);
             fixedY = centerY - newH / 2;
             movableY = centerY + newH / 2;
@@ -617,8 +617,8 @@ export class TransformHandler {
     }
 
     // --- 6. 直接计算最终尺寸（移除最小尺寸限制 -> 已在上面步骤中集成限制） ---
-    let newWidth = Math.abs(movableX - fixedX);
-    let newHeight = Math.abs(movableY - fixedY);
+    const newWidth = Math.abs(movableX - fixedX);
+    const newHeight = Math.abs(movableY - fixedY);
 
     // --- 7. 旋转坐标系转换（恢复旋转，精准计算最终位置） ---
     // 未旋转坐标系的新左上角
