@@ -678,7 +678,7 @@ export class TransformHandler {
       const node = this.store.nodes[id] as BaseNodeState;
       if (!node) return;
 
-      // 修复1：偏移改为**像素值**（而非比例），避免边界框尺寸为0时的NaN
+      // 偏移为**像素值**（非比例），避免边界框尺寸为0时的NaN
       const offsetX = node.transform.x - calcStartBounds.x;
       const offsetY = node.transform.y - calcStartBounds.y;
 
