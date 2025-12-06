@@ -346,11 +346,14 @@ const handleKeyDown = (e: KeyboardEvent) => {
     return;
   }
 
-  // Ctrl/Cmd + Y 或 Ctrl/Cmd + Shift + Z: 重做
-  if (
-    (e.ctrlKey || e.metaKey) &&
-    (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'))
-  ) {
+  // Ctrl/Cmd + Y: 重做
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'y') {
+    e.preventDefault();
+    store.redo();
+    return;
+  }
+  // Ctrl/Cmd + Shift + Z: 重做
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z') {
     e.preventDefault();
     store.redo();
     return;
