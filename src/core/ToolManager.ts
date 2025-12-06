@@ -203,15 +203,15 @@ export class ToolManager {
     // 强制防护：不通过则直接忽略
     if (!this.forceProtectEvent(e)) return;
 
-    // 创建模式拦截（最高优先级）
-    if (this.creationHandler && this.creationHandler.isCreating()) {
-      this.creationHandler.handleMouseDown(e);
+    // 【修复】空格+左键平移（绝对最高优先级，即使创建模式也可以平移）
+    if (this.getIsSpacePressed() && e.button === 0) {
+      this.viewportHandler.startPan(e);
       return;
     }
 
-    // 原有业务逻辑：空格+左键平移（最高优先级）
-    if (this.getIsSpacePressed() && e.button === 0) {
-      this.viewportHandler.startPan(e);
+    // 创建模式拦截（次高优先级）
+    if (this.creationHandler && this.creationHandler.isCreating()) {
+      this.creationHandler.handleMouseDown(e);
       return;
     }
 
@@ -290,8 +290,13 @@ export class ToolManager {
       if (!this.stageEl?.contains(e.target as Node)) return;
     }
 
-    // 创建模式拦截（最高优先级）
+    // 创建模式拦截（次高优先级，允许 Space-Pan 穿透）
     if (this.creationHandler && this.creationHandler.isCreating()) {
+      // 【修复】Space-Pan 优先级最高，即使在创建模式也能平移画布
+      if (this.viewportHandler.isPanning) {
+        this.viewportHandler.updatePan(e);
+        return;
+      }
       this.creationHandler.handleMouseMove(e);
       return;
     }

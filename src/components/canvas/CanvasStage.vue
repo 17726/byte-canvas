@@ -6,6 +6,7 @@
     @wheel="handleWheel"
     @contextmenu="handleContextMenu"
     :style="stageStyle"
+    :class="{ 'is-creating': isCreating }"
   >
     <!--
       视口层 (Viewport Layer)
@@ -43,8 +44,8 @@
         class="preview-node"
       />
 
-      <!-- 选中覆盖层 (处理拖拽缩放) -->
-      <SelectionOverlay />
+      <!-- 选中覆盖层 (处理拖拽缩放) - 创建模式下隐藏 -->
+      <SelectionOverlay v-if="!isCreating" />
     </div>
 
     <!-- 悬浮属性栏 (Context Toolbar) - 放在视口外，但跟随节点坐标 -->
@@ -95,6 +96,9 @@ const { deleteSelected, copy, cut, paste, groupSelected, ungroupSelected } = use
 // 空格键状态（迁移自ToolManager，统一在组件内维护）
 const isSpacePressed = ref(false);
 
+// 创建模式状态（用于交互锁定）
+const isCreating = computed(() => store.creationTool !== 'select');
+
 // 创建 toolManager ref 并立即 provide（解决依赖注入时序问题）
 const toolManagerRef = ref<ToolManager | null>(null);
 provide('toolManager', toolManagerRef);
@@ -112,11 +116,14 @@ const stageStyle = computed(() => {
   // 基础样式：先初始化背景色 + 光标样式
   const style: CSSProperties = {
     backgroundColor: bg,
-    // 空格按下时切换为手型光标：
-    // - 未交互时：grab（可拖拽手型）
-    // - 交互中（如拖拽画布）：grabbing（拖拽中手型）
-    // - 未按空格：默认光标（可根据需求调整为 'default'/'auto'）
-    cursor: isSpacePressed.value ? (store.isInteracting ? 'grabbing' : 'grab') : 'default',
+    // 光标优先级：创建模式 > 空格平移 > 默认
+    cursor: isCreating.value
+      ? 'crosshair'
+      : isSpacePressed.value
+        ? store.isInteracting
+          ? 'grabbing'
+          : 'grab'
+        : 'default',
   };
 
   // 网格不可见时，直接返回基础样式（含光标）
@@ -477,6 +484,11 @@ onUnmounted(() => {
   border: 1px solid rgba(66, 133, 244, 0.8);
   pointer-events: none;
   z-index: 100;
+}
+
+/* 创建模式交互锁定 */
+.canvas-stage.is-creating .canvas-viewport > :not(.preview-node) {
+  pointer-events: none !important;
 }
 
 .debug-info:hover {

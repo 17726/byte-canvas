@@ -25,7 +25,7 @@
  * - reset: 重置所有框选状态
  */
 
-import { isNodeHitRectSAT, containerToWorld, getRelativePos } from '@/core/utils/geometry';
+import { isNodeHitRectSAT, containerToWorld, eventToContainer } from '@/core/utils/geometry';
 import type { ViewportState, BaseNodeState } from '@/types/state';
 import type { useCanvasStore } from '@/store/canvasStore';
 
@@ -105,7 +105,7 @@ export class SelectionHandler {
   finishBoxSelect(): void {
     if (!this.isBoxSelecting) return;
 
-    // 【修复】使用 getRelativePos 替代手动计算 getBoundingClientRect
+    // 【修复】使用 eventToContainer 替代手动计算 getBoundingClientRect
     // 注意：boxSelectStart/End 存储的是 Screen 坐标，需要转换为 Container 坐标
     const startContainerX = this.stageEl
       ? this.boxSelectStart.x - this.stageEl.getBoundingClientRect().left
@@ -248,8 +248,8 @@ export class SelectionHandler {
     const bounds = this.getSelectedNodesBounds();
     if (!bounds) return false;
 
-    // 【修复】使用 getRelativePos + containerToWorld 替代手动计算
-    const containerPos = getRelativePos(e, this.stageEl);
+    // 【修复】使用 eventToContainer + containerToWorld 替代手动计算
+    const containerPos = eventToContainer(e, this.stageEl);
     const worldPos = containerToWorld(
       this.store.viewport as ViewportState,
       containerPos.x,

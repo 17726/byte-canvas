@@ -47,6 +47,8 @@ export class CreationHandler {
   private isAltPressed = false;
   // 当前创建的节点类型
   private currentNodeType: NodeType | null = null;
+  // 是否已经显示过预览（防止闪烁）
+  private hasShownPreview = false;
 
   constructor(store: ReturnType<typeof useCanvasStore>, stageEl: HTMLElement | null) {
     this.store = store;
@@ -101,6 +103,9 @@ export class CreationHandler {
         ...previewNode.style,
         opacity: 0.5,
       };
+      // 【修复闪烁】初始隐藏预览节点，等待首次 handleMouseMove 再显示
+      previewNode.isVisible = false;
+      this.hasShownPreview = false;
       this.store.setPreviewNode(previewNode);
     }
   }
@@ -116,6 +121,12 @@ export class CreationHandler {
   handleMouseMove(e: MouseEvent) {
     const previewNode = this.store.previewNode;
     if (!previewNode) return;
+
+    // 【修复闪烁】首次移动时才显示预览节点
+    if (!this.hasShownPreview) {
+      previewNode.isVisible = true;
+      this.hasShownPreview = true;
+    }
 
     // 存储最后的鼠标事件
     this.lastMouseEvent = e;
@@ -269,6 +280,7 @@ export class CreationHandler {
     this.isDragging = false;
     this.startPoint = null;
     this.currentNodeType = null;
+    this.hasShownPreview = false;
   }
 
   /**

@@ -27,7 +27,7 @@
  *
  * 本文件提供四个核心纯函数，强制所有 Handler 使用统一的坐标转换逻辑：
  *
- * - getRelativePos: Screen -> Container（处理 DOM 偏移）
+ * - eventToContainer: Screen -> Container（处理 DOM 偏移）
  * - containerToWorld: Container -> World（处理 Zoom/Pan）
  * - eventToWorld: Screen -> World（组合转换，推荐优先使用）
  * - worldToClient: World -> Container/Screen（逆向转换，支持可选 DOM 偏移）
@@ -56,7 +56,7 @@
  *    ```
  *    ✅ 正确示例：
  *    ```ts
- *    const pos = getRelativePos(e, stageEl);
+ *    const pos = eventToContainer(e, stageEl);
  *    ```
  *
  * 2. **优先使用 eventToWorld 一步到位转换**
@@ -162,13 +162,21 @@ export function calculateBounds(
 // ====================================
 
 /**
- * 【核心函数 1】计算鼠标相对于 DOM 容器左上角的坐标
+ * 【核心函数 1】将鼠标事件坐标转换为容器相对坐标
  *
  * 坐标系转换：Screen -> Container
+ *
+ * 转换链路：
+ * ```
+ * MouseEvent.clientX/Y (浏览器窗口坐标)
+ *   ↓ 减去 el.getBoundingClientRect()
+ * Container X/Y (相对于 CanvasStage 左上角)
+ * ```
  *
  * 用途：
  * - 框选框渲染（需要相对于 CanvasStage 的位置）
  * - 需要容器相对坐标的场景
+ * - 作为 eventToWorld 的第一步
  *
  * @param e - 鼠标事件
  * @param el - DOM 容器元素（通常是 CanvasStage 根元素）
@@ -177,14 +185,14 @@ export function calculateBounds(
  * @example
  * ```ts
  * // 框选框起点计算
- * const startPos = getRelativePos(e, stageEl);
+ * const startPos = eventToContainer(e, stageEl);
  * boxSelectStart.value = startPos;
  * ```
  */
-export function getRelativePos(e: MouseEvent, el: HTMLElement | null): { x: number; y: number } {
+export function eventToContainer(e: MouseEvent, el: HTMLElement | null): { x: number; y: number } {
   // 非空检查：如果容器不存在，返回屏幕坐标作为兜底
   if (!el) {
-    console.warn('[geometry] getRelativePos: el is null, fallback to clientX/Y');
+    console.warn('[geometry] eventToContainer: el is null, fallback to clientX/Y');
     return { x: e.clientX, y: e.clientY };
   }
 
@@ -211,7 +219,7 @@ export function getRelativePos(e: MouseEvent, el: HTMLElement | null): { x: numb
  *
  * @example
  * ```ts
- * const containerPos = getRelativePos(e, stageEl);
+ * const containerPos = eventToContainer(e, stageEl);
  * const worldPos = containerToWorld(viewport, containerPos.x, containerPos.y);
  * node.transform.x = worldPos.x; // 设置节点位置
  * ```
@@ -260,7 +268,7 @@ export function eventToWorld(
   el: HTMLElement | null,
   viewport: ViewportState
 ): { x: number; y: number } {
-  const containerPos = getRelativePos(e, el);
+  const containerPos = eventToContainer(e, el);
   return containerToWorld(viewport, containerPos.x, containerPos.y);
 }
 
