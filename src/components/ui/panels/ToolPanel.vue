@@ -43,12 +43,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed } from 'vue';
 import { IconPlus, IconEdit, IconDelete } from '@arco-design/web-vue/es/icon';
 //TODO：UI开发完成后优化icon-park库的导入，针对按需导入减小打包体积
 import { Square, Round } from '@icon-park/vue-next';
 import { useCanvasStore } from '@/store/canvasStore';
-import { NodeFactory } from '@/core/services/NodeFactory';
 import { useNodeActions } from '@/composables/useNodeActions';
 import ImageMenu from '../common/ImageMenu.vue';
 
@@ -65,37 +64,33 @@ enum MenuKey {
 
 const store = useCanvasStore();
 
-// 高亮控制
-const selectedKeys = ref<string[]>([]);
+// 高亮控制：根据当前创建工具同步高亮状态
+const selectedKeys = computed(() => {
+  switch (store.creationTool) {
+    case 'rect':
+      return [MenuKey.AddRect];
+    case 'circle':
+      return [MenuKey.AddCircle];
+    case 'text':
+      return [MenuKey.AddText];
+    default:
+      return [];
+  }
+});
 
 function onMenuItemClick(key: string) {
   switch (key) {
     case MenuKey.AddRect:
-      console.log('矩形被点击');
-      {
-        const node = NodeFactory.createRect();
-        store.addNode(node);
-        store.setActive([node.id]);
-      }
-      selectedKeys.value = [key];
+      console.log('矩形工具被激活');
+      store.setCreationTool('rect');
       break;
     case MenuKey.AddCircle:
-      console.log('圆被点击');
-      {
-        const node = NodeFactory.createCircle();
-        store.addNode(node);
-        store.setActive([node.id]);
-      }
-      selectedKeys.value = [key];
+      console.log('圆形工具被激活');
+      store.setCreationTool('circle');
       break;
     case MenuKey.AddText:
-      console.log('文本被点击');
-      {
-        const node = NodeFactory.createText();
-        store.addNode(node);
-        store.setActive([node.id]);
-      }
-      selectedKeys.value = [key];
+      console.log('文本工具被激活');
+      store.setCreationTool('text');
       break;
     //NOTE: 菜单项不支持预览图 故创建图片独立出去处理(ImageMenu.vue)
     // case MenuKey.AddImage:
@@ -105,7 +100,6 @@ function onMenuItemClick(key: string) {
     //   break;
     case MenuKey.Delete:
       deleteSelected();
-      selectedKeys.value = []; // 清空选中状态
       break;
     default:
       console.warn(`未处理的菜单项: ${key}`);

@@ -83,6 +83,8 @@ export class ToolManager {
   private selectionHandler: SelectionHandler;
   private textSelectionHandler: TextSelectionHandler;
   private rotationHandler: RotationHandler;
+  // 公开创建处理器，供 Vue 组件访问（用于 Esc 键处理）
+  public creationHandler!: import('./handlers/CreationHandler').CreationHandler;
 
   // 改为从外部获取空格键状态（不再内部维护）
   private getIsSpacePressed: () => boolean;
@@ -111,6 +113,17 @@ export class ToolManager {
       this.viewportHandler
     );
     this.rotationHandler = new RotationHandler(); // 新增：初始化旋转处理器
+
+    // 延迟初始化创建处理器（避免循环依赖）
+    this.initCreationHandler();
+  }
+
+  /**
+   * 延迟初始化创建处理器
+   */
+  private async initCreationHandler() {
+    const { CreationHandler } = await import('./handlers/CreationHandler');
+    this.creationHandler = new CreationHandler(this.store);
   }
 
   /**
@@ -189,6 +202,12 @@ export class ToolManager {
   handleMouseDown(e: MouseEvent) {
     // 强制防护：不通过则直接忽略
     if (!this.forceProtectEvent(e)) return;
+
+    // 创建模式拦截（最高优先级）
+    if (this.creationHandler && this.creationHandler.isCreating()) {
+      this.creationHandler.handleMouseDown(e);
+      return;
+    }
 
     // 原有业务逻辑：空格+左键平移（最高优先级）
     if (this.getIsSpacePressed() && e.button === 0) {
@@ -271,6 +290,12 @@ export class ToolManager {
       if (!this.stageEl?.contains(e.target as Node)) return;
     }
 
+    // 创建模式拦截（最高优先级）
+    if (this.creationHandler && this.creationHandler.isCreating()) {
+      this.creationHandler.handleMouseMove(e);
+      return;
+    }
+
     // 最高优先级：多选缩放
     if (this.transformHandler.isMultiResizing) {
       this.transformHandler.updateMultiResize(e);
@@ -318,6 +343,12 @@ export class ToolManager {
    * 结束所有交互状态，并在组合编辑模式下自动调整边界
    */
   handleMouseUp() {
+    // 创建模式拦截
+    if (this.creationHandler && this.creationHandler.isCreating()) {
+      this.creationHandler.handleMouseUp();
+      return;
+    }
+
     // 防护逻辑：用mock事件强制防护，避免外部up事件干扰
     const mockEvent = new MouseEvent('mouseup');
     this.forceProtectEvent(mockEvent);

@@ -34,6 +34,15 @@
         @contextmenu="handleNodeContextMenu($event, node!.id)"
       />
 
+      <!-- 预览节点（Ghost Node）- 创建模式下显示 -->
+      <component
+        v-if="store.previewNode"
+        :key="'preview-' + store.previewNode.id"
+        :is="getComponentType(store.previewNode.type)"
+        :node="store.previewNode"
+        class="preview-node"
+      />
+
       <!-- 选中覆盖层 (处理拖拽缩放) -->
       <SelectionOverlay />
     </div>
@@ -67,7 +76,7 @@ import { ToolManager } from '@/core/ToolManager';
 import { useCanvasStore } from '@/store/canvasStore';
 import { useNodeActions } from '@/composables/useNodeActions';
 import { NodeType } from '@/types/state';
-import { computed, onMounted, onUnmounted, provide, ref, type CSSProperties } from 'vue';
+import { computed, onMounted, onUnmounted, provide, ref, watch, type CSSProperties } from 'vue';
 import GroupToolbar from '../ui/floating/GroupActions.vue';
 import ContextToolbar from '../ui/floating/HoverToolbar.vue';
 import CircleLayer from './layers/CircleLayer.vue';
@@ -295,10 +304,16 @@ const handleKeyDown = (e: KeyboardEvent) => {
     return;
   }
 
-  // Escape: 退出组合编辑模式
+  // Escape: 取消创建模式或退出组合编辑模式
   if (e.key === 'Escape') {
+    e.preventDefault();
+    // 优先处理创建模式
+    if (toolManagerRef.value?.creationHandler?.isCreating()) {
+      toolManagerRef.value.creationHandler.reset();
+      return;
+    }
+    // 其次处理组合编辑模式
     if (store.editingGroupId) {
-      e.preventDefault();
       GroupService.exitGroupEdit(store);
       return;
     }
@@ -379,6 +394,16 @@ const handleWindowBlur = () => {
   isSpacePressed.value = false;
 };
 
+// 监听创建工具变化，同步到 CreationHandler
+watch(
+  () => store.creationTool,
+  (newTool) => {
+    if (toolManagerRef.value?.creationHandler) {
+      toolManagerRef.value.creationHandler.setTool(newTool);
+    }
+  }
+);
+
 // 全局事件监听（整合所有事件：鼠标 + 键盘）
 onMounted(() => {
   // 1. 初始化 toolManager，传入空格键状态获取函数
@@ -438,6 +463,11 @@ onUnmounted(() => {
   cursor: pointer;
   user-select: none;
   transition: background-color 0.2s;
+}
+
+/* 预览节点样式 - 半透明且禁用鼠标事件 */
+.preview-node {
+  pointer-events: none !important;
 }
 
 /* 框选样式 */
