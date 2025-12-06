@@ -1,16 +1,28 @@
 <template>
   <div v-if="hasSelectedNodes && !allNodesLocked" class="selection-container">
-    <template v-if="isEditingGroup && selectedNodes.length > 0">
+    <!-- 在组合编辑模式下，如果没有操作框（没有选中子元素），显示子元素的虚线框 -->
+    <!-- 如果有操作框，则不显示 individual-selection，避免重复 -->
+    <template v-if="isEditingGroup && selectedNodes.length > 0 && !operationOverlayStyle">
       <div
         v-for="node in selectedNodes"
-        :key="node.id"
+        :key="node?.id"
         class="individual-selection"
-        :style="getIndividualStyle(node)"
+        :style="node ? getIndividualStyle(node) : {}"
       ></div>
     </template>
 
+    <!-- 组合的整体边界框（大框） -->
     <div class="selection-overlay" :style="overlayStyle">
       <div class="selection-border"></div>
+    </div>
+
+    <!-- 选中子元素的操作框（带控制点） -->
+    <div
+      v-if="operationOverlayStyle"
+      class="selection-overlay operation-overlay"
+      :style="operationOverlayStyle"
+    >
+      <div class="selection-border operation-border"></div>
 
       <div
         v-for="handle in handles"
@@ -124,7 +136,17 @@ const allNodesLocked = computed(() =>
 );
 
 // 选中的节点列表（用于绘制每个子元素的单独虚线框）
-const selectedNodes = computed(() => store.activeElements as BaseNodeState[]);
+// 在组合编辑模式下，只显示组合内的选中子元素
+const selectedNodes = computed(() => {
+  const editingId = store.editingGroupId;
+  if (editingId) {
+    // 组合编辑模式下，只返回组合内的选中子元素
+    return store.activeElements.filter((node) => {
+      return node && node.parentId === editingId;
+    }) as BaseNodeState[];
+  }
+  return store.activeElements as BaseNodeState[];
+});
 
 // 单个元素选中框样式（使用绝对坐标）
 const getIndividualStyle = (node: BaseNodeState) => {
@@ -183,7 +205,8 @@ const getRotatedBounds = (node: BaseNodeState) => {
   return { minX, maxX, minY, maxY };
 };
 
-// 组合编辑模式下：实时计算当前组合子元素的包围盒
+// 组合编辑模式下：实时计算组合的整体边界框（基于所有子元素）
+// 子元素的选中框通过 selectedNodes 单独显示
 const editingGroupBounds = computed(() => {
   const editingId = store.editingGroupId;
   if (!editingId) return null;
@@ -191,19 +214,31 @@ const editingGroupBounds = computed(() => {
   const group = store.nodes[editingId];
   if (!group || group.type !== NodeType.GROUP) return null;
 
-  const childNodes = group.children
+  // 实时计算所有子元素的边界框（使用绝对坐标）
+  const children = group.children
     .map((id) => store.nodes[id])
     .filter((node): node is NodeState => Boolean(node));
 
-  if (childNodes.length === 0) return null;
+  if (children.length === 0) {
+    // 如果没有子元素，使用组合的 transform
+    const absTransform = store.getAbsoluteTransform(editingId);
+    if (!absTransform) return null;
+    return {
+      x: absTransform.x,
+      y: absTransform.y,
+      width: absTransform.width,
+      height: absTransform.height,
+      rotation: absTransform.rotation || 0,
+    };
+  }
 
+  // 计算所有子元素的边界（考虑旋转，使用绝对坐标）
   let minX = Infinity,
     maxX = -Infinity,
     minY = Infinity,
     maxY = -Infinity;
 
-  childNodes.forEach((child) => {
-    // 假设 child 的旋转是相对于画布的绝对旋转
+  children.forEach((child) => {
     const bounds = getRotatedBounds(child as BaseNodeState);
     minX = Math.min(minX, bounds.minX);
     maxX = Math.max(maxX, bounds.maxX);
@@ -211,17 +246,23 @@ const editingGroupBounds = computed(() => {
     maxY = Math.max(maxY, bounds.maxY);
   });
 
+  // 使用组合的旋转角度
+  const rotation = group.transform.rotation || 0;
+
   return {
     x: minX,
     y: minY,
     width: maxX - minX,
     height: maxY - minY,
-    rotation: group.transform.rotation || 0, // 组合框的旋转
+    rotation: rotation,
   };
 });
 
-// 计算多选大框的包围盒
+// 计算用于显示大框的包围盒
+// 在组合编辑模式下，始终显示组合的整体边界框
+// 在非组合编辑模式下，显示选中元素的边界框
 const selectionBounds = computed(() => {
+  // 组合编辑模式下，始终显示组合的整体边界框
   if (editingGroupBounds.value) {
     return editingGroupBounds.value;
   }
@@ -266,13 +307,125 @@ const selectionBounds = computed(() => {
   };
 });
 
-// 大框的样式
+// 计算用于缩放和旋转操作的边界框
+// 在组合编辑模式下，如果有选中的子元素，使用选中子元素的边界框；否则使用组合的边界框
+const operationBounds = computed(() => {
+  const editingId = store.editingGroupId;
+  if (editingId) {
+    // 组合编辑模式下，检查是否有选中的子元素
+    const activeIds = Array.from(store.activeElementIds);
+    const hasActiveChildren = activeIds.some((id) => {
+      const node = store.nodes[id];
+      return node && node.parentId === editingId;
+    });
+
+    if (hasActiveChildren) {
+      // 有选中的子元素，计算选中子元素的边界框
+      const nodesToCalculate = activeIds
+        .map((id) => store.nodes[id])
+        .filter((node): node is NodeState => {
+          if (!node) return false;
+          return node.parentId === editingId;
+        });
+
+      if (nodesToCalculate.length === 0) {
+        // 如果没有有效的选中子元素，返回组合的边界框
+        return editingGroupBounds.value;
+      }
+
+      // 单选时：使用元素的实际尺寸和旋转角度，不计算 AABB
+      if (nodesToCalculate.length === 1) {
+        const firstNode = nodesToCalculate[0];
+        if (!firstNode) return editingGroupBounds.value;
+
+        const absTransform = store.getAbsoluteTransform(firstNode.id);
+        if (!absTransform) return editingGroupBounds.value;
+
+        return {
+          x: absTransform.x,
+          y: absTransform.y,
+          width: absTransform.width,
+          height: absTransform.height,
+          rotation: absTransform.rotation || 0,
+        };
+      }
+
+      // 多选时：计算所有子元素的 AABB（轴对齐包围盒）
+      let minX = Infinity,
+        maxX = -Infinity,
+        minY = Infinity,
+        maxY = -Infinity;
+
+      nodesToCalculate.forEach((child) => {
+        const bounds = getRotatedBounds(child as BaseNodeState);
+        minX = Math.min(minX, bounds.minX);
+        maxX = Math.max(maxX, bounds.maxX);
+        minY = Math.min(minY, bounds.minY);
+        maxY = Math.max(maxY, bounds.maxY);
+      });
+
+      return {
+        x: minX,
+        y: minY,
+        width: maxX - minX,
+        height: maxY - minY,
+        rotation: 0, // 多选时使用 0 度（AABB 是轴对齐的）
+      };
+    } else {
+      // 没有选中的子元素，返回组合的边界框
+      return editingGroupBounds.value;
+    }
+  }
+
+  // 非组合编辑模式下，使用 selectionBounds
+  return selectionBounds.value;
+});
+
+// 大框的样式（组合的整体边界框）
 const overlayStyle = computed(() => {
   const bounds = selectionBounds.value;
   if (!bounds) return {};
 
   const rotation = 'rotation' in bounds ? bounds.rotation || 0 : 0;
 
+  return {
+    transform: `translate(${bounds.x}px, ${bounds.y}px) rotate(${rotation}deg)`,
+    transformOrigin: `${bounds.width / 2}px ${bounds.height / 2}px`,
+    width: `${bounds.width}px`,
+    height: `${bounds.height}px`,
+  };
+});
+
+// 操作框的样式（选中子元素的边界框，带控制点）
+const operationOverlayStyle = computed(() => {
+  const editingId = store.editingGroupId;
+  if (!editingId) {
+    // 非组合编辑模式下，使用 operationBounds（与 selectionBounds 相同）
+    const bounds = operationBounds.value;
+    if (!bounds) return null;
+
+    const rotation = 'rotation' in bounds ? bounds.rotation || 0 : 0;
+    return {
+      transform: `translate(${bounds.x}px, ${bounds.y}px) rotate(${rotation}deg)`,
+      transformOrigin: `${bounds.width / 2}px ${bounds.height / 2}px`,
+      width: `${bounds.width}px`,
+      height: `${bounds.height}px`,
+    };
+  }
+
+  // 组合编辑模式下，只有选中子元素时才显示操作框
+  const activeIds = Array.from(store.activeElementIds);
+  const hasActiveChildren = activeIds.some((id) => {
+    const node = store.nodes[id];
+    return node && node.parentId === editingId;
+  });
+
+  if (!hasActiveChildren) return null;
+
+  const bounds = operationBounds.value;
+  if (!bounds) return null;
+
+  const rotation = 'rotation' in bounds ? bounds.rotation || 0 : 0;
   return {
     transform: `translate(${bounds.x}px, ${bounds.y}px) rotate(${rotation}deg)`,
     transformOrigin: `${bounds.width / 2}px ${bounds.height / 2}px`,
@@ -307,8 +460,8 @@ const getHandleStyle = (handle: ResizeHandle) => {
   };
 
   // 2. 获取选中框的旋转角度
-  // 只有单选或组合编辑时，rotation才可能非0
-  const boundsRotation = selectionBounds.value?.rotation || 0;
+  // 使用 operationBounds 来计算控制点的旋转角度（基于实际操作的边界框）
+  const boundsRotation = operationBounds.value?.rotation || 0;
 
   // 3. 获取该 handle 对应的基础光标角度 (n-resize = 0deg)
   const baseAngle = getHandleBaseAngle(handle);
@@ -345,14 +498,44 @@ const getHandleStyle = (handle: ResizeHandle) => {
 
 // 触发多选/单选缩放
 const onHandleDown = (e: MouseEvent, handle: ResizeHandle) => {
-  const bounds = selectionBounds.value;
-  if (!bounds || !toolManagerRef?.value || store.activeElements.length === 0) return;
+  const bounds = operationBounds.value;
+  if (!bounds || !toolManagerRef?.value) return;
+
+  // 在组合编辑模式下，如果没有选中子元素，不允许缩放
+  // 在非组合编辑模式下，必须有选中的元素
+  const isEditingGroup = !!store.editingGroupId;
+  const hasActiveElements = store.activeElements.length > 0;
+
+  if (isEditingGroup) {
+    // 组合编辑模式下，必须选中组合内的子元素才能缩放
+    const activeIds = Array.from(store.activeElementIds);
+    const hasActiveChildren = activeIds.some((id) => {
+      const node = store.nodes[id];
+      return node && node.parentId === store.editingGroupId;
+    });
+    if (!hasActiveChildren) return;
+  } else {
+    // 非组合编辑模式下，必须有选中的元素
+    if (!hasActiveElements) return;
+  }
 
   // 核心修复：阻止事件冒泡和默认行为，避免状态被覆盖
   e.stopPropagation();
   e.preventDefault();
 
-  const nodeIds = store.activeElements.map((node) => (node as BaseNodeState).id);
+  // 在组合编辑模式下，只使用组合内的子元素
+  let nodeIds: string[];
+  if (isEditingGroup) {
+    const activeIds = Array.from(store.activeElementIds);
+    nodeIds = activeIds.filter((id) => {
+      const node = store.nodes[id];
+      return node && node.parentId === store.editingGroupId;
+    });
+  } else {
+    nodeIds = store.activeElements.map((node) => (node as BaseNodeState).id);
+  }
+
+  if (nodeIds.length === 0) return;
 
   if (nodeIds.length === 1) {
     if (!nodeIds[0]) return;
@@ -366,7 +549,7 @@ const onHandleDown = (e: MouseEvent, handle: ResizeHandle) => {
 
 // 旋转样式计算
 const rotateHandleStyle = computed(() => {
-  const bounds = selectionBounds.value;
+  const bounds = operationBounds.value;
   if (!bounds) return {};
 
   const scale = 1 / store.viewport.zoom;
@@ -390,6 +573,24 @@ const rotateHandleStyle = computed(() => {
 // 旋转控制点鼠标按下事件
 const onRotateHandleDown = (e: MouseEvent) => {
   if (!toolManagerRef?.value) return;
+
+  // 在组合编辑模式下，如果没有选中子元素，不允许旋转
+  // 在非组合编辑模式下，必须有选中的元素
+  const isEditingGroup = !!store.editingGroupId;
+  const hasActiveElements = store.activeElements.length > 0;
+
+  if (isEditingGroup) {
+    // 组合编辑模式下，必须选中组合内的子元素才能旋转
+    const activeIds = Array.from(store.activeElementIds);
+    const hasActiveChildren = activeIds.some((id) => {
+      const node = store.nodes[id];
+      return node && node.parentId === store.editingGroupId;
+    });
+    if (!hasActiveChildren) return;
+  } else {
+    // 非组合编辑模式下，必须有选中的元素
+    if (!hasActiveElements) return;
+  }
 
   e.stopPropagation();
   e.preventDefault();
@@ -435,6 +636,15 @@ const onRotateHandleDown = (e: MouseEvent) => {
   border: 1px solid #1890ff;
   pointer-events: none;
   box-sizing: border-box;
+}
+
+.operation-overlay {
+  z-index: 1000; /* 操作框在组合框之上 */
+}
+
+.operation-border {
+  border: 1px solid #1890ff;
+  border-style: dashed; /* 操作框使用虚线，与组合框区分 */
 }
 
 /* ⚠️ 注意：移除了默认的 cursor 样式，使其可以被动态覆盖 */
