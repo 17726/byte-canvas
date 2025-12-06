@@ -186,21 +186,14 @@ const boxSelectEnd = ref({ x: 0, y: 0 });
 
 // 框选样式计算
 const boxSelectStyle = computed(() => {
-  const stageEl = stageRef.value;
-  const stageRect = stageEl ? stageEl.getBoundingClientRect() : { left: 0, top: 0 };
   const start = boxSelectStart.value;
   const end = boxSelectEnd.value;
 
-  // 转换为相对于画布的坐标
-  const startX = start.x - stageRect.left;
-  const startY = start.y - stageRect.top;
-  const endX = end.x - stageRect.left;
-  const endY = end.y - stageRect.top;
-
-  const left = Math.min(startX, endX);
-  const top = Math.min(startY, endY);
-  const width = Math.abs(endX - startX);
-  const height = Math.abs(endY - startY);
+  // 【修复】SelectionHandler 已输出 Container 坐标，直接使用
+  const left = Math.min(start.x, end.x);
+  const top = Math.min(start.y, end.y);
+  const width = Math.abs(end.x - start.x);
+  const height = Math.abs(end.y - start.y);
 
   // 修正：如果 left/top 小于 0，需要调整 width/height 以保持视觉一致性
   // 否则 Math.max(0, left) 会导致框选框“粘”在边缘但尺寸不变，造成视觉误差

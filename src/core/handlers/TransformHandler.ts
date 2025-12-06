@@ -44,6 +44,7 @@
 import { useCanvasStore } from '@/store/canvasStore';
 import type { BaseNodeState } from '@/types/state';
 import type { ResizeHandle } from '@/types/editor';
+import { eventToWorld } from '@/core/utils/geometry';
 
 /** 拖拽类型 */
 type DragType = 'node' | 'area';
@@ -305,12 +306,15 @@ export class TransformHandler {
       }
     });
 
+    // 【修复】使用 eventToWorld 记录起始世界坐标
+    const startWorldPos = eventToWorld(e, null, this.store.viewport);
+
     this.dragState = {
       isDragging: true,
       type: 'node',
       nodeId,
-      startX: e.clientX,
-      startY: e.clientY,
+      startX: startWorldPos.x,
+      startY: startWorldPos.y,
       startNodeX: node.transform.x,
       startNodeY: node.transform.y,
       startTransformMap,
@@ -324,9 +328,11 @@ export class TransformHandler {
   updateDrag(e: MouseEvent) {
     if (!this.dragState.isDragging) return;
 
+    // 【修复】使用 eventToWorld 计算位移
     const { startX, startY, startTransformMap } = this.dragState;
-    const dx = (e.clientX - startX) / this.store.viewport.zoom;
-    const dy = (e.clientY - startY) / this.store.viewport.zoom;
+    const currentWorldPos = eventToWorld(e, null, this.store.viewport);
+    const dx = currentWorldPos.x - startX;
+    const dy = currentWorldPos.y - startY;
 
     Object.entries(startTransformMap).forEach(([id, startPos]) => {
       const node = this.store.nodes[id];
@@ -382,13 +388,16 @@ export class TransformHandler {
     const centerX = x + width / 2;
     const centerY = y + height / 2;
 
+    // 【修复】使用 eventToWorld 记录起始世界坐标
+    const startWorldPos = eventToWorld(e, null, this.store.viewport);
+
     // 记录初始状态
     this.resizeState = {
       isResizing: true,
       handle,
       nodeId,
-      startMouseX: e.clientX,
-      startMouseY: e.clientY,
+      startMouseX: startWorldPos.x,
+      startMouseY: startWorldPos.y,
       startNodeX: x,
       startNodeY: y,
       startWidth: width,
@@ -744,13 +753,16 @@ export class TransformHandler {
       };
     });
 
+    // 【修复】使用 eventToWorld 记录起始世界坐标
+    const startWorldPos = eventToWorld(e, null, this.store.viewport);
+
     this.multiResizeState = {
       isMultiResizing: true,
       handle,
       nodeIds: validNodeIds,
       startBounds: { ...calcStartBounds }, // 使用计算的包围盒
-      startMouseX: e.clientX,
-      startMouseY: e.clientY,
+      startMouseX: startWorldPos.x,
+      startMouseY: startWorldPos.y,
       nodeStartStates,
       // 新增：整体边界框的中心和旋转（对齐单节点缩放）
       startCenterX,
@@ -781,31 +793,25 @@ export class TransformHandler {
     if (!isMultiResizing || !handle || nodeIds.length === 0) return;
 
     // ========== 1. 基础参数初始化（修复：精度处理） ==========
-    const { zoom } = this.store.viewport;
     const isCorner = ['nw', 'ne', 'se', 'sw'].includes(handle);
     const isEdge = ['n', 's', 'e', 'w'].includes(handle);
     const hasShift = e.shiftKey;
     const hasAlt = e.altKey;
 
-    // ========== 2. 坐标转换（修复：浮点精度） ==========
-    // 鼠标坐标转画布坐标（考虑视口缩放，增加精度处理）
-    const startMouseCanvas = {
-      x: Math.round((startMouseX / zoom) * 1000) / 1000,
-      y: Math.round((startMouseY / zoom) * 1000) / 1000,
-    };
-    const currentMouseCanvas = {
-      x: Math.round((e.clientX / zoom) * 1000) / 1000,
-      y: Math.round((e.clientY / zoom) * 1000) / 1000,
-    };
+    // ========== 2. 坐标转换（修复：使用 eventToWorld） ==========
+    // 【修复】使用 eventToWorld 获取当前世界坐标
+    const currentWorldPos = eventToWorld(e, null, this.store.viewport);
+    const startMouseWorld = { x: startMouseX, y: startMouseY };
+    const currentMouseWorld = { x: currentWorldPos.x, y: currentWorldPos.y };
 
     // 反向旋转到未旋转坐标系（多选边界框默认旋转0，此处保留逻辑可扩展）
     const startUnrotated = this.unrotatePoint(
-      startMouseCanvas,
+      startMouseWorld,
       { x: startCenterX, y: startCenterY },
       startRotation
     );
     const currentUnrotated = this.unrotatePoint(
-      currentMouseCanvas,
+      currentMouseWorld,
       { x: startCenterX, y: startCenterY },
       startRotation
     );
