@@ -93,6 +93,10 @@ export class CreationHandler {
             this.reset();
             return;
           }
+        } else {
+          console.error('图片URL未提供');
+          this.reset();
+          return;
         }
         break;
     }
