@@ -106,7 +106,7 @@ export class ToolManager {
 
     // 初始化处理器 - 确保所有需要坐标转换的 Handler 都接收 stageEl
     this.viewportHandler = new ViewportHandler(this.store);
-    this.transformHandler = new TransformHandler(this.store);
+    this.transformHandler = new TransformHandler(this.store, stageEl); // 【修复】注入 stageEl
     this.selectionHandler = new SelectionHandler(this.store, stageEl);
     this.textSelectionHandler = new TextSelectionHandler(
       this.store,

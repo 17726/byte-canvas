@@ -57,8 +57,7 @@ interface InternalDragState {
   isDragging: boolean;
   type: DragType | null;
   nodeId: string;
-  startX: number;
-  startY: number;
+  startMouseWorld: { x: number; y: number }; // 【修复】存储世界坐标
   startNodeX: number;
   startNodeY: number;
   /** 多节点拖拽时，每个节点的初始变换 */
@@ -74,8 +73,7 @@ interface InternalResizeState {
   nodeId: string;
 
   // 鼠标初始状态
-  startMouseX: number;
-  startMouseY: number;
+  startMouseWorld: { x: number; y: number }; // 【修复】存储世界坐标
 
   // 节点初始变换状态
   startNodeX: number;
@@ -120,8 +118,7 @@ interface InternalMultiResizeState {
   handle: ResizeHandle | null;
   nodeIds: string[];
   startBounds: { x: number; y: number; width: number; height: number };
-  startMouseX: number;
-  startMouseY: number;
+  startMouseWorld: { x: number; y: number }; // 【修复】存储世界坐标
   nodeStartStates: Record<string, NodeStartState>;
   // 新增以下字段
   startCenterX: number;
@@ -147,14 +144,14 @@ const edgeConfig: EdgeConfig = {
 
 export class TransformHandler {
   private store: ReturnType<typeof useCanvasStore>;
+  private stageEl: HTMLElement | null; // 【修复】添加 stageEl 依赖
 
   /** 拖拽状态 */
   private dragState: InternalDragState = {
     isDragging: false,
     type: null,
     nodeId: '',
-    startX: 0,
-    startY: 0,
+    startMouseWorld: { x: 0, y: 0 },
     startNodeX: 0,
     startNodeY: 0,
     startTransformMap: {},
@@ -166,8 +163,7 @@ export class TransformHandler {
     isResizing: false,
     handle: null,
     nodeId: '',
-    startMouseX: 0,
-    startMouseY: 0,
+    startMouseWorld: { x: 0, y: 0 },
     startNodeX: 0,
     startNodeY: 0,
     startWidth: 0,
@@ -189,16 +185,16 @@ export class TransformHandler {
     handle: null,
     nodeIds: [],
     startBounds: { x: 0, y: 0, width: 0, height: 0 },
-    startMouseX: 0,
-    startMouseY: 0,
+    startMouseWorld: { x: 0, y: 0 },
     nodeStartStates: {},
     startCenterX: 0,
     startCenterY: 0,
     startRotation: 0,
   };
 
-  constructor(store: ReturnType<typeof useCanvasStore>) {
+  constructor(store: ReturnType<typeof useCanvasStore>, stageEl: HTMLElement | null = null) {
     this.store = store;
+    this.stageEl = stageEl; // 【修复】保存 stageEl
   }
 
   // ==================== 辅助方法 ====================
@@ -307,14 +303,13 @@ export class TransformHandler {
     });
 
     // 【修复】使用 eventToWorld 记录起始世界坐标
-    const startWorldPos = eventToWorld(e, null, this.store.viewport);
+    const startWorldPos = eventToWorld(e, this.stageEl, this.store.viewport);
 
     this.dragState = {
       isDragging: true,
       type: 'node',
       nodeId,
-      startX: startWorldPos.x,
-      startY: startWorldPos.y,
+      startMouseWorld: { x: startWorldPos.x, y: startWorldPos.y },
       startNodeX: node.transform.x,
       startNodeY: node.transform.y,
       startTransformMap,
@@ -329,10 +324,10 @@ export class TransformHandler {
     if (!this.dragState.isDragging) return;
 
     // 【修复】使用 eventToWorld 计算位移
-    const { startX, startY, startTransformMap } = this.dragState;
-    const currentWorldPos = eventToWorld(e, null, this.store.viewport);
-    const dx = currentWorldPos.x - startX;
-    const dy = currentWorldPos.y - startY;
+    const { startMouseWorld, startTransformMap } = this.dragState;
+    const currentWorldPos = eventToWorld(e, this.stageEl, this.store.viewport);
+    const dx = currentWorldPos.x - startMouseWorld.x;
+    const dy = currentWorldPos.y - startMouseWorld.y;
 
     Object.entries(startTransformMap).forEach(([id, startPos]) => {
       const node = this.store.nodes[id];
@@ -389,15 +384,14 @@ export class TransformHandler {
     const centerY = y + height / 2;
 
     // 【修复】使用 eventToWorld 记录起始世界坐标
-    const startWorldPos = eventToWorld(e, null, this.store.viewport);
+    const startWorldPos = eventToWorld(e, this.stageEl, this.store.viewport);
 
     // 记录初始状态
     this.resizeState = {
       isResizing: true,
       handle,
       nodeId,
-      startMouseX: startWorldPos.x,
-      startMouseY: startWorldPos.y,
+      startMouseWorld: { x: startWorldPos.x, y: startWorldPos.y },
       startNodeX: x,
       startNodeY: y,
       startWidth: width,
@@ -418,8 +412,7 @@ export class TransformHandler {
     const {
       handle,
       nodeId,
-      startMouseX,
-      startMouseY,
+      startMouseWorld,
       startNodeX,
       startNodeY,
       startWidth,
@@ -432,25 +425,22 @@ export class TransformHandler {
     const node = this.store.nodes[nodeId];
     if (!node) return;
 
-    // 获取视口信息
-    const { zoom } = this.store.viewport;
     // 标记：是否为角点缩放（双轴）/ 四边缩放（单轴）
     const isCorner = ['nw', 'ne', 'se', 'sw'].includes(handle);
     const isEdge = ['n', 's', 'e', 'w'].includes(handle);
 
-    // --- 1. 坐标转换：将鼠标位移转换到未旋转坐标系 ---
-    // 鼠标坐标转画布坐标（考虑缩放）
-    const startMouseCanvas = { x: startMouseX / zoom, y: startMouseY / zoom };
-    const currentMouseCanvas = { x: e.clientX / zoom, y: e.clientY / zoom };
+    // 【修复】使用 eventToWorld 获取当前世界坐标
+    const currentWorldPos = eventToWorld(e, this.stageEl, this.store.viewport);
 
+    // --- 1. 坐标转换：将鼠标位移转换到未旋转坐标系 ---
     // 将鼠标点反向旋转到未旋转坐标系（以节点初始中心为旋转中心）
     const startUnrotated = this.unrotatePoint(
-      startMouseCanvas,
+      startMouseWorld,
       { x: startCenterX, y: startCenterY },
       startRotation
     );
     const currentUnrotated = this.unrotatePoint(
-      currentMouseCanvas,
+      { x: currentWorldPos.x, y: currentWorldPos.y },
       { x: startCenterX, y: startCenterY },
       startRotation
     );
@@ -754,15 +744,14 @@ export class TransformHandler {
     });
 
     // 【修复】使用 eventToWorld 记录起始世界坐标
-    const startWorldPos = eventToWorld(e, null, this.store.viewport);
+    const startWorldPos = eventToWorld(e, this.stageEl, this.store.viewport);
 
     this.multiResizeState = {
       isMultiResizing: true,
       handle,
       nodeIds: validNodeIds,
       startBounds: { ...calcStartBounds }, // 使用计算的包围盒
-      startMouseX: startWorldPos.x,
-      startMouseY: startWorldPos.y,
+      startMouseWorld: { x: startWorldPos.x, y: startWorldPos.y },
       nodeStartStates,
       // 新增：整体边界框的中心和旋转（对齐单节点缩放）
       startCenterX,
@@ -782,8 +771,7 @@ export class TransformHandler {
       handle,
       nodeIds,
       startBounds,
-      startMouseX,
-      startMouseY,
+      startMouseWorld,
       nodeStartStates,
       startCenterX,
       startCenterY,
@@ -800,9 +788,7 @@ export class TransformHandler {
 
     // ========== 2. 坐标转换（修复：使用 eventToWorld） ==========
     // 【修复】使用 eventToWorld 获取当前世界坐标
-    const currentWorldPos = eventToWorld(e, null, this.store.viewport);
-    const startMouseWorld = { x: startMouseX, y: startMouseY };
-    const currentMouseWorld = { x: currentWorldPos.x, y: currentWorldPos.y };
+    const currentWorldPos = eventToWorld(e, this.stageEl, this.store.viewport);
 
     // 反向旋转到未旋转坐标系（多选边界框默认旋转0，此处保留逻辑可扩展）
     const startUnrotated = this.unrotatePoint(
@@ -811,7 +797,7 @@ export class TransformHandler {
       startRotation
     );
     const currentUnrotated = this.unrotatePoint(
-      currentMouseWorld,
+      { x: currentWorldPos.x, y: currentWorldPos.y },
       { x: startCenterX, y: startCenterY },
       startRotation
     );
