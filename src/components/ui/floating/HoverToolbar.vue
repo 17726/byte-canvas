@@ -102,7 +102,7 @@
             :popup-offset="-150"
             :popup-translate="[-100, -160]"
             size="mini"
-            v-model="textColor"
+            v-model="computedTextColor"
             trigger="hover"
           />
         </a-tooltip>
@@ -299,172 +299,245 @@ const sendToBack = () => {
 // --- Text Actions ---
 // fontSize, textColor 已从 useStyleSync 导入
 
-// textColor 已从 useStyleSync 导入；现在直接更新 store，不再通过 ToolManager
+// 颜色计算属性：支持局部/全局颜色修改
+const computedTextColor = computed({
+  get: () => textColor.value,
+  set: (val: string) => {
+    const selection = store.globalTextSelection;
+    if (selection && activeNode.value) {
+      toolManagerRef?.value?.handleColorChange(activeNode.value.id, val);
+    } else {
+      textColor.value = val;
+    }
+  },
+});
 
 // --- 样式开关 (Toggle) ---
 
 //粗体
 const isBold = computed(() => {
-  const activeId = Array.from(store.activeElementIds)[0];
-  if (!activeId) return false;
+  const activeId = activeNode.value?.id;
+  if (!activeId || !isText.value) return false;
 
   const node = store.nodes[activeId] as TextState;
-  const selection = toolManagerRef?.value.getCurrentSelection();
-  if (!node || !selection) return false;
+  // 使用 store 中的全局选区状态（响应式）
+  const selection = store.globalTextSelection;
+  const { inlineStyles = [], fontWeight: globalFontWeight } = node.props;
+  const isGlobalBold = globalFontWeight === 'bold' || globalFontWeight === 700;
+
+  // 如果没有选区，直接返回全局状态
+  if (!selection) return isGlobalBold;
 
   const { start, end } = selection;
-  const { inlineStyles = [], fontWeight: globalFontWeight } = node.props;
 
   // 1. 检查行内样式：是否有覆盖选中范围的 bold 样式
   const hasInlineBold = inlineStyles.some(
     (style) =>
       style.start <= start &&
       style.end >= end &&
-      // 行内样式的 fontWeight 可能是 'bold' 或 700（两种都表示加粗）
       (style.styles.fontWeight === 'bold' || style.styles.fontWeight === 700)
   );
   if (hasInlineBold) return true;
 
-  // 2. 检查全局样式：若没有行内样式覆盖，且全局是加粗，则返回 true
-  // 全局样式的 fontWeight 可能是 'bold' 或 number 类型（700 对应加粗）
-  const isGlobalBold = globalFontWeight === 'bold' || globalFontWeight === 700;
-
-  // 检查选中范围是否被行内样式覆盖（只要有行内样式修改 fontWeight，就不算全局生效）
+  // 检查选中范围是否被行内样式覆盖
   const hasInlineOverride = inlineStyles.some(
-    (style) => style.start <= start && style.end >= end && style.styles.fontWeight !== undefined // 只要设置了行内 fontWeight，无论值是什么，都算覆盖
+    (style) => style.start <= start && style.end >= end && style.styles.fontWeight !== undefined
   );
 
   return isGlobalBold && !hasInlineOverride;
 });
 
 const toggleBold = () => {
-  const activeId = Array.from(store.activeElementIds)[0];
-  if (activeId) {
-    console.log('设置粗体');
-    toolManagerRef?.value.handleToggleBold(activeId);
-    console.log('设置粗体完毕');
+  const activeId = activeNode.value?.id;
+  if (!activeId) return;
+
+  const selection = store.globalTextSelection;
+  if (selection) {
+    toolManagerRef?.value?.handleToggleBold(activeId);
+  } else {
+    // 全局切换
+    const current = fontWeight.value;
+    const isBold = current === 'bold' || current === 700;
+    fontWeight.value = isBold ? 'normal' : 'bold';
   }
 };
 
 //斜体
 const isItalic = computed(() => {
-  const activeId = Array.from(store.activeElementIds)[0];
-  if (!activeId) return false;
+  const activeId = activeNode.value?.id;
+  if (!activeId || !isText.value) return false;
 
   const node = store.nodes[activeId] as TextState;
-  const selection = toolManagerRef?.value.getCurrentSelection();
-  if (!node || !selection) return false;
+  const selection = store.globalTextSelection;
+  const { inlineStyles = [], fontStyle: globalFontStyle } = node.props;
+  const isGlobalItalic = globalFontStyle === 'italic';
+
+  if (!selection) return isGlobalItalic;
 
   const { start, end } = selection;
-  const { inlineStyles = [], fontStyle: globalFontStyle } = node.props;
 
-  // 1. 检查行内样式：是否有覆盖选中范围的 italic 样式
   const hasInlineItalic = inlineStyles.some(
     (style) => style.start <= start && style.end >= end && style.styles.fontStyle === 'italic'
   );
   if (hasInlineItalic) return true;
 
-  // 2. 检查全局样式：若没有行内样式覆盖，且全局是 italic，则返回 true
-  const isGlobalItalic = globalFontStyle === 'italic';
-
-  // 检查选中范围是否被行内样式覆盖（只要有行内样式修改 fontStyle，就不算全局生效）
   const hasInlineOverride = inlineStyles.some(
-    (style) => style.start <= start && style.end >= end && style.styles.fontStyle !== undefined // 只要设置了行内 fontStyle，无论值是什么，都算覆盖
+    (style) => style.start <= start && style.end >= end && style.styles.fontStyle !== undefined
   );
 
   return isGlobalItalic && !hasInlineOverride;
 });
 
 const toggleItalic = () => {
-  const activeId = Array.from(store.activeElementIds)[0];
-  if (activeId) {
-    toolManagerRef?.value.handleToggleItalic(activeId);
+  const activeId = activeNode.value?.id;
+  if (!activeId) return;
+
+  const selection = store.globalTextSelection;
+  if (selection) {
+    toolManagerRef?.value?.handleToggleItalic(activeId);
+  } else {
+    // 全局切换 (fontStyle 不在 useStyleSync 中，需手动更新)
+    const node = store.nodes[activeId] as TextState;
+    const current = node.props.fontStyle;
+    store.updateNode(activeId, {
+      props: { ...node.props, fontStyle: current === 'italic' ? 'normal' : 'italic' },
+    });
   }
 };
 
 //下划线
 const isUnderline = computed(() => {
-  const activeId = Array.from(store.activeElementIds)[0];
-  if (!activeId) return false;
+  const activeId = activeNode.value?.id;
+  if (!activeId || !isText.value) return false;
 
   const node = store.nodes[activeId] as TextState;
-  const selection = toolManagerRef?.value.getCurrentSelection();
-  if (!node || !selection) return false;
-
-  const { start, end } = selection;
+  const selection = store.globalTextSelection;
   const { inlineStyles = [], textDecoration: globalTextDecoration } = node.props;
 
-  // 辅助函数：判断 textDecoration 是否包含下划线
   const hasUnderlineValue = (value?: TextDecorationValue) => {
     if (!value) return false;
-    // 处理多值情况（如 "underline line-through" 同时存在下划线和删除线）
     return value.split(' ').includes('underline');
   };
 
-  // 1. 检查行内样式：是否有覆盖选中范围的下划线样式
+  const isGlobalUnderline = hasUnderlineValue(globalTextDecoration);
+
+  if (!selection) return isGlobalUnderline;
+
+  const { start, end } = selection;
+
   const hasInlineUnderline = inlineStyles.some(
     (style) =>
       style.start <= start && style.end >= end && hasUnderlineValue(style.styles.textDecoration)
   );
   if (hasInlineUnderline) return true;
 
-  // 2. 检查全局样式：若没有行内样式覆盖，且全局有下划线，则返回 true
-  const isGlobalUnderline = hasUnderlineValue(globalTextDecoration);
-
-  // 检查选中范围是否被行内样式覆盖（只要有行内样式修改 textDecoration，就不算全局生效）
   const hasInlineOverride = inlineStyles.some(
-    (style) => style.start <= start && style.end >= end && style.styles.textDecoration !== undefined // 只要设置了行内 textDecoration，无论值是什么，都算覆盖
+    (style) => style.start <= start && style.end >= end && style.styles.textDecoration !== undefined
   );
 
   return isGlobalUnderline && !hasInlineOverride;
 });
+
 const toggleUnderline = () => {
-  const activeId = Array.from(store.activeElementIds)[0];
-  if (activeId) {
-    toolManagerRef?.value.handleToggleUnderline(activeId);
+  const activeId = activeNode.value?.id;
+  if (!activeId) return;
+
+  const selection = store.globalTextSelection;
+  if (selection) {
+    toolManagerRef?.value?.handleToggleUnderline(activeId);
+  } else {
+    // 全局切换
+    const node = store.nodes[activeId] as TextState;
+    const current = node.props.textDecoration || 'none';
+    const parts = current === 'none' ? [] : current.split(' ');
+
+    // Toggle underline
+    if (parts.includes('underline')) {
+      const index = parts.indexOf('underline');
+      parts.splice(index, 1);
+    } else {
+      parts.push('underline');
+    }
+
+    // Ensure standard order: underline then line-through
+    const hasUnderline = parts.includes('underline');
+    const hasLineThrough = parts.includes('line-through');
+    const newParts: string[] = [];
+    if (hasUnderline) newParts.push('underline');
+    if (hasLineThrough) newParts.push('line-through');
+
+    const next = (newParts.length > 0 ? newParts.join(' ') : 'none') as TextDecorationValue;
+    store.updateNode(activeId, {
+      props: { ...node.props, textDecoration: next },
+    });
   }
 };
 
 //删除线
 const isStrikethrough = computed(() => {
-  const activeId = Array.from(store.activeElementIds)[0];
-  if (!activeId) return false;
+  const activeId = activeNode.value?.id;
+  if (!activeId || !isText.value) return false;
 
   const node = store.nodes[activeId] as TextState;
-  const selection = toolManagerRef?.value.getCurrentSelection();
-  if (!node || !selection) return false;
-
-  const { start, end } = selection;
+  const selection = store.globalTextSelection;
   const { inlineStyles = [], textDecoration: globalTextDecoration } = node.props;
 
-  // 辅助函数：判断 textDecoration 是否包含删除线
   const hasStrikethroughValue = (value?: TextDecorationValue) => {
     if (!value) return false;
-    // 处理可能的多值情况（如 "underline line-through"）
     return value.split(' ').includes('line-through');
   };
 
-  // 1. 检查行内样式：是否有覆盖选中范围的删除线样式
+  const isGlobalStrikethrough = hasStrikethroughValue(globalTextDecoration);
+
+  if (!selection) return isGlobalStrikethrough;
+
+  const { start, end } = selection;
+
   const hasInlineStrikethrough = inlineStyles.some(
     (style) =>
       style.start <= start && style.end >= end && hasStrikethroughValue(style.styles.textDecoration)
   );
   if (hasInlineStrikethrough) return true;
 
-  // 2. 检查全局样式：若没有行内样式覆盖，且全局有删除线，则返回 true
-  const isGlobalStrikethrough = hasStrikethroughValue(globalTextDecoration);
-
-  // 检查选中范围是否被行内样式覆盖（只要有行内样式修改 textDecoration，就不算全局生效）
   const hasInlineOverride = inlineStyles.some(
-    (style) => style.start <= start && style.end >= end && style.styles.textDecoration !== undefined // 只要设置了行内 textDecoration，无论值是什么，都算覆盖
+    (style) => style.start <= start && style.end >= end && style.styles.textDecoration !== undefined
   );
 
   return isGlobalStrikethrough && !hasInlineOverride;
 });
+
 const toggleStrikethrough = () => {
-  const activeId = Array.from(store.activeElementIds)[0];
-  if (activeId) {
-    toolManagerRef?.value.handleToggleStrikethrough(activeId);
+  const activeId = activeNode.value?.id;
+  if (!activeId) return;
+
+  const selection = store.globalTextSelection;
+  if (selection) {
+    toolManagerRef?.value?.handleToggleStrikethrough(activeId);
+  } else {
+    // 全局切换
+    const node = store.nodes[activeId] as TextState;
+    const current = node.props.textDecoration || 'none';
+    const parts = current === 'none' ? [] : current.split(' ');
+
+    // Toggle line-through
+    if (parts.includes('line-through')) {
+      const index = parts.indexOf('line-through');
+      parts.splice(index, 1);
+    } else {
+      parts.push('line-through');
+    }
+
+    // Ensure standard order: underline then line-through
+    const hasUnderline = parts.includes('underline');
+    const hasLineThrough = parts.includes('line-through');
+    const newParts: string[] = [];
+    if (hasUnderline) newParts.push('underline');
+    if (hasLineThrough) newParts.push('line-through');
+
+    const next = (newParts.length > 0 ? newParts.join(' ') : 'none') as TextDecorationValue;
+    store.updateNode(activeId, {
+      props: { ...node.props, textDecoration: next },
+    });
   }
 };
 
