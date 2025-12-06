@@ -840,8 +840,14 @@ export class TextSelectionHandler {
     }
 
     // 3.4 判断全局是否已应用该样式（值完全匹配）
-    const isGlobalApplied = currentGlobalValue === styleValue;
-
+    let isGlobalApplied: boolean;
+    if (styleKey === 'textDecoration') {
+      const globalValues = currentGlobalValue?.toString().split(/\s+/) || [];
+      const targetValue = styleValue?.toString() || '';
+      isGlobalApplied = globalValues.includes(targetValue);
+    } else {
+      isGlobalApplied = currentGlobalValue === styleValue;
+    }
     // ===================== 4. 根据toggle处理样式 =====================
     // 修复点1：初始化时显式定义类型，避免TS类型窄化
     const finalGlobalStyles: Partial<
