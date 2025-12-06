@@ -46,7 +46,6 @@
 <script setup lang="ts">
 import { ref, computed, onUnmounted } from 'vue';
 import { IconImage } from '@arco-design/web-vue/es/icon';
-import { NodeFactory } from '@/core/services/NodeFactory';
 import { useCanvasStore } from '@/store/canvasStore';
 import { DEFAULT_IMAGE_URL } from '@/config/defaults';
 
@@ -165,7 +164,7 @@ const loadLazyImage = (index: number) => {
 };
 
 // 图片网格点击事件 - 事件委托 通过单个事件监听器处理多个子元素的点击事件，而不是为每个子元素单独绑定事件
-const handleImageGridClick = async (event: Event) => {
+const handleImageGridClick = (event: Event) => {
   console.log('图片被点击');
   // 1. 找到实际被点击的 .image-item 元素
   const imageItem = (event.target as HTMLElement).closest('.image-item');
@@ -173,17 +172,12 @@ const handleImageGridClick = async (event: Event) => {
   if (!imageItem) return;
   // 3. 从 data 属性中获取图片URL
   const imageUrl = (imageItem as HTMLElement).dataset.imageUrl;
-  // 4. 如果有URL，调用创建图片的函数
+  // 4. 如果有URL，激活图片创建工具（进入创建模式）
   const url = imageUrl || DEFAULT_IMAGE_URL;
-  console.log('创建图片, URL:', url);
+  console.log('激活图片创建工具, URL:', url);
 
-  try {
-    const node = await NodeFactory.createImage(url);
-    store.addNode(node);
-    store.setActive([node.id]);
-  } catch (error) {
-    console.error('创建图片节点失败:', error);
-  }
+  // 使用新的创建模式：设置工具为 image，传入图片URL
+  store.setCreationTool('image', { imageUrl: url });
 };
 
 // 图片库数据
