@@ -612,6 +612,7 @@ export class ToolManager {
 
   //处理文本样式
   handleToggleBold(id: string) {
+    this.textSelectionHandler.updateGlobalStyles(id, this.store, 'fontWeight', 'bold', true);
     this.textSelectionHandler.updatePartialInlineStyle(
       id,
       this.store,
@@ -623,6 +624,7 @@ export class ToolManager {
   }
 
   handleToggleItalic(id: string) {
+    this.textSelectionHandler.updateGlobalStyles(id, this.store, 'fontStyle', 'italic', true);
     this.textSelectionHandler.updatePartialInlineStyle(
       id,
       this.store,
@@ -633,6 +635,13 @@ export class ToolManager {
   }
 
   handleToggleUnderline(id: string) {
+    this.textSelectionHandler.updateGlobalStyles(
+      id,
+      this.store,
+      'textDecoration',
+      'underline',
+      true
+    );
     this.textSelectionHandler.updatePartialInlineStyle(
       id,
       this.store,
@@ -643,6 +652,13 @@ export class ToolManager {
   }
 
   handleToggleStrikethrough(id: string) {
+    this.textSelectionHandler.updateGlobalStyles(
+      id,
+      this.store,
+      'textDecoration',
+      'line-through',
+      true
+    );
     this.textSelectionHandler.updatePartialInlineStyle(
       id,
       this.store,
@@ -653,12 +669,14 @@ export class ToolManager {
   }
 
   handleColorChange(id: string, newColor: string) {
+    this.textSelectionHandler.updateGlobalStyles(id, this.store, 'color', newColor, false);
     this.textSelectionHandler.updatePartialInlineStyle(id, this.store, 'color', newColor, false);
   }
 
-  handleFontSizeChange(id: string, newFontSize: number) {
-    this.textSelectionHandler.updateGlobalStyles(id, this.store, { fontSize: newFontSize });
-  }
+  //这里没用了
+  // handleFontSizeChange(id: string, newFontSize: number) {
+  //   this.textSelectionHandler.updateGlobalStyles(id, this.store, { fontSize: newFontSize });
+  // }
   /**
    * 处理文本节点鼠标抬起（供文本组件调用，内部转发给 TextSelectionHandler）
    * @param e - 鼠标事件
