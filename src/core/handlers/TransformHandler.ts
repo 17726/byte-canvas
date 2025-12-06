@@ -6,7 +6,6 @@
 import { useCanvasStore } from '@/store/canvasStore';
 import type { BaseNodeState } from '@/types/state';
 import type { ResizeHandle } from '@/types/editor';
-import { zip } from 'lodash-es';
 
 /** 拖拽类型 */
 type DragType = 'node' | 'area';
