@@ -2,7 +2,7 @@
   <div v-if="hasSelectedNodes && !allNodesLocked" class="selection-container">
     <!-- 在组合编辑模式下，如果没有操作框（没有选中子元素），显示子元素的虚线框 -->
     <!-- 如果有操作框，则不显示 individual-selection，避免重复 -->
-    <template v-if="isEditingGroup && selectedNodes.length > 0 && !operationOverlayStyle">
+    <template v-if="isEditingGroup && selectedNodes.length > 0 && operationOverlayStyle === null">
       <div
         v-for="node in selectedNodes"
         :key="node?.id"
