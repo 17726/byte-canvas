@@ -126,8 +126,6 @@ export const useCanvasStore = defineStore('canvas', () => {
   const MAX_HISTORY = 50;
   let isRestoringSnapshot = false;
   let isHistoryLocked = false;
-  // 防止在 addNode 后立即调用 updateNode 时重复记录快照
-  let isAddingNode = false;
 
   const canUndo = computed(() => historyStack.value.length > 0);
   const canRedo = computed(() => redoStack.value.length > 0);
@@ -140,20 +138,40 @@ export const useCanvasStore = defineStore('canvas', () => {
     editingGroupId: editingGroupId.value,
   });
 
-  const pushSnapshot = (caller?: string) => {
+  const pushSnapshot = () => {
     if (isRestoringSnapshot || isHistoryLocked) return;
-    // 调试：追踪调用来源
-    if (caller) {
-      console.log(`[pushSnapshot] 被调用，来源: ${caller}`);
-    } else {
-      const stack = new Error().stack;
-      console.log('[pushSnapshot] 被调用，调用栈:', stack?.split('\n').slice(1, 6).join('\n'));
-    }
     historyStack.value.push(createSnapshot());
     if (historyStack.value.length > MAX_HISTORY) {
       historyStack.value.shift();
     }
     redoStack.value = [];
+  };
+
+  /**
+   * 批量操作时锁定历史记录，避免重复记录快照
+   * 使用方式：
+   * const unlock = lockHistory();
+   * // ... 批量操作
+   * unlock();
+   */
+  /**
+   * 批量操作时锁定历史记录，避免重复记录快照
+   * 使用方式：
+   * const unlock = lockHistory();
+   * // ... 批量操作
+   * unlock();
+   */
+  const lockHistory = () => {
+    const wasLocked = isHistoryLocked;
+    if (!wasLocked) {
+      pushSnapshot(); // 在锁定前记录一次快照
+      isHistoryLocked = true;
+    }
+    return () => {
+      if (!wasLocked) {
+        isHistoryLocked = false;
+      }
+    };
   };
 
   const restoreSnapshot = (snapshot: CanvasSnapshot) => {
@@ -213,9 +231,9 @@ export const useCanvasStore = defineStore('canvas', () => {
     if (!node) return;
 
     // 非交互态下，记录快照以支持撤销
-    // 但如果正在添加节点或恢复快照，则跳过（避免在 addNode 后立即调用 updateNode 时重复记录，或撤销时重复记录）
-    if (!isInteracting.value && !isAddingNode && !isRestoringSnapshot) {
-      pushSnapshot('updateNode');
+    // 但如果正在恢复快照，则跳过（避免撤销时重复记录）
+    if (!isInteracting.value && !isRestoringSnapshot) {
+      pushSnapshot();
     }
 
     // ==================== 组合节点特殊处理 ====================
@@ -365,23 +383,17 @@ export const useCanvasStore = defineStore('canvas', () => {
 
   // 2. 添加节点
   function addNode(node: NodeState) {
-    isAddingNode = true;
-    pushSnapshot('addNode');
+    pushSnapshot();
     nodes.value[node.id] = node;
     nodeOrder.value.push(node.id);
     version.value++; // 触发更新
-    // 使用 queueMicrotask 确保在下一个微任务中重置标志
-    // 这样可以避免在同一个同步调用链中的 updateNode 重复记录快照
-    queueMicrotask(() => {
-      isAddingNode = false;
-    });
   }
 
   // 3. 删除节点（如果是组合，递归删除所有子节点）
   function deleteNode(id: string) {
     const wasLocked = isHistoryLocked;
     if (!wasLocked) {
-      pushSnapshot('deleteNode');
+      pushSnapshot();
       isHistoryLocked = true; // 避免递归删除时重复记录
     }
     const node = nodes.value[id];
@@ -415,7 +427,7 @@ export const useCanvasStore = defineStore('canvas', () => {
   // 注意：如果包含组合，会递归删除其子节点
   function deleteNodes(ids: string[]) {
     if (ids.length === 0) return;
-    pushSnapshot('deleteNodes');
+    pushSnapshot();
     const idsToDelete = ids.filter((id) => nodes.value[id]);
     if (idsToDelete.length === 0) return;
 
@@ -526,7 +538,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     console.log('[CanvasStore] 状态已从 localStorage 恢复');
     historyStack.value = [];
     redoStack.value = [];
-    pushSnapshot('initFromStorage'); // 初始化快照，保证首次撤销可返回到加载状态
+    pushSnapshot(); // 初始化快照，保证首次撤销可返回到加载状态
     return true;
   }
 
@@ -592,7 +604,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     () => isInteracting.value,
     (next, prev) => {
       if (next && !prev) {
-        pushSnapshot('watch-isInteracting');
+        pushSnapshot();
       }
     }
   );
@@ -683,7 +695,7 @@ export const useCanvasStore = defineStore('canvas', () => {
 
     const newIds: string[] = [];
     const prevLock = isHistoryLocked;
-    pushSnapshot('paste'); // 记录粘贴前的状态
+    pushSnapshot(); // 记录粘贴前的状态
     isHistoryLocked = true; // 避免循环内的 addNode 反复写入历史
 
     /**
@@ -925,5 +937,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     getAbsoluteTransform,
     // UI 状态请使用 uiStore 中的 activePanel 和 isPanelExpanded
     updateGlobalTextSelection,
+    // 批量操作支持
+    lockHistory,
   };
 });

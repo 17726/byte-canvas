@@ -71,6 +71,10 @@ export class GroupService {
     // 计算组合的边界框（使用绝对坐标）
     const bounds = store.getSelectionBounds(validIds);
 
+    // 锁定历史记录，避免在更新子节点时重复记录快照
+    // 这样整个组合操作只会记录一次快照，撤销时一次性恢复到组合前的状态
+    const unlockHistory = store.lockHistory();
+
     // 创建新的组合节点
     const groupId = uuidv4();
     const groupNode: GroupState = {
@@ -107,7 +111,7 @@ export class GroupService {
         const absX = absTransform ? absTransform.x : node.transform.x;
         const absY = absTransform ? absTransform.y : node.transform.y;
 
-        // 使用 updateNode 确保响应式更新
+        // 使用 updateNode 确保响应式更新（此时不会记录快照，因为历史记录已锁定）
         store.updateNode(id, {
           parentId: groupId,
           transform: {
@@ -134,6 +138,10 @@ export class GroupService {
     store.setActive([groupId]);
 
     store.version++;
+
+    // 解锁历史记录
+    unlockHistory();
+
     console.log(`[Group] 创建组合 ${groupId}，包含 ${validIds.length} 个元素`);
     return groupId;
   }
