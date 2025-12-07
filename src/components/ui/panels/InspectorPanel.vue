@@ -190,7 +190,7 @@
             </div>
             <div class="prop-item">
               <div class="section-title">颜色</div>
-              <a-color-picker v-model="textColor" show-text size="small" />
+              <a-color-picker :value="textColor" show-text size="small" />
             </div>
           </template>
           <!-- Image Specific -->

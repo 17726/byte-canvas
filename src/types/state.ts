@@ -106,12 +106,12 @@ export interface TextState extends BaseNodeState {
   type: NodeType.TEXT;
   props: {
     content: string;
-    fontFamily: string;
-    fontSize: number;
-    fontWeight: 'normal' | 'bold' | number; // B (加粗)
-    fontStyle: 'normal' | 'italic'; // I (斜体)
-    color: string;
-    lineHeight: number;
+    fontFamily?: string;
+    fontSize?: number;
+    fontWeight?: 'normal' | 'bold' | number; // B (加粗)
+    fontStyle?: 'normal' | 'italic'; // I (斜体)
+    color?: string;
+    lineHeight?: number;
     textDecoration?: TextDecorationValue;
     // 添加部分文本样式支持
     /**
