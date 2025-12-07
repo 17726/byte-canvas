@@ -165,6 +165,17 @@ export function useStyleSync() {
     0
   );
 
+  const borderStyle = createBinding<string>(
+    (node) => {
+      if (node.type === NodeType.RECT || node.type === NodeType.CIRCLE) {
+        return (node as ShapeState).style.borderStyle || 'solid';
+      }
+      return 'solid';
+    },
+    (node, value) => ({ style: { ...node.style, borderStyle: value } }),
+    'solid'
+  );
+
   // ==================== Text 属性 ====================
 
   const fontSize = createBinding<number>(
@@ -294,6 +305,7 @@ export function useStyleSync() {
     fillColor,
     strokeColor,
     strokeWidth,
+    borderStyle,
 
     // Text 属性
     fontSize,

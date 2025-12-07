@@ -17,12 +17,12 @@
       </div>
       <div class="divider"></div>
       <div class="tool-item">
-        <a-popover trigger="hover" position="top" content-class="toolbar-popover-content">
+        <a-popover trigger="click" position="top" content-class="toolbar-popover-content">
           <a-button size="mini" type="text" padding="0">
             <icon-menu style="font-size: 20px; width: 24px" />
           </a-button>
           <template #content>
-            <div class="popover-grid" style="display: flex; gap: 10px">
+            <div class="popover-grid" style="display: flex; gap: 10px; align-items: center">
               <a-tooltip content="边框颜色" :mouse-enter-delay="0.5">
                 <a-color-picker
                   position="left"
@@ -41,6 +41,15 @@
                   :min="0"
                   :max="100"
                 />
+              </a-tooltip>
+              <a-tooltip
+                content="边框线条"
+                :mouse-enter-delay="0.5"
+                style="display: flex; align-items: center"
+              >
+                <a-button size="mini" :type="isDashed ? 'primary' : 'text'" @click="toggleDashed">
+                  <icon-halo theme="outline" size="16" fill="#333" />
+                </a-button>
               </a-tooltip>
             </div>
           </template>
@@ -203,7 +212,7 @@
 import { computed, inject, type Ref } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
 import { useStyleSync } from '@/composables/useStyleSync';
-import { type TextDecorationValue, type TextState } from '@/types/state';
+import { type TextDecorationValue, type TextState, type ShapeState } from '@/types/state';
 import { worldToClient } from '@/core/utils/geometry';
 // import { DEFAULT_IMAGE_FILTERS, DEFAULT_IMAGE_URL } from '@/config/defaults';
 import {
@@ -216,12 +225,12 @@ import {
   SentToBack as IconSendToBack,
   Layers as IconLayers, // 新增图标
   // Text as IconText, // 新增图标
+  Halo as IconHalo, // 新增图标
 } from '@icon-park/vue-next';
 import { ToolManager } from '@/core/ToolManager';
 import { IconFontColors, IconMenu } from '@arco-design/web-vue/es/icon';
 const store = useCanvasStore();
 const toolManagerRef = inject<Ref<ToolManager>>('toolManager');
-
 // 使用 useStyleSync 进行属性绑定
 const {
   activeNode,
@@ -298,7 +307,24 @@ const sendToBack = () => {
 
 // --- Shape Actions ---
 // fillColor, strokeColor, strokeWidth 已从 useStyleSync 导入
-
+const isDashed = computed(() => {
+  // 获取第一个激活的节点ID
+  const activeId = Array.from(store.activeElementIds)[0];
+  if (!activeId) return false;
+  // 获取节点并校验类型（仅矩形/圆形有边框样式）
+  const node = store.nodes[activeId] as ShapeState;
+  const shapeNode = node as ShapeState;
+  // 判断边框样式是否为虚线
+  return shapeNode.style.borderStyle === 'dashed';
+});
+const toggleDashed = () => {
+  const activeId = Array.from(store.activeElementIds)[0];
+  if (activeId) {
+    console.log('切换虚线');
+    // toolManagerRef?.value.handleToggleDashed(activeId);
+    console.log('切换虚线完毕');
+  }
+};
 // --- Text Actions ---
 // fontSize, textColor 已从 useStyleSync 导入
 
