@@ -7,7 +7,7 @@ export const DEFAULT_VIEWPORT = {
   offsetX: 0,
   offsetY: 0,
   rotation: 0,
-  backgroundColor: 'rgba(234,234,239,1)',
+  backgroundColor: 'rgba(245,245,245,100)',
   isGridVisible: true,
   gridSize: 20,
   isSnapToGrid: true,

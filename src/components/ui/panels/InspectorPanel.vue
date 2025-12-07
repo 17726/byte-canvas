@@ -7,11 +7,6 @@
       </div>
       <div class="panel-section">
         <div class="panel-section">
-          <div class="section-title">网格</div>
-          <div class="prop-item">
-            <span class="label">显示网格</span>
-            <a-switch v-model:checked="store.viewport.isGridVisible" />
-          </div>
           <div class="prop-item">
             <span class="label">样式</span>
             <a-radio-group v-model="store.viewport.gridStyle" size="mini">
