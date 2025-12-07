@@ -1,22 +1,84 @@
 /**
  * @file geometry.ts
- * @description 几何计算工具库
+ * @description 几何计算与坐标转换工具库 - 三大坐标系统的统一抽象层
  *
- * 本文件存放所有与几何计算相关的纯函数 (Pure Functions)。
+ * ====================================
+ * 三大坐标系统概念 (Three Coordinate Systems)
+ * ====================================
  *
- * 特点：
- * 1. 无状态 (Stateless)：不依赖外部 Store 或类实例，输入确定则输出确定。
- * 2. 纯计算 (Pure Calculation)：仅进行数学运算，不涉及 DOM 操作或副作用。
- * 3. 通用性 (Generic)：可被 ToolManager、Renderers 或其他 Service 复用。
+ * 1. **Screen 坐标系 (浏览器视口坐标)**
+ *    - 来源：MouseEvent.clientX / clientY
+ *    - 特点：相对于浏览器窗口左上角，包含页面所有 UI 元素（Header、Sidebar 等）
+ *    - 用途：原始鼠标事件、DOM 元素定位
  *
- * 包含函数列表：
+ * 2. **Container 坐标系 (画布容器相对坐标)**
+ *    - 来源：Screen 坐标 - el.getBoundingClientRect()
+ *    - 特点：相对于 CanvasStage 根元素左上角，剔除了外部布局影响
+ *    - 用途：框选框渲染、DOM 层叠效果
+ *
+ * 3. **World 坐标系 (逻辑世界坐标)**
+ *    - 来源：Container 坐标 / viewport.zoom - viewport.offset
+ *    - 特点：画布内部逻辑坐标，不受缩放(zoom)和平移(pan)影响
+ *    - 用途：节点位置计算、碰撞检测、几何变换
+ *
+ * ====================================
+ * 核心转换函数 (Core Transformation Functions)
+ * ====================================
+ *
+ * 本文件提供四个核心纯函数，强制所有 Handler 使用统一的坐标转换逻辑：
+ *
+ * - eventToContainer: Screen -> Container（处理 DOM 偏移）
+ * - containerToWorld: Container -> World（处理 Zoom/Pan）
+ * - eventToWorld: Screen -> World（组合转换，推荐优先使用）
+ * - worldToClient: World -> Container/Screen（逆向转换，支持可选 DOM 偏移）
+ *
+ * ====================================
+ * 其他几何计算函数
+ * ====================================
+ *
  * - calculateBounds: 计算一组节点的包围盒 (AABB)
- * - clientToWorld: 屏幕坐标转世界坐标
- * - worldToClient: 世界坐标转屏幕坐标
  * - isNodeInRect: 判断节点是否在矩形区域内 (碰撞检测)
  * - calculateRectResize: 计算矩形缩放后的位置和尺寸
  * - calculateCircleResize: 计算圆形缩放后的位置和尺寸
  * - calculateTextResize: 计算文本缩放后的位置和尺寸
+ *
+ * ====================================
+ * 开发规范 (Development Guidelines)
+ * ====================================
+ *
+ * ⚠️ **重要提示**：所有涉及鼠标位置计算的 Handler，必须遵循以下规范：
+ *
+ * 1. **禁止手动计算 getBoundingClientRect()**
+ *    ❌ 错误示例：
+ *    ```ts
+ *    const rect = stageEl.getBoundingClientRect();
+ *    const x = e.clientX - rect.left;
+ *    ```
+ *    ✅ 正确示例：
+ *    ```ts
+ *    const pos = eventToContainer(e, stageEl);
+ *    ```
+ *
+ * 2. **优先使用 eventToWorld 一步到位转换**
+ *    ❌ 错误示例：
+ *    ```ts
+ *    const rect = stageEl.getBoundingClientRect();
+ *    const containerX = e.clientX - rect.left;
+ *    const worldX = (containerX - viewport.offsetX) / viewport.zoom;
+ *    ```
+ *    ✅ 正确示例：
+ *    ```ts
+ *    const worldPos = eventToWorld(e, stageEl, viewport);
+ *    ```
+ *
+ * 3. **仅在需要容器坐标时才拆分步骤**
+ *    - 框选框渲染：需要 Container 坐标（因为框选框是 DOM 元素）
+ *    - 节点位置计算：需要 World 坐标（因为节点的 x/y 是逻辑坐标）
+ *
+ * 4. **所有涉及 DOM 元素的地方必须做非空检查**
+ *    ```ts
+ *    if (!stageEl) return { x: 0, y: 0 }; // 兜底处理
+ *    ```
  */
 
 import type { BaseNodeState, ViewportState } from '@/types/state';
@@ -95,42 +157,180 @@ export function calculateBounds(
   };
 }
 
-// 屏幕坐标 → 画布世界坐标（考虑视口偏移和缩放）
+// ====================================
+// 核心坐标转换函数 (Core Transformation Functions)
+// ====================================
+
 /**
- * 将屏幕坐标转换为画布世界坐标
- * @param viewport 当前视口状态 (包含缩放和偏移)
- * @param clientX 鼠标事件的 clientX
- * @param clientY 鼠标事件的 clientY
- * @returns 转换后的世界坐标 {x, y}
+ * 【核心函数 1】将鼠标事件坐标转换为容器相对坐标
+ *
+ * 坐标系转换：Screen -> Container
+ *
+ * 转换链路：
+ * ```
+ * MouseEvent.clientX/Y (浏览器窗口坐标)
+ *   ↓ 减去 el.getBoundingClientRect()
+ * Container X/Y (相对于 CanvasStage 左上角)
+ * ```
+ *
+ * 用途：
+ * - 框选框渲染（需要相对于 CanvasStage 的位置）
+ * - 需要容器相对坐标的场景
+ * - 作为 eventToWorld 的第一步
+ *
+ * @param e - 鼠标事件
+ * @param el - DOM 容器元素（通常是 CanvasStage 根元素）
+ * @returns 相对于容器左上角的坐标 { x, y }（单位：像素）
+ *
+ * @example
+ * ```ts
+ * // 框选框起点计算
+ * const startPos = eventToContainer(e, stageEl);
+ * boxSelectStart.value = startPos;
+ * ```
+ */
+export function eventToContainer(e: MouseEvent, el: HTMLElement | null): { x: number; y: number } {
+  // 非空检查：如果容器不存在，返回屏幕坐标作为兜底
+  if (!el) {
+    console.warn('[geometry] eventToContainer: el is null, fallback to clientX/Y');
+    return { x: e.clientX, y: e.clientY };
+  }
+
+  const rect = el.getBoundingClientRect();
+  return {
+    x: e.clientX - rect.left,
+    y: e.clientY - rect.top,
+  };
+}
+
+/**
+ * 【核心函数 2】将容器坐标转换为逻辑世界坐标
+ *
+ * 坐标系转换：Container -> World
+ *
+ * 处理：
+ * - 视口缩放（viewport.zoom）
+ * - 视口平移（viewport.offsetX / offsetY）
+ *
+ * @param viewport - 当前视口状态
+ * @param containerX - 容器坐标 X（相对于 CanvasStage 左上角）
+ * @param containerY - 容器坐标 Y
+ * @returns 世界坐标 { x, y }（画布逻辑坐标）
+ *
+ * @example
+ * ```ts
+ * const containerPos = eventToContainer(e, stageEl);
+ * const worldPos = containerToWorld(viewport, containerPos.x, containerPos.y);
+ * node.transform.x = worldPos.x; // 设置节点位置
+ * ```
+ */
+export function containerToWorld(
+  viewport: ViewportState,
+  containerX: number,
+  containerY: number
+): { x: number; y: number } {
+  return {
+    x: (containerX - viewport.offsetX) / viewport.zoom,
+    y: (containerY - viewport.offsetY) / viewport.zoom,
+  };
+}
+
+/**
+ * 【核心函数 3】将鼠标事件直接转换为逻辑世界坐标（推荐使用）
+ *
+ * 坐标系转换：Screen -> Container -> World（组合转换）
+ *
+ * 这是最常用的转换函数，适用于所有需要计算节点位置的场景。
+ *
+ * 内部流程：
+ * 1. 计算相对于容器的坐标（处理 DOM 偏移）
+ * 2. 转换为世界坐标（处理 Zoom/Pan）
+ *
+ * @param e - 鼠标事件
+ * @param el - DOM 容器元素
+ * @param viewport - 当前视口状态
+ * @returns 世界坐标 { x, y }（画布逻辑坐标）
+ *
+ * @example
+ * ```ts
+ * // 创建模式：鼠标位置作为图形左上角
+ * const worldPos = eventToWorld(e, stageEl, viewport);
+ * previewNode.transform.x = worldPos.x;
+ * previewNode.transform.y = worldPos.y;
+ *
+ * // 旋转计算：鼠标相对于节点中心的角度
+ * const worldPos = eventToWorld(e, stageEl, viewport);
+ * const angle = Math.atan2(worldPos.y - centerY, worldPos.x - centerX);
+ * ```
+ */
+export function eventToWorld(
+  e: MouseEvent,
+  el: HTMLElement | null,
+  viewport: ViewportState
+): { x: number; y: number } {
+  const containerPos = eventToContainer(e, el);
+  return containerToWorld(viewport, containerPos.x, containerPos.y);
+}
+
+/**
+ * 【核心函数 4】将逻辑世界坐标转换为容器/屏幕坐标（逆向转换）
+ *
+ * 坐标系转换：World -> Container/Screen
+ *
+ * 用途：
+ * - 将节点的逻辑位置转换为屏幕位置（用于渲染悬浮工具栏等）
+ * - 计算世界坐标对应的屏幕像素位置
+ *
+ * @param viewport - 当前视口状态
+ * @param worldX - 世界坐标 X
+ * @param worldY - 世界坐标 Y
+ * @param el - 可选：DOM 容器元素。如果提供，返回绝对屏幕坐标；否则返回容器相对坐标
+ * @returns 容器坐标或屏幕坐标 { x, y }
+ *
+ * @example
+ * ```ts
+ * // 返回容器相对坐标（用于 CSS 定位）
+ * const containerPos = worldToClient(viewport, node.x, node.y);
+ * toolbarStyle.left = containerPos.x + 'px';
+ *
+ * // 返回绝对屏幕坐标
+ * const screenPos = worldToClient(viewport, node.x, node.y, stageEl);
+ * ```
+ */
+export function worldToClient(
+  viewport: ViewportState,
+  worldX: number,
+  worldY: number,
+  el?: HTMLElement | null
+): { x: number; y: number } {
+  // 先转换为容器坐标
+  const containerX = worldX * viewport.zoom + viewport.offsetX;
+  const containerY = worldY * viewport.zoom + viewport.offsetY;
+
+  // 如果提供了容器元素，转换为绝对屏幕坐标
+  if (el) {
+    const rect = el.getBoundingClientRect();
+    return {
+      x: containerX + rect.left,
+      y: containerY + rect.top,
+    };
+  }
+
+  // 否则返回容器相对坐标
+  return { x: containerX, y: containerY };
+}
+
+/**
+ * @deprecated 使用 eventToWorld 替代
+ * 保留此函数仅为向后兼容，新代码请使用 eventToWorld
  */
 export function clientToWorld(
   viewport: ViewportState,
   clientX: number,
   clientY: number
 ): { x: number; y: number } {
-  return {
-    x: (clientX - viewport.offsetX) / viewport.zoom, //clientX是相对于浏览器窗口的坐标，需要减去视口的偏移量，再除以缩放比例
-    y: (clientY - viewport.offsetY) / viewport.zoom,
-  };
-}
-
-// 画布世界坐标 → 屏幕坐标
-/**
- * 将画布世界坐标转换为屏幕坐标
- * @param viewport 当前视口状态
- * @param worldX 世界坐标 X
- * @param worldY 世界坐标 Y
- * @returns 转换后的屏幕坐标 {x, y}
- */
-export function worldToClient(
-  viewport: ViewportState,
-  worldX: number,
-  worldY: number
-): { x: number; y: number } {
-  return {
-    x: worldX * viewport.zoom + viewport.offsetX,
-    y: worldY * viewport.zoom + viewport.offsetY,
-  };
+  console.warn('[geometry] clientToWorld is deprecated, use eventToWorld instead');
+  return containerToWorld(viewport, clientX, clientY);
 }
 
 // 判断矩形框内是否包含某元素

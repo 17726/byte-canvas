@@ -1,6 +1,7 @@
 // src/core/handlers/RotationHandler.ts
 import { useCanvasStore } from '@/store/canvasStore';
 import type { BaseNodeState } from '@/types/state';
+import { eventToWorld } from '../utils/geometry';
 
 /** 旋转相关状态 */
 interface RotationState {
@@ -10,16 +11,30 @@ interface RotationState {
 }
 
 /**
- * 旋转处理器
- * 职责：实现「单个节点绕自身中心旋转」「多选节点各自绕自身中心旋转」
+ * 旋转处理器 - 使用统一坐标转换系统
+ *
+ * 职责：
+ * - 实现「单个节点绕自身中心旋转」
+ * - 实现「多选节点各自绕自身中心旋转」
+ *
+ * 坐标系统：
+ * - 使用 eventToWorld 获取鼠标的世界坐标
+ * - 使用节点中心的世界坐标计算角度
+ * - 确保旋转计算更加严谨（消除屏幕坐标带来的几何偏差）
  */
 export class RotationHandler {
   private store = useCanvasStore();
+  private stageEl: HTMLElement | null;
+
   private rotationState: RotationState = {
     isRotating: false,
     startAngle: 0,
     nodeInitialRotations: {},
   };
+
+  constructor(stageEl: HTMLElement | null) {
+    this.stageEl = stageEl;
+  }
 
   /** 获取当前旋转状态（供ToolManager判断优先级） */
   get isRotating() {
@@ -50,18 +65,17 @@ export class RotationHandler {
     if (!firstNode) return; // 新增：空值校验，避免后续错误
     const firstNodeAbsTransform =
       this.store.getAbsoluteTransform(firstNodeId) || firstNode.transform;
+    // 计算节点中心的世界坐标
     const nodeCenter = {
       x: firstNodeAbsTransform.x + firstNodeAbsTransform.width / 2,
       y: firstNodeAbsTransform.y + firstNodeAbsTransform.height / 2,
     };
 
-    // 转换鼠标坐标为「画布内相对坐标」（抵消视口缩放/平移影响）
-    const viewport = this.store.viewport;
-    const mouseX = (e.clientX - viewport.offsetX) / viewport.zoom;
-    const mouseY = (e.clientY - viewport.offsetY) / viewport.zoom;
+    // 【修复】使用 eventToWorld 获取鼠标的世界坐标（更严谨）
+    const mouseWorld = eventToWorld(e, this.stageEl, this.store.viewport);
 
-    // 计算初始角度（弧度）
-    const startAngle = Math.atan2(mouseY - nodeCenter.y, mouseX - nodeCenter.x);
+    // 计算初始角度（弧度）- 鼠标世界坐标 vs 节点中心世界坐标
+    const startAngle = Math.atan2(mouseWorld.y - nodeCenter.y, mouseWorld.x - nodeCenter.x);
 
     // 更新旋转状态
     this.rotationState = {
@@ -87,18 +101,17 @@ export class RotationHandler {
     const firstNode = this.store.nodes[firstNodeId] as BaseNodeState;
     const firstNodeAbsTransform =
       this.store.getAbsoluteTransform(firstNodeId) || firstNode.transform;
+    // 计算节点中心的世界坐标
     const nodeCenter = {
       x: firstNodeAbsTransform.x + firstNodeAbsTransform.width / 2,
       y: firstNodeAbsTransform.y + firstNodeAbsTransform.height / 2,
     };
 
-    // 转换鼠标坐标为「画布内相对坐标」
-    const viewport = this.store.viewport;
-    const mouseX = (e.clientX - viewport.offsetX) / viewport.zoom;
-    const mouseY = (e.clientY - viewport.offsetY) / viewport.zoom;
+    // 【修复】使用 eventToWorld 获取鼠标的世界坐标
+    const mouseWorld = eventToWorld(e, this.stageEl, this.store.viewport);
 
-    // 计算当前鼠标相对于节点中心的角度（弧度）
-    const currentAngle = Math.atan2(mouseY - nodeCenter.y, mouseX - nodeCenter.x);
+    // 计算当前鼠标相对于节点中心的角度（弧度）- 世界坐标计算更精确
+    const currentAngle = Math.atan2(mouseWorld.y - nodeCenter.y, mouseWorld.x - nodeCenter.x);
 
     // 计算角度变化量（弧度转角度，保留1位小数）
     const angleDelta = Math.round((((currentAngle - startAngle) * 180) / Math.PI) * 10) / 10;

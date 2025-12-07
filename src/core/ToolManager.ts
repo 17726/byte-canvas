@@ -58,6 +58,7 @@ import { useCanvasStore } from '@/store/canvasStore';
 import { useUIStore } from '@/store/uiStore';
 import type { ResizeHandle } from '@/types/editor';
 import { NodeType, type BaseNodeState } from '@/types/state';
+import { CreationHandler } from './handlers/CreationHandler';
 import { RotationHandler } from './handlers/RotationHandler';
 import { SelectionHandler } from './handlers/SelectionHandler';
 import { TextSelectionHandler } from './handlers/TextSelectionHandler';
@@ -83,6 +84,8 @@ export class ToolManager {
   private selectionHandler: SelectionHandler;
   private textSelectionHandler: TextSelectionHandler;
   private rotationHandler: RotationHandler;
+  // 公开创建处理器，供 Vue 组件访问（用于 Esc 键处理）
+  public creationHandler!: import('./handlers/CreationHandler').CreationHandler;
 
   // 改为从外部获取空格键状态（不再内部维护）
   private getIsSpacePressed: () => boolean;
@@ -101,16 +104,19 @@ export class ToolManager {
     this.stageEl = stageEl;
     this.getIsSpacePressed = getIsSpacePressed;
 
-    // 初始化处理器
+    // 初始化处理器 - 确保所有需要坐标转换的 Handler 都接收 stageEl
     this.viewportHandler = new ViewportHandler(this.store);
-    this.transformHandler = new TransformHandler(this.store);
+    this.transformHandler = new TransformHandler(this.store, stageEl); // 【修复】注入 stageEl
     this.selectionHandler = new SelectionHandler(this.store, stageEl);
     this.textSelectionHandler = new TextSelectionHandler(
       this.store,
       this.transformHandler,
       this.viewportHandler
     );
-    this.rotationHandler = new RotationHandler(); // 新增：初始化旋转处理器
+    this.rotationHandler = new RotationHandler(stageEl); // 【修复】传入 stageEl
+
+    // 【修复】同步实例化创建处理器（解决竞态条件）
+    this.creationHandler = new CreationHandler(this.store, stageEl);
   }
 
   /**
@@ -190,9 +196,16 @@ export class ToolManager {
     // 强制防护：不通过则直接忽略
     if (!this.forceProtectEvent(e)) return;
 
-    // 原有业务逻辑：空格+左键平移（最高优先级）
+    // 【修复】空格+左键平移（绝对最高优先级，即使创建模式也可以平移）
     if (this.getIsSpacePressed() && e.button === 0) {
       this.viewportHandler.startPan(e);
+      this.store.isInteracting = true; // 标记交互中，触发光标变为 grabbing
+      return;
+    }
+
+    // 创建模式拦截（次高优先级）
+    if (this.creationHandler && this.creationHandler.isCreating()) {
+      this.creationHandler.handleMouseDown(e);
       return;
     }
 
@@ -207,6 +220,7 @@ export class ToolManager {
     // 原有业务逻辑：中键平移
     if (e.button === 1) {
       this.viewportHandler.startPan(e);
+      this.store.isInteracting = true; // 标记交互中
       this.store.setActive([]);
       if (this.store.editingGroupId) {
         GroupService.exitGroupEdit(this.store);
@@ -271,6 +285,12 @@ export class ToolManager {
       if (!this.stageEl?.contains(e.target as Node)) return;
     }
 
+    // 创建模式拦截（最高优先级）
+    if (this.creationHandler && this.creationHandler.isCreating()) {
+      this.creationHandler.handleMouseMove(e);
+      return;
+    }
+
     // 最高优先级：多选缩放
     if (this.transformHandler.isMultiResizing) {
       this.transformHandler.updateMultiResize(e);
@@ -318,6 +338,12 @@ export class ToolManager {
    * 结束所有交互状态，并在组合编辑模式下自动调整边界
    */
   handleMouseUp() {
+    // 创建模式拦截
+    if (this.creationHandler && this.creationHandler.isCreating()) {
+      this.creationHandler.handleMouseUp();
+      return;
+    }
+
     // 防护逻辑：用mock事件强制防护，避免外部up事件干扰
     const mockEvent = new MouseEvent('mouseup');
     this.forceProtectEvent(mockEvent);
@@ -326,6 +352,7 @@ export class ToolManager {
 
     // 重置画布平移状态
     this.viewportHandler.endPan();
+    this.store.isInteracting = false; // 重置交互状态
 
     // 重置旋转状态
     this.rotationHandler.endRotate();
