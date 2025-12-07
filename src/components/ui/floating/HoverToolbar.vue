@@ -68,7 +68,7 @@
             :popup-offset="-150"
             :popup-translate="[-100, -160]"
             size="mini"
-            v-model="textColor"
+            @change="handleColorChange"
             trigger="hover"
           >
           </a-color-picker>
@@ -304,12 +304,22 @@ const activeTextNode = computed(() => {
   return null;
 });
 
-const textColor = computed({
-  //NOTE: 关于调色板图标样式的响应还有待商榷 这个get响应逻辑是错的但先不改（可画不变）
-  get: () => activeTextNode.value?.props.color || '#000000',
-  set: (val) =>
-    activeTextNode.value && toolManagerRef?.value.handleColorChange(activeTextNode.value.id, val),
-});
+// const textColor = computed({
+//   //NOTE: 关于调色板图标样式的响应还有待商榷 这个get响应逻辑是错的但先不改（可画不变）
+//   get: () => activeTextNode.value?.props.color || '#000000',
+//   set: (val) =>
+//     activeTextNode.value && toolManagerRef?.value.handleColorChange(activeTextNode.value.id, val),
+// });
+
+const handleColorChange = (selectedColor: string) => {
+  // 1. 过滤无效值（和你之前修复的逻辑一致）
+  if (!selectedColor) return;
+
+  // 2. 触发原有修改颜色的逻辑
+  if (activeTextNode.value && toolManagerRef?.value) {
+    toolManagerRef.value.handleColorChange(activeTextNode.value.id, selectedColor);
+  }
+};
 
 // --- 样式开关 (Toggle) ---
 
