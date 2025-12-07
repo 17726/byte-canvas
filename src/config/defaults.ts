@@ -7,12 +7,12 @@ export const DEFAULT_VIEWPORT = {
   offsetX: 0,
   offsetY: 0,
   rotation: 0,
-  backgroundColor: 'rgba(234,234,239,1)',
+  backgroundColor: 'rgba(245,245,245,1)',
   isGridVisible: true,
   gridSize: 20,
   isSnapToGrid: true,
   gridStyle: 'dot' as const, // 'dot' | 'line' | 'none'
-  gridDotColor: 'rgba(255,255,255,1)',
+  gridDotColor: 'rgba(196,196,196, 0.7)',
   gridDotSize: 1,
 };
 
@@ -98,9 +98,9 @@ export const DEFAULT_IMAGE_FILTERS = {
 
 // 预设画布主题（用于快速应用背景/网格配色）
 export const DEFAULT_CANVAS_THEMES = [
-  { name: 'Soft', background: '#fbfcfe', gridColor: 'rgba(0,0,0,0.04)', gridSize: 20 },
-  { name: 'Warm', background: '#fff8f0', gridColor: 'rgba(0,0,0,0.03)', gridSize: 20 },
-  { name: 'Dark', background: '#0f1724', gridColor: 'rgba(255,255,255,0.04)', gridSize: 20 },
+  { name: 'Soft', background: '#fbfcfe', gridColor: 'rgba(0,0,0,0.1)', gridSize: 20 },
+  { name: 'Warm', background: '#fff8f0', gridColor: 'rgba(0,0,0,0.1)', gridSize: 20 },
+  { name: 'Dark', background: '#0f1724', gridColor: 'rgba(255, 255, 255, 0.15)', gridSize: 20 },
 ];
 
 // Canvas Background / Grid Defaults
