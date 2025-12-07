@@ -555,18 +555,32 @@ export class TextSelectionHandler {
       if (styleKey === 'textDecoration' && styleValue) {
         const targetValue = styleValue.toString().trim();
         const origValues = remainingStyles.textDecoration?.toString().split(/\s+/) || [];
-        // 只过滤掉目标值，保留其他值（如移除underline，保留line-through）
-        const newValues = origValues.filter((v) => v !== targetValue);
-        if (newValues.length > 0) {
-          remainingStyles.textDecoration = newValues.join(' ') as TextDecorationValue;
+        const hasTargetDecoration = origValues.includes(targetValue);
+        console.log('targetValue:', targetValue);
+        console.log('origValues:', origValues);
+        console.log('hasTargetDecoration:', hasTargetDecoration);
+        if (hasTargetDecoration) {
+          // 已有，过滤掉目标值，保留其他值（如移除underline，保留line-through）
+          const newValues = origValues.filter((v) => v !== targetValue);
+          if (newValues.length > 0) {
+            remainingStyles.textDecoration = newValues.join(' ') as TextDecorationValue;
+          } else {
+            // 无剩余值则删除整个属性
+            delete remainingStyles.textDecoration;
+          }
         } else {
-          // 无剩余值则删除整个属性
-          delete remainingStyles.textDecoration;
+          //没有，要加上
+          newStyles.push({
+            start: overlapStart,
+            end: overlapEnd,
+            styles: { [styleKey]: styleValue } as InlineStyleProps,
+          });
+          console.log('加上了 newStyles:', newStyles);
         }
       } else {
         // 非textDecoration：删除整个属性（原有逻辑）
         delete remainingStyles[styleKey];
-        console.log('已删除原有属性bold');
+        console.log('已删除原有属性');
         console.log('删除后的remaining:', remainingStyles);
         console.log('删除后的remaining长度:', Object.keys(remainingStyles).length);
       }
@@ -589,7 +603,7 @@ export class TextSelectionHandler {
         styles: { ...origStyles }, // 保留原样式
       });
     }
-    console.log('newStyles:', newStyles);
+    console.log('newStyles:', JSON.stringify(newStyles));
     return newStyles;
   }
 
@@ -693,13 +707,13 @@ export class TextSelectionHandler {
     //5. 处理样式的【添加】
     if (toggle) {
       //NOTE: 此处只需处理textDecoration的特殊添加（多值叠加） 其他单值toggle在split函数中已经完成: 若有应用，删去对应属性
-      if (styleKey === 'textDecoration') {
-        updatedStyles.push({
-          start: selectionStart,
-          end: selectionEnd,
-          styles: { [styleKey]: styleValue } as InlineStyleProps,
-        });
-      }
+      // if (styleKey === 'textDecoration') {
+      //   updatedStyles.push({
+      //     start: selectionStart,
+      //     end: selectionEnd,
+      //     styles: { [styleKey]: styleValue } as InlineStyleProps,
+      //   });
+      // }
     } else {
       updatedStyles.push({
         start: selectionStart,
@@ -839,7 +853,7 @@ export class TextSelectionHandler {
 
     if (!toggle) {
       // -------------------- 场景1：toggle=false 强制覆盖 --------------------
-      console.debug(`updateGlobalStyles: 节点${id}强制设置全局样式 ${styleKey}=${styleValue}`);
+      console.log(`updateGlobalStyles: 节点${id}强制设置全局样式 ${styleKey}=${styleValue}`);
       // 修复点2：显式类型断言，兼容TextGlobalStyleProps的属性类型
       finalGlobalStyles[styleKey] = styleValue as string | number | undefined;
       // 清理所有内联样式中的该属性
@@ -852,41 +866,121 @@ export class TextSelectionHandler {
         .filter((style) => Object.keys(style.styles).length > 0); // 过滤空样式
     } else {
       // -------------------- 场景2：toggle=true 智能切换 --------------------
-      // 子场景A：内联有该样式但未覆盖全部文本 → 全局应用，清理内联
+      // 子场景A：内联有该样式但未覆盖全部文本 → 全局应用（合并值），清理内联
       if (styleRanges.length > 0 && !isInlineCoversAll) {
-        console.debug(
+        console.log(
           `updateGlobalStyles: 节点${id}内联样式未全覆盖，全局应用 ${styleKey}=${styleValue}`
         );
-        finalGlobalStyles[styleKey] = styleValue as string | number | undefined;
-        // 清理内联样式中的该属性
+        // 核心修改：textDecoration合并值，非textDecoration直接赋值
+        if (styleKey === 'textDecoration' && styleValue) {
+          const targetValue = styleValue.toString().trim();
+          // 读取原有全局textDecoration值
+          const currentGlobalTextDeco = (nodeProps as TextGlobalStyleProps).textDecoration;
+          // 拆分原有值（无则为空数组）
+          const currentValues = currentGlobalTextDeco
+            ? currentGlobalTextDeco.toString().split(/\s+/).filter(Boolean)
+            : [];
+          // 合并目标值并去重（避免重复值，如多次添加underline）
+          const newValues = Array.from(new Set([...currentValues, targetValue]));
+          // 赋值合并后的值
+          finalGlobalStyles[styleKey] = newValues.join(' ') as TextDecorationValue;
+        } else {
+          // 非textDecoration属性：直接赋值（原有逻辑）
+          finalGlobalStyles[styleKey] = styleValue as string | number | undefined;
+        }
+
+        // 清理内联样式（精准移除目标值，保留其他值）
         finalInlineStyles = inlineStyles
           .map((style) => {
             const newStyles = { ...style.styles };
-            delete newStyles[styleKey];
+            if (styleKey === 'textDecoration' && styleValue) {
+              const targetValue = styleValue.toString().trim();
+              const currentTextDeco = newStyles.textDecoration;
+
+              if (currentTextDeco) {
+                const currentValues = currentTextDeco.toString().split(/\s+/).filter(Boolean);
+                const remainingValues = currentValues.filter((v) => v !== targetValue);
+
+                if (remainingValues.length > 0) {
+                  newStyles.textDecoration = remainingValues.join(' ') as TextDecorationValue;
+                } else {
+                  delete newStyles.textDecoration;
+                }
+              }
+            } else {
+              delete newStyles[styleKey];
+            }
             return { ...style, styles: newStyles };
           })
           .filter((style) => Object.keys(style.styles).length > 0);
       }
-      // 子场景B：内联全覆盖 或 全局已应用 → 取消全局+清理内联
+      // 子场景B：内联全覆盖 或 全局已应用 → 取消全局（精准移除）+ 清理内联
       else if (isInlineCoversAll || isGlobalApplied) {
         console.debug(`updateGlobalStyles: 节点${id}样式全覆盖/全局已应用，取消 ${styleKey}`);
-        // 取消全局样式（设为undefined）
-        finalGlobalStyles[styleKey] = undefined;
-        // 清理内联样式中的该属性
+        // 取消全局样式（精准移除textDecoration目标值）
+        if (styleKey === 'textDecoration' && styleValue) {
+          const currentGlobalTextDeco = (nodeProps as TextGlobalStyleProps).textDecoration;
+          const targetValue = styleValue.toString().trim();
+
+          if (currentGlobalTextDeco) {
+            const currentValues = currentGlobalTextDeco.toString().split(/\s+/).filter(Boolean);
+            const remainingValues = currentValues.filter((v) => v !== targetValue);
+
+            if (remainingValues.length > 0) {
+              finalGlobalStyles[styleKey] = remainingValues.join(' ') as TextDecorationValue;
+            } else {
+              finalGlobalStyles[styleKey] = undefined;
+            }
+          } else {
+            finalGlobalStyles[styleKey] = undefined;
+          }
+        } else {
+          finalGlobalStyles[styleKey] = undefined;
+        }
+
+        // 清理内联样式（精准移除目标值）
         finalInlineStyles = inlineStyles
           .map((style) => {
             const newStyles = { ...style.styles };
-            delete newStyles[styleKey];
+            if (styleKey === 'textDecoration' && styleValue) {
+              const targetValue = styleValue.toString().trim();
+              const currentTextDeco = newStyles.textDecoration;
+
+              if (currentTextDeco) {
+                const currentValues = currentTextDeco.toString().split(/\s+/).filter(Boolean);
+                const remainingValues = currentValues.filter((v) => v !== targetValue);
+
+                if (remainingValues.length > 0) {
+                  newStyles.textDecoration = remainingValues.join(' ') as TextDecorationValue;
+                } else {
+                  delete newStyles.textDecoration;
+                }
+              }
+            } else {
+              delete newStyles[styleKey];
+            }
             return { ...style, styles: newStyles };
           })
           .filter((style) => Object.keys(style.styles).length > 0);
       }
-      // 子场景C：无内联样式且全局未应用 → 全局应用该样式
+      // 子场景C：无内联样式且全局未应用 → 全局应用（合并值）
       else {
         console.debug(
           `updateGlobalStyles: 节点${id}无相关样式，全局应用 ${styleKey}=${styleValue}`
         );
-        finalGlobalStyles[styleKey] = styleValue as string | number | undefined;
+        // 核心修改：textDecoration合并值，非textDecoration直接赋值
+        if (styleKey === 'textDecoration' && styleValue) {
+          const targetValue = styleValue.toString().trim();
+          const currentGlobalTextDeco = (nodeProps as TextGlobalStyleProps).textDecoration;
+          const currentValues = currentGlobalTextDeco
+            ? currentGlobalTextDeco.toString().split(/\s+/).filter(Boolean)
+            : [];
+          // 合并目标值并去重
+          const newValues = Array.from(new Set([...currentValues, targetValue]));
+          finalGlobalStyles[styleKey] = newValues.join(' ') as TextDecorationValue;
+        } else {
+          finalGlobalStyles[styleKey] = styleValue as string | number | undefined;
+        }
       }
     }
 
