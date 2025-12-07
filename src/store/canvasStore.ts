@@ -403,10 +403,23 @@ export const useCanvasStore = defineStore('canvas', () => {
 
   // 2. 添加节点
   function addNode(node: NodeState) {
-    pushSnapshot();
+    // 如果刚结束交互（isInteracting 刚变为 false），说明交互开始时的快照已经记录了
+    // 此时不应该再记录快照，避免重复记录
+    // 使用 lockHistoryWithoutSnapshot 来防止在添加节点后可能触发的 updateNode 记录快照
+    const unlockHistory = lockHistoryWithoutSnapshot();
+
+    // 只有在非交互状态下才记录快照
+    // 如果 isInteracting 为 true，说明交互开始时的 watch 已经记录了快照
+    if (!isInteracting.value) {
+      pushSnapshot();
+    }
+
     nodes.value[node.id] = node;
     nodeOrder.value.push(node.id);
     version.value++; // 触发更新
+
+    // 解锁历史记录
+    unlockHistory();
   }
 
   // 3. 删除节点（如果是组合，递归删除所有子节点）
