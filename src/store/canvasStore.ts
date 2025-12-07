@@ -112,6 +112,78 @@ export const useCanvasStore = defineStore('canvas', () => {
   // 当前正在编辑的组合 ID（双击组合进入编辑模式）
   const editingGroupId = ref<string | null>(null);
 
+  // ==================== 创建工具状态 ====================
+  // 当前激活的创建工具（类似 Figma 的工具选择）
+  const creationTool = ref<import('@/types/editor').CanvasToolType>('select');
+  // 创建工具选项（如图片URL等）
+  const creationToolOptions = ref<import('@/types/editor').CreationToolOptions>({});
+  // 预览节点（Ghost Node，用于拖拽创建时的半透明预览）
+  const previewNode = ref<NodeState | null>(null);
+
+  // ==================== 历史记录（Undo/Redo） ====================
+  type CanvasSnapshot = {
+    nodes: Record<string, NodeState>;
+    nodeOrder: string[];
+    viewport: ViewportState;
+    activeElementIds: string[];
+    editingGroupId: string | null;
+  };
+
+  const historyStack = ref<CanvasSnapshot[]>([]);
+  const redoStack = ref<CanvasSnapshot[]>([]);
+  const MAX_HISTORY = 50;
+  let isRestoringSnapshot = false;
+  let isHistoryLocked = false;
+
+  const canUndo = computed(() => historyStack.value.length > 0);
+  const canRedo = computed(() => redoStack.value.length > 0);
+
+  const createSnapshot = (): CanvasSnapshot => ({
+    nodes: cloneDeep(nodes.value),
+    nodeOrder: [...nodeOrder.value],
+    viewport: { ...(viewport as ViewportState) },
+    activeElementIds: Array.from(activeElementIds.value),
+    editingGroupId: editingGroupId.value,
+  });
+
+  const pushSnapshot = () => {
+    if (isRestoringSnapshot || isHistoryLocked) return;
+    historyStack.value.push(createSnapshot());
+    if (historyStack.value.length > MAX_HISTORY) {
+      historyStack.value.shift();
+    }
+    redoStack.value = [];
+  };
+
+  const restoreSnapshot = (snapshot: CanvasSnapshot) => {
+    isRestoringSnapshot = true;
+    nodes.value = cloneDeep(snapshot.nodes);
+    nodeOrder.value = [...snapshot.nodeOrder];
+    Object.assign(viewport, snapshot.viewport);
+    activeElementIds.value = new Set(snapshot.activeElementIds);
+    editingGroupId.value = snapshot.editingGroupId;
+    version.value++; // 标记一次变更，触发依赖更新
+    isRestoringSnapshot = false;
+  };
+
+  const undo = () => {
+    if (!historyStack.value.length) return false;
+    const current = createSnapshot();
+    const previous = historyStack.value.pop()!;
+    redoStack.value.push(current);
+    restoreSnapshot(previous);
+    return true;
+  };
+
+  const redo = () => {
+    if (!redoStack.value.length) return false;
+    const current = createSnapshot();
+    const next = redoStack.value.pop()!;
+    historyStack.value.push(current);
+    restoreSnapshot(next);
+    return true;
+  };
+
   // Getters
   // 获取排序后的渲染列表，供 v-for 使用
   const renderList = computed(() => {
@@ -134,6 +206,11 @@ export const useCanvasStore = defineStore('canvas', () => {
   function updateNode(id: string, patch: Partial<NodeState>) {
     const node = nodes.value[id];
     if (!node) return;
+
+    // 非交互态下，记录快照以支持撤销
+    if (!isInteracting.value) {
+      pushSnapshot();
+    }
 
     // ==================== 组合节点特殊处理 ====================
     // 注意：只有在非编辑模式下才触发子节点同步更新
@@ -282,6 +359,7 @@ export const useCanvasStore = defineStore('canvas', () => {
 
   // 2. 添加节点
   function addNode(node: NodeState) {
+    pushSnapshot();
     nodes.value[node.id] = node;
     nodeOrder.value.push(node.id);
     version.value++; // 触发更新
@@ -289,6 +367,11 @@ export const useCanvasStore = defineStore('canvas', () => {
 
   // 3. 删除节点（如果是组合，递归删除所有子节点）
   function deleteNode(id: string) {
+    const wasLocked = isHistoryLocked;
+    if (!wasLocked) {
+      pushSnapshot();
+      isHistoryLocked = true; // 避免递归删除时重复记录
+    }
     const node = nodes.value[id];
     if (!node) return;
 
@@ -310,6 +393,10 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
 
     version.value++; // 触发更新
+
+    if (!wasLocked) {
+      isHistoryLocked = false;
+    }
   }
 
   // 4. 批量删除节点（仅触发一次 version 更新）
@@ -317,6 +404,7 @@ export const useCanvasStore = defineStore('canvas', () => {
   function deleteNodes(ids: string[]) {
     if (ids.length === 0) return;
 
+    pushSnapshot();
     const idsToDelete = ids.filter((id) => nodes.value[id]);
     if (idsToDelete.length === 0) return;
 
@@ -383,6 +471,28 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
   }
 
+  // ==================== 创建工具操作 ====================
+  /**
+   * 设置当前创建工具
+   * @param tool 工具类型
+   * @param options 工具选项（如图片URL）
+   */
+  function setCreationTool(
+    tool: import('@/types/editor').CanvasToolType,
+    options?: import('@/types/editor').CreationToolOptions
+  ) {
+    creationTool.value = tool;
+    creationToolOptions.value = options || {};
+  }
+
+  /**
+   * 设置预览节点（Ghost Node）
+   * @param node 预览节点数据，传 null 清空
+   */
+  function setPreviewNode(node: NodeState | null) {
+    previewNode.value = node;
+  }
+
   // ==================== 持久化功能 ====================
 
   // 创建防抖保存函数（500ms 防抖，避免频繁写入）
@@ -425,6 +535,9 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
 
     console.log('[CanvasStore] 状态已从 localStorage 恢复');
+    historyStack.value = [];
+    redoStack.value = [];
+    pushSnapshot(); // 初始化快照，保证首次撤销可返回到加载状态
     return true;
   }
 
@@ -445,6 +558,8 @@ export const useCanvasStore = defineStore('canvas', () => {
     activeElementIds.value = new Set();
     Object.assign(viewport, DEFAULT_VIEWPORT);
     version.value = 0;
+    historyStack.value = [];
+    redoStack.value = [];
     console.log('[CanvasStore] 画布已重置');
   }
 
@@ -479,6 +594,16 @@ export const useCanvasStore = defineStore('canvas', () => {
       // version 变化或视口变化，且非交互状态时保存
       if ((versionChanged || viewportChanged) && !newState.interacting) {
         saveToStorage();
+      }
+    }
+  );
+
+  // 记录交互开始时的快照（如拖拽/旋转/缩放）
+  watch(
+    () => isInteracting.value,
+    (next, prev) => {
+      if (next && !prev) {
+        pushSnapshot();
       }
     }
   );
@@ -568,6 +693,9 @@ export const useCanvasStore = defineStore('canvas', () => {
     const offset = PASTE_OFFSET * pasteCount;
 
     const newIds: string[] = [];
+    const prevLock = isHistoryLocked;
+    pushSnapshot(); // 记录粘贴前的状态
+    isHistoryLocked = true; // 避免循环内的 addNode 反复写入历史
 
     /**
      * 深拷贝组合及其所有子节点，生成全新的 ID 和 parentId 关系
@@ -663,6 +791,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
 
     console.log(`[Clipboard] 粘贴 ${newIds.length} 个元素`);
+    isHistoryLocked = prevLock;
     return true;
   }
 
@@ -776,6 +905,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     renderList,
     activeElements,
     globalTextSelection,
+    // 节点操作
     updateNode,
     addNode,
     deleteNode,
@@ -786,6 +916,14 @@ export const useCanvasStore = defineStore('canvas', () => {
     initFromStorage,
     saveToStorage,
     clearStorage,
+    // 历史记录
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+    // 仅供调试使用(undo/redo栈)
+    // historyStack,
+    // redoStack,
     // 复制/剪切/粘贴
     copySelected,
     cutSelected,
@@ -799,5 +937,11 @@ export const useCanvasStore = defineStore('canvas', () => {
     getAbsoluteTransform,
     // UI 状态请使用 uiStore 中的 activePanel 和 isPanelExpanded
     updateGlobalTextSelection,
+    // 创建工具相关
+    creationTool,
+    creationToolOptions,
+    previewNode,
+    setCreationTool,
+    setPreviewNode,
   };
 });

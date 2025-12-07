@@ -203,7 +203,7 @@
 import { computed, inject, type Ref } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
 import { useStyleSync } from '@/composables/useStyleSync';
-import { type TextDecorationValue, type TextState } from '@/types/state';
+import { NodeType, type TextDecorationValue, type TextState } from '@/types/state';
 import { worldToClient } from '@/core/utils/geometry';
 // import { DEFAULT_IMAGE_FILTERS, DEFAULT_IMAGE_URL } from '@/config/defaults';
 import {
@@ -233,7 +233,6 @@ const {
   strokeColor,
   strokeWidth,
   fontSize,
-  textColor,
 } = useStyleSync();
 
 // 显示条件：有且仅有一个选中节点，并且不在其他交互中（如拖拽）
@@ -299,22 +298,32 @@ const sendToBack = () => {
 // fillColor, strokeColor, strokeWidth 已从 useStyleSync 导入
 // --- Text Actions ---
 // fontSize, textColor 已从 useStyleSync 导入
+// 1. 安全获取当前文本节点 (Computed)
+// 这样后面就不用每次都写 (activeNode.value as TextState) 了
+const activeTextNode = computed(() => {
+  const node = store.activeElements[0];
+  if (node?.type === NodeType.TEXT) {
+    return node as TextState;
+  }
+  return null;
+});
 
-// textColor 已从 useStyleSync 导入；现在直接更新 store，不再通过 ToolManager
+const textColor = computed({
+  //NOTE: 关于调色板图标样式的响应还有待商榷 这个get响应逻辑是错的但先不改（可画不变）
+  get: () => activeTextNode.value?.props.color || '#000000',
+  set: (val) =>
+    activeTextNode.value && toolManagerRef?.value.handleColorChange(activeTextNode.value.id, val),
+});
 
 // --- 样式开关 (Toggle) ---
 
 //粗体
 const isBold = computed(() => {
-  const activeId = Array.from(store.activeElementIds)[0];
-  if (!activeId) return false;
-
-  const node = store.nodes[activeId] as TextState;
   const selection = toolManagerRef?.value.getCurrentSelection();
-  if (!node || !selection) return false;
+  if (!activeTextNode.value || !selection) return false;
 
   const { start, end } = selection;
-  const { inlineStyles = [], fontWeight: globalFontWeight } = node.props;
+  const { inlineStyles = [], fontWeight: globalFontWeight } = activeTextNode.value.props;
 
   // 1. 检查行内样式：是否有覆盖选中范围的 bold 样式
   const hasInlineBold = inlineStyles.some(
@@ -349,15 +358,11 @@ const toggleBold = () => {
 
 //斜体
 const isItalic = computed(() => {
-  const activeId = Array.from(store.activeElementIds)[0];
-  if (!activeId) return false;
-
-  const node = store.nodes[activeId] as TextState;
   const selection = toolManagerRef?.value.getCurrentSelection();
-  if (!node || !selection) return false;
+  if (!activeTextNode.value || !selection) return false;
 
   const { start, end } = selection;
-  const { inlineStyles = [], fontStyle: globalFontStyle } = node.props;
+  const { inlineStyles = [], fontStyle: globalFontStyle } = activeTextNode.value.props;
 
   // 1. 检查行内样式：是否有覆盖选中范围的 italic 样式
   const hasInlineItalic = inlineStyles.some(
@@ -385,15 +390,11 @@ const toggleItalic = () => {
 
 //下划线
 const isUnderline = computed(() => {
-  const activeId = Array.from(store.activeElementIds)[0];
-  if (!activeId) return false;
-
-  const node = store.nodes[activeId] as TextState;
   const selection = toolManagerRef?.value.getCurrentSelection();
-  if (!node || !selection) return false;
+  if (!activeTextNode.value || !selection) return false;
 
   const { start, end } = selection;
-  const { inlineStyles = [], textDecoration: globalTextDecoration } = node.props;
+  const { inlineStyles = [], textDecoration: globalTextDecoration } = activeTextNode.value.props;
 
   // 辅助函数：判断 textDecoration 是否包含下划线
   const hasUnderlineValue = (value?: TextDecorationValue) => {
@@ -428,15 +429,11 @@ const toggleUnderline = () => {
 
 //删除线
 const isStrikethrough = computed(() => {
-  const activeId = Array.from(store.activeElementIds)[0];
-  if (!activeId) return false;
-
-  const node = store.nodes[activeId] as TextState;
   const selection = toolManagerRef?.value.getCurrentSelection();
-  if (!node || !selection) return false;
+  if (!activeTextNode.value || !selection) return false;
 
   const { start, end } = selection;
-  const { inlineStyles = [], textDecoration: globalTextDecoration } = node.props;
+  const { inlineStyles = [], textDecoration: globalTextDecoration } = activeTextNode.value.props;
 
   // 辅助函数：判断 textDecoration 是否包含删除线
   const hasStrikethroughValue = (value?: TextDecorationValue) => {

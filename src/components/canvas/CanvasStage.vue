@@ -6,6 +6,7 @@
     @wheel="handleWheel"
     @contextmenu="handleContextMenu"
     :style="stageStyle"
+    :class="{ 'is-creating': isCreating }"
   >
     <!--
       视口层 (Viewport Layer)
@@ -32,6 +33,15 @@
         @mousedown="handleNodeDown($event, node!.id)"
         @dblclick="handleNodeDoubleClick($event, node!.id)"
         @contextmenu="handleNodeContextMenu($event, node!.id)"
+      />
+
+      <!-- 预览节点（Ghost Node）- 创建模式下显示 -->
+      <component
+        v-if="store.previewNode"
+        :key="'preview-' + store.previewNode.id"
+        :is="getComponentType(store.previewNode.type)"
+        :node="store.previewNode"
+        class="preview-node"
       />
 
       <!-- 选中覆盖层 (处理拖拽缩放) -->
@@ -67,7 +77,7 @@ import { ToolManager } from '@/core/ToolManager';
 import { useCanvasStore } from '@/store/canvasStore';
 import { useNodeActions } from '@/composables/useNodeActions';
 import { NodeType } from '@/types/state';
-import { computed, onMounted, onUnmounted, provide, ref, type CSSProperties } from 'vue';
+import { computed, onMounted, onUnmounted, provide, ref, watch, type CSSProperties } from 'vue';
 import GroupToolbar from '../ui/floating/GroupActions.vue';
 import ContextToolbar from '../ui/floating/HoverToolbar.vue';
 import CircleLayer from './layers/CircleLayer.vue';
@@ -86,6 +96,9 @@ const { deleteSelected, copy, cut, paste, groupSelected, ungroupSelected } = use
 // 空格键状态（迁移自ToolManager，统一在组件内维护）
 const isSpacePressed = ref(false);
 
+// 创建模式状态（用于交互锁定）
+const isCreating = computed(() => store.creationTool !== 'select');
+
 // 创建 toolManager ref 并立即 provide（解决依赖注入时序问题）
 const toolManagerRef = ref<ToolManager | null>(null);
 provide('toolManager', toolManagerRef);
@@ -103,11 +116,14 @@ const stageStyle = computed(() => {
   // 基础样式：先初始化背景色 + 光标样式
   const style: CSSProperties = {
     backgroundColor: bg,
-    // 空格按下时切换为手型光标：
-    // - 未交互时：grab（可拖拽手型）
-    // - 交互中（如拖拽画布）：grabbing（拖拽中手型）
-    // - 未按空格：默认光标（可根据需求调整为 'default'/'auto'）
-    cursor: isSpacePressed.value ? (store.isInteracting ? 'grabbing' : 'grab') : 'default',
+    // 光标优先级：空格平移 > 创建模式 > 默认
+    cursor: isSpacePressed.value
+      ? store.isInteracting
+        ? 'grabbing'
+        : 'grab'
+      : isCreating.value
+        ? 'crosshair'
+        : 'default',
   };
 
   // 网格不可见时，直接返回基础样式（含光标）
@@ -170,21 +186,14 @@ const boxSelectEnd = ref({ x: 0, y: 0 });
 
 // 框选样式计算
 const boxSelectStyle = computed(() => {
-  const stageEl = stageRef.value;
-  const stageRect = stageEl ? stageEl.getBoundingClientRect() : { left: 0, top: 0 };
   const start = boxSelectStart.value;
   const end = boxSelectEnd.value;
 
-  // 转换为相对于画布的坐标
-  const startX = start.x - stageRect.left;
-  const startY = start.y - stageRect.top;
-  const endX = end.x - stageRect.left;
-  const endY = end.y - stageRect.top;
-
-  const left = Math.min(startX, endX);
-  const top = Math.min(startY, endY);
-  const width = Math.abs(endX - startX);
-  const height = Math.abs(endY - startY);
+  // 【修复】SelectionHandler 已输出 Container 坐标，直接使用
+  const left = Math.min(start.x, end.x);
+  const top = Math.min(start.y, end.y);
+  const width = Math.abs(end.x - start.x);
+  const height = Math.abs(end.y - start.y);
 
   // 修正：如果 left/top 小于 0，需要调整 width/height 以保持视觉一致性
   // 否则 Math.max(0, left) 会导致框选框“粘”在边缘但尺寸不变，造成视觉误差
@@ -295,10 +304,16 @@ const handleKeyDown = (e: KeyboardEvent) => {
     return;
   }
 
-  // Escape: 退出组合编辑模式
+  // Escape: 取消创建模式或退出组合编辑模式
   if (e.key === 'Escape') {
+    e.preventDefault();
+    // 优先处理创建模式
+    if (toolManagerRef.value?.creationHandler?.isCreating()) {
+      toolManagerRef.value.creationHandler.reset();
+      return;
+    }
+    // 其次处理组合编辑模式
     if (store.editingGroupId) {
-      e.preventDefault();
       GroupService.exitGroupEdit(store);
       return;
     }
@@ -339,6 +354,26 @@ const handleKeyDown = (e: KeyboardEvent) => {
     return;
   }
 
+  // Ctrl/Cmd + Z: 撤销
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
+    e.preventDefault();
+    store.undo();
+    return;
+  }
+
+  // Ctrl/Cmd + Y: 重做
+  if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'y') {
+    e.preventDefault();
+    store.redo();
+    return;
+  }
+  // Ctrl/Cmd + Shift + Z: 重做
+  if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z') {
+    e.preventDefault();
+    store.redo();
+    return;
+  }
+
   // Delete / Backspace: 删除选中元素（使用 useNodeActions，带 UI 反馈）
   if (e.key === 'Delete' || e.key === 'Backspace') {
     e.preventDefault();
@@ -358,6 +393,18 @@ const handleKeyUp = (e: KeyboardEvent) => {
 const handleWindowBlur = () => {
   isSpacePressed.value = false;
 };
+
+// 监听创建工具变化，同步到 CreationHandler
+watch(
+  () => store.creationTool,
+  (newTool) => {
+    // 【修复】增加非空检查
+    const handler = toolManagerRef.value?.creationHandler;
+    if (handler) {
+      handler.setTool(newTool);
+    }
+  }
+);
 
 // 全局事件监听（整合所有事件：鼠标 + 键盘）
 onMounted(() => {
@@ -420,6 +467,11 @@ onUnmounted(() => {
   transition: background-color 0.2s;
 }
 
+/* 预览节点样式 - 半透明且禁用鼠标事件 */
+.preview-node {
+  pointer-events: none !important;
+}
+
 /* 框选样式 */
 .box-select-overlay {
   position: absolute;
@@ -427,6 +479,11 @@ onUnmounted(() => {
   border: 1px solid rgba(66, 133, 244, 0.8);
   pointer-events: none;
   z-index: 100;
+}
+
+/* 创建模式交互锁定 - 只禁用节点组件 */
+.canvas-stage.is-creating .canvas-viewport > :not(.preview-node):not(.selection-overlay) {
+  pointer-events: none !important;
 }
 
 .debug-info:hover {
