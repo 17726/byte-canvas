@@ -63,52 +63,48 @@
       </div>
       <div class="divider"></div>
       <div class="tool-item">
-        <a-popover trigger="hover" position="top" content-class="toolbar-popover-content">
-          <a-button size="mini" type="text">
-            <icon-font-colors style="font-size: 24px" />
+        <a-tooltip content="文本颜色" :mouse-enter-delay="0.5">
+          <a-color-picker
+            :popup-offset="-150"
+            :popup-translate="[-100, -160]"
+            size="mini"
+            v-model="textColor"
+            trigger="hover"
+          >
+          </a-color-picker>
+        </a-tooltip>
+      </div>
+      <div class="tool-item">
+        <a-tooltip content="加粗" :mouse-enter-delay="0.5">
+          <a-button size="mini" :type="isBold ? 'primary' : 'text'" @click="toggleBold">
+            <icon-text-bold />
           </a-button>
-          <template #content>
-            <div class="popover-grid">
-              <a-tooltip content="加粗" :mouse-enter-delay="0.5">
-                <a-button size="mini" :type="isBold ? 'primary' : 'text'" @click="toggleBold">
-                  <icon-text-bold />
-                </a-button>
-              </a-tooltip>
-              <a-tooltip content="倾斜" :mouse-enter-delay="0.5">
-                <a-button size="mini" :type="isItalic ? 'primary' : 'text'" @click="toggleItalic">
-                  <icon-text-italic />
-                </a-button>
-              </a-tooltip>
-              <a-tooltip content="下划线" :mouse-enter-delay="0.5">
-                <a-button
-                  size="mini"
-                  :type="isUnderline ? 'primary' : 'text'"
-                  @click="toggleUnderline"
-                >
-                  <icon-text-underline />
-                </a-button>
-              </a-tooltip>
-              <a-tooltip content="删除线" :mouse-enter-delay="0.5">
-                <a-button
-                  size="mini"
-                  :type="isStrikethrough ? 'primary' : 'text'"
-                  @click="toggleStrikethrough"
-                >
-                  <icon-strikethrough />
-                </a-button>
-              </a-tooltip>
-              <a-tooltip content="删除线" :mouse-enter-delay="0.5">
-                <a-color-picker
-                  :popup-offset="-150"
-                  :popup-translate="[-100, -160]"
-                  size="mini"
-                  v-model="textColor"
-                  trigger="hover"
-                />
-              </a-tooltip>
-            </div>
-          </template>
-        </a-popover>
+        </a-tooltip>
+      </div>
+      <div class="tool-item">
+        <a-tooltip content="倾斜" :mouse-enter-delay="0.5">
+          <a-button size="mini" :type="isItalic ? 'primary' : 'text'" @click="toggleItalic">
+            <icon-text-italic />
+          </a-button>
+        </a-tooltip>
+      </div>
+      <div class="tool-item">
+        <a-tooltip content="下划线" :mouse-enter-delay="0.5">
+          <a-button size="mini" :type="isUnderline ? 'primary' : 'text'" @click="toggleUnderline">
+            <icon-text-underline />
+          </a-button>
+        </a-tooltip>
+      </div>
+      <div class="tool-item">
+        <a-tooltip content="删除线" :mouse-enter-delay="0.5">
+          <a-button
+            size="mini"
+            :type="isStrikethrough ? 'primary' : 'text'"
+            @click="toggleStrikethrough"
+          >
+            <icon-strikethrough />
+          </a-button>
+        </a-tooltip>
       </div>
     </template>
 
