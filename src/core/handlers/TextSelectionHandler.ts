@@ -691,37 +691,22 @@ export class TextSelectionHandler {
     }
 
     //5. 处理样式的【添加】
-    if (!toggle) {
+    if (toggle) {
+      //NOTE: 此处只需处理textDecoration的特殊添加（多值叠加） 其他单值toggle在split函数中已经完成: 若有应用，删去对应属性
+      if (styleKey === 'textDecoration') {
+        updatedStyles.push({
+          start: selectionStart,
+          end: selectionEnd,
+          styles: { [styleKey]: styleValue } as InlineStyleProps,
+        });
+      }
+    } else {
       updatedStyles.push({
         start: selectionStart,
         end: selectionEnd,
         styles: { [styleKey]: styleValue } as InlineStyleProps,
       });
     }
-    //
-    // if (toggle) {
-    //   if (
-    //     !targetStyleExistsInRange ||
-    //     globalSplitStyles === undefined ||
-    //     globalStyleValue !== styleValue
-    //   ) {
-    //     updatedStyles.push({
-    //       start: selectionStart,
-    //       end: selectionEnd,
-    //       styles: { [styleKey]: styleValue } as InlineStyleProps,
-    //     });
-    //   }
-    // } else {
-    //   if (globalSplitStyles === undefined || globalStyleValue !== styleValue) {
-
-    //   }
-    // }
-
-    // updatedStyles.push({
-    //       start: selectionStart,
-    //       end: selectionEnd,
-    //       styles: { [styleKey]: styleValue } as InlineStyleProps,
-    //     });
 
     // 6. 去重+排序（原有逻辑）
     const finalStyles = updatedStyles
