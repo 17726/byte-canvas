@@ -1,62 +1,72 @@
 <template>
   <div v-if="isVisible" class="context-toolbar" :style="positionStyle" @mousedown.stop>
     <!-- Shape Controls -->
-    <template v-if="isShape">
+    <template v-if="isShape || isText">
       <div class="tool-item">
-        <a-color-picker
-          :popup-offset="-150"
-          :popup-translate="[-100, -160]"
-          size="mini"
-          v-model="fillColor"
-          trigger="hover"
-          disabled-alpha
-        />
+        <a-tooltip content="填充颜色" :mouse-enter-delay="0.5">
+          <a-color-picker
+            position="left"
+            popup-offset="30"
+            :popup-translate="[0, 50]"
+            size="mini"
+            v-model="fillColor"
+            trigger="hover"
+            disabled-alpha
+          />
+        </a-tooltip>
       </div>
       <div class="divider"></div>
       <div class="tool-item">
-        <a-color-picker
-          :popup-offset="-150"
-          :popup-translate="[-100, -160]"
-          size="mini"
-          v-model="strokeColor"
-          trigger="hover"
-        />
-      </div>
-      <div class="divider"></div>
-      <div class="tool-item">
-        <span style="width: 50px">边框：</span>
-        <a-input-number
-          size="mini"
-          v-model="strokeWidth"
-          style="width: 50px"
-          class="input-demo"
-          :min="0"
-          :max="100"
-        />
+        <a-popover trigger="hover" position="top" content-class="toolbar-popover-content">
+          <a-button size="mini" type="text" padding="0">
+            <icon-menu style="font-size: 20px; width: 24px" />
+          </a-button>
+          <template #content>
+            <div class="popover-grid" style="display: flex; gap: 10px">
+              <a-tooltip content="边框颜色" :mouse-enter-delay="0.5">
+                <a-color-picker
+                  position="left"
+                  popup-offset="30"
+                  size="mini"
+                  v-model="strokeColor"
+                  trigger="hover"
+                />
+              </a-tooltip>
+              <a-tooltip content="边框大小" :mouse-enter-delay="0.5">
+                <a-input-number
+                  size="mini"
+                  v-model="strokeWidth"
+                  style="width: 50px"
+                  class="input-demo"
+                  :min="0"
+                  :max="100"
+                />
+              </a-tooltip>
+            </div>
+          </template>
+        </a-popover>
       </div>
     </template>
 
     <!-- Text Controls -->
     <template v-if="isText">
-      <div class="tool-item" style="width: 85px">
-        字号:
+      <div class="tool-item" style="width: 100px">
         <a-input-number
           size="mini"
           v-model="fontSize"
-          style="width: 50px; margin-left: 2px"
+          style="width: 90px; margin-left: 2px"
           class="input-demo"
           :min="12"
           :max="100"
+          mode="button"
         />
       </div>
       <div class="divider"></div>
       <div class="tool-item">
-        <a-popover trigger="click" position="top" content-class="toolbar-popover-content">
-          <a-tooltip position="top" content="文本样式">
-            <a-button size="mini" type="text">
-              <icon-text />
-            </a-button>
-          </a-tooltip>
+        <a-popover trigger="hover" position="top" content-class="toolbar-popover-content">
+          <a-button size="mini" type="text">
+            <icon-font-colors style="font-size: 24px" />
+          </a-button>
           <template #content>
             <div class="popover-grid">
               <a-tooltip content="加粗" :mouse-enter-delay="0.5">
@@ -87,19 +97,18 @@
                   <icon-strikethrough />
                 </a-button>
               </a-tooltip>
+              <a-tooltip content="删除线" :mouse-enter-delay="0.5">
+                <a-color-picker
+                  :popup-offset="-150"
+                  :popup-translate="[-100, -160]"
+                  size="mini"
+                  v-model="textColor"
+                  trigger="hover"
+                />
+              </a-tooltip>
             </div>
           </template>
         </a-popover>
-      </div>
-      <div class="divider"></div>
-      <div class="tool-item">
-        <a-color-picker
-          :popup-offset="-150"
-          :popup-translate="[-100, -160]"
-          size="mini"
-          v-model="textColor"
-          trigger="hover"
-        />
       </div>
     </template>
 
@@ -157,9 +166,9 @@
       </div>
       <div class="divider"></div>
       <div class="tool-item">
-        <a-popover trigger="click" position="bottom" content-class="layer-popover">
+        <a-popover trigger="click" position="right" content-class="layer-popover">
           <a-tooltip placement="top" content="图层顺序">
-            <a-button size="mini" type="text">
+            <a-button fontsize="24px" type="text">
               <icon-layers />
             </a-button>
           </a-tooltip>
@@ -206,10 +215,10 @@ import {
   BringToFrontOne as IconBringToFront,
   SentToBack as IconSendToBack,
   Layers as IconLayers, // 新增图标
-  Text as IconText, // 新增图标
+  // Text as IconText, // 新增图标
 } from '@icon-park/vue-next';
 import { ToolManager } from '@/core/ToolManager';
-
+import { IconFontColors, IconMenu } from '@arco-design/web-vue/es/icon';
 const store = useCanvasStore();
 const toolManagerRef = inject<Ref<ToolManager>>('toolManager');
 
@@ -556,5 +565,12 @@ const handleDelete = () => {
   display: flex;
   flex-direction: column; /* 按钮垂直排列 */
   gap: 4px; /* 按钮之间的间距 */
+}
+
+.arco-btn-size-mini {
+  height: 24px;
+  padding: 0 1px;
+  font-size: 16px;
+  border-radius: var(--border-radius-small);
 }
 </style>
