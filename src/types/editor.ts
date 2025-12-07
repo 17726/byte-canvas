@@ -51,3 +51,11 @@ export type NodeStartState = {
   scaleX: number;
   scaleY: number;
 };
+
+/** 画布工具类型 */
+export type CanvasToolType = 'select' | 'rect' | 'circle' | 'text' | 'image';
+
+/** 创建工具选项 */
+export interface CreationToolOptions {
+  imageUrl?: string; // 图片URL（用于 image 工具）
+}

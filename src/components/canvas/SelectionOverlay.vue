@@ -119,7 +119,7 @@ const isEditingGroup = computed(() => !!store.editingGroupId);
 // 可见性判断：有选中节点或处于组合编辑模式时显示
 const hasSelectedNodes = computed(() => store.activeElements.length > 0 || !!store.editingGroupId);
 
-// 当前用于计算“大框”的目标节点
+// 当前用于计算"大框"的目标节点
 const overlayNodes = computed<BaseNodeState[]>(() => {
   const editingId = store.editingGroupId;
   if (editingId) {

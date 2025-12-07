@@ -62,7 +62,7 @@
 
 // stores/canvasStore.ts
 import { defineStore } from 'pinia';
-import { ref, reactive, computed, watch, readonly } from 'vue';
+import { ref, reactive, computed, watch } from 'vue';
 import type { NodeState, ShapeState, TextState, ImageState, ViewportState } from '@/types/state';
 import { NodeType } from '@/types/state';
 import { DEFAULT_VIEWPORT } from '@/config/defaults';
@@ -111,6 +111,14 @@ export const useCanvasStore = defineStore('canvas', () => {
   // ==================== 组合编辑状态 ====================
   // 当前正在编辑的组合 ID（双击组合进入编辑模式）
   const editingGroupId = ref<string | null>(null);
+
+  // ==================== 创建工具状态 ====================
+  // 当前激活的创建工具（类似 Figma 的工具选择）
+  const creationTool = ref<import('@/types/editor').CanvasToolType>('select');
+  // 创建工具选项（如图片URL等）
+  const creationToolOptions = ref<import('@/types/editor').CreationToolOptions>({});
+  // 预览节点（Ghost Node，用于拖拽创建时的半透明预览）
+  const previewNode = ref<NodeState | null>(null);
 
   // ==================== 历史记录（Undo/Redo） ====================
   type CanvasSnapshot = {
@@ -461,6 +469,28 @@ export const useCanvasStore = defineStore('canvas', () => {
     } else {
       activeElementIds.value.add(id);
     }
+  }
+
+  // ==================== 创建工具操作 ====================
+  /**
+   * 设置当前创建工具
+   * @param tool 工具类型
+   * @param options 工具选项（如图片URL）
+   */
+  function setCreationTool(
+    tool: import('@/types/editor').CanvasToolType,
+    options?: import('@/types/editor').CreationToolOptions
+  ) {
+    creationTool.value = tool;
+    creationToolOptions.value = options || {};
+  }
+
+  /**
+   * 设置预览节点（Ghost Node）
+   * @param node 预览节点数据，传 null 清空
+   */
+  function setPreviewNode(node: NodeState | null) {
+    previewNode.value = node;
   }
 
   // ==================== 持久化功能 ====================
@@ -875,6 +905,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     renderList,
     activeElements,
     globalTextSelection,
+    // 节点操作
     updateNode,
     addNode,
     deleteNode,
@@ -891,8 +922,8 @@ export const useCanvasStore = defineStore('canvas', () => {
     canUndo,
     canRedo,
     // 仅供调试使用(undo/redo栈)
-    // historyStack: readonly(historyStack),
-    // redoStack: readonly(redoStack),
+    // historyStack,
+    // redoStack,
     // 复制/剪切/粘贴
     copySelected,
     cutSelected,
@@ -906,5 +937,11 @@ export const useCanvasStore = defineStore('canvas', () => {
     getAbsoluteTransform,
     // UI 状态请使用 uiStore 中的 activePanel 和 isPanelExpanded
     updateGlobalTextSelection,
+    // 创建工具相关
+    creationTool,
+    creationToolOptions,
+    previewNode,
+    setCreationTool,
+    setPreviewNode,
   };
 });
