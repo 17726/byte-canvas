@@ -568,14 +568,6 @@ export class TextSelectionHandler {
             // 无剩余值则删除整个属性
             delete remainingStyles.textDecoration;
           }
-        } else {
-          //没有，要加上
-          newStyles.push({
-            start: overlapStart,
-            end: overlapEnd,
-            styles: { [styleKey]: styleValue } as InlineStyleProps,
-          });
-          console.log('加上了 newStyles:', newStyles);
         }
       } else {
         // 非textDecoration：删除整个属性（原有逻辑）
@@ -673,15 +665,17 @@ export class TextSelectionHandler {
       globalSplitStyles = [...unselectedStyles, ...selectedStyles]; //从全局属性中拆出来的三部分 要加入到内联样式数组中
     }
     console.log('globalSplitStyles:', JSON.stringify(globalSplitStyles));
-    // ===================== 原有逻辑：预处理现有样式（无修改） =====================
+    // ===================== 预处理现有样式（无修改） =====================
     const validInlineStyles = [
       ...inlineStyles.filter((style) => style.start < style.end),
       ...globalSplitStyles,
     ]; //原有内联样式数组+全局拆分处理得到的内联样式数组（就是对全局样式做简单拆分）
     console.log('validInlineStyles:', JSON.stringify(validInlineStyles));
-    // 4. 处理范围重叠（原有逻辑完全保留）
+
+    // 4. 处理范围重叠
     const updatedStyles: Array<{ start: number; end: number; styles: InlineStyleProps }> = [];
     console.log('初始updatedstyles:', JSON.stringify(updatedStyles));
+
     for (const style of validInlineStyles) {
       if (style.end <= selectionStart || style.start >= selectionEnd) {
         //完全不在选中范围内（无重叠） 直接保留
@@ -705,15 +699,41 @@ export class TextSelectionHandler {
     }
 
     //5. 处理样式的【添加】
+    // 步骤1：判断选中区域是否已存在目标样式值（兼容textDecoration多值）
+    let hasTargetStyle = false;
+    // 遍历现有样式，检查选中范围内是否包含目标值
+    for (const style of validInlineStyles) {
+      // 仅检查与选中区域重叠的样式
+      if (style.start < selectionEnd && style.end > selectionStart) {
+        if (styleKey === 'textDecoration' && styleValue) {
+          // textDecoration特判：判断是否包含目标值（而非全等）
+          const targetValue = styleValue.toString().trim();
+          const currentTextDeco = style.styles.textDecoration;
+          if (currentTextDeco) {
+            const currentValues = currentTextDeco.toString().split(/\s+/).filter(Boolean);
+            if (currentValues.includes(targetValue)) {
+              hasTargetStyle = true;
+              break; // 找到目标值，终止遍历
+            }
+          }
+        } else {
+          // 普通属性：判断是否存在该属性且值完全匹配
+          if (style.styles[styleKey] === styleValue) {
+            hasTargetStyle = true;
+            break;
+          }
+        }
+      }
+    }
     if (toggle) {
-      //NOTE: 此处只需处理textDecoration的特殊添加（多值叠加） 其他单值toggle在split函数中已经完成: 若有应用，删去对应属性
-      // if (styleKey === 'textDecoration') {
-      //   updatedStyles.push({
-      //     start: selectionStart,
-      //     end: selectionEnd,
-      //     styles: { [styleKey]: styleValue } as InlineStyleProps,
-      //   });
-      // }
+      if (!hasTargetStyle) {
+        updatedStyles.push({
+          start: selectionStart,
+          end: selectionEnd,
+          styles: { [styleKey]: styleValue } as InlineStyleProps,
+        });
+      }
+      // 若hasTargetStyle=true，说明已有该样式，toggle逻辑下不添加（相当于移除）
     } else {
       updatedStyles.push({
         start: selectionStart,
