@@ -92,14 +92,14 @@ export interface ShapeState extends BaseNodeState {
 /** 2. 文本节点 State */
 export type TextDecorationValue = 'none' | 'underline' | 'line-through' | 'underline line-through'; //允许同时使用
 
-// 1. 定义行内样式专属类型（仅允许文本片段独立设置的属性）
+// 1. 定义行内样式专属类型（允许文本片段独立设置的属性）
 export type InlineStyleProps = {
   color?: string; // 文本颜色（支持行内独立设置）
   fontWeight?: 'normal' | 'bold' | number; // 字体粗细
   fontStyle?: 'normal' | 'italic'; // 字体斜体
   textDecoration?: TextDecorationValue; // 文本装饰（下划线/删除线）
   fontSize?: number; // 字体大小（支持行内局部调整）
-  letterSpacing?: number | string; // 字间距（仅行内有效）
+  fontFamily?: string;
 };
 
 export interface TextState extends BaseNodeState {
