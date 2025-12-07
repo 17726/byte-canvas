@@ -340,6 +340,11 @@ export class GroupService {
 
     if (!needsAdjust) return;
 
+    // 锁定历史记录但不记录快照，避免在调整组合边界时记录快照
+    // 这个操作是自动的边界调整，不应该作为独立的操作记录到历史中
+    // 交互开始时的快照已经记录了初始状态，这个自动调整不应该创建新的快照
+    const unlockHistory = store.lockHistoryWithoutSnapshot();
+
     // 调整所有子元素的相对坐标（相对于新的组合原点）
     const offsetX = -minX;
     const offsetY = -minY;
@@ -364,6 +369,9 @@ export class GroupService {
         height: newBoundsHeight,
       },
     });
+
+    // 解锁历史记录
+    unlockHistory();
 
     console.log(`[Group] 调整组合边界: ${editingGroupId}`);
   }

@@ -154,17 +154,29 @@ export const useCanvasStore = defineStore('canvas', () => {
    * // ... 批量操作
    * unlock();
    */
-  /**
-   * 批量操作时锁定历史记录，避免重复记录快照
-   * 使用方式：
-   * const unlock = lockHistory();
-   * // ... 批量操作
-   * unlock();
-   */
   const lockHistory = () => {
     const wasLocked = isHistoryLocked;
     if (!wasLocked) {
       pushSnapshot(); // 在锁定前记录一次快照
+      isHistoryLocked = true;
+    }
+    return () => {
+      if (!wasLocked) {
+        isHistoryLocked = false;
+      }
+    };
+  };
+
+  /**
+   * 锁定历史记录但不记录快照（用于自动操作，如调整组合边界）
+   * 使用方式：
+   * const unlock = lockHistoryWithoutSnapshot();
+   * // ... 自动操作
+   * unlock();
+   */
+  const lockHistoryWithoutSnapshot = () => {
+    const wasLocked = isHistoryLocked;
+    if (!wasLocked) {
       isHistoryLocked = true;
     }
     return () => {
@@ -939,5 +951,6 @@ export const useCanvasStore = defineStore('canvas', () => {
     updateGlobalTextSelection,
     // 批量操作支持
     lockHistory,
+    lockHistoryWithoutSnapshot,
   };
 });
