@@ -347,8 +347,8 @@ const handleColorChange = (selectedColor: string) => {
 const handleFontFamilyChange = (fontFamily: string) => {
   if (!fontFamily) return;
 
-  if (activeNode.value && toolManagerRef?.value) {
-    toolManagerRef.value.handleFontFamilyChange(activeNode.value.id, fontFamily);
+  if (activeTextNode.value && toolManagerRef?.value) {
+    toolManagerRef.value.handleFontFamilyChange(activeTextNode.value.id, fontFamily);
   }
 };
 
