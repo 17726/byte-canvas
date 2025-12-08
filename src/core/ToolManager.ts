@@ -559,9 +559,16 @@ export class ToolManager {
    */
   initTextEditor(id: string, editor: HTMLElement | undefined) {
     if (!editor) return;
+    // init 方法内部已经处理了全局监听器的注册
     this.textSelectionHandler.init(id, editor);
-    // 注册全局事件
-    document.addEventListener('mousedown', this.textSelectionHandler.handleGlobalMousedown, true);
+  }
+
+  /**
+   * 移除文本编辑器（组件卸载时调用）
+   * @param id - 要移除的节点ID
+   */
+  removeTextEditor(id: string) {
+    this.textSelectionHandler.removeEditor(id);
   }
 
   /**

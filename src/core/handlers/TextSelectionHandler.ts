@@ -42,6 +42,8 @@ export class TextSelectionHandler {
   private isClickingToolbar = false;
   // 新增：维护所有editor的ref映射，key=节点ID，value=DOM元素
   private editors: Record<string, HTMLElement | null> = {};
+  // 全局监听器引用计数（避免重复添加/移除）
+  private globalListenerRefCount = 0;
 
   /**
    * 构造函数（适配 ToolManager 实例化参数）
@@ -66,6 +68,12 @@ export class TextSelectionHandler {
   // 接收nodeId和对应的editor，存入映射
   init(nodeId: string, editor: HTMLElement | null) {
     this.editors[nodeId] = editor; // 按节点ID存储editor
+
+    // 只在第一次调用时添加全局监听器
+    if (this.globalListenerRefCount === 0) {
+      document.addEventListener('mousedown', this.handleGlobalMousedown, true);
+    }
+    this.globalListenerRefCount++;
   }
 
   // 公共方法，更新全局选区
@@ -432,7 +440,7 @@ export class TextSelectionHandler {
     let currentNode: Node | null;
 
     while ((currentNode = walker.nextNode())) {
-      // 找到文本内容完全匹配的节点（忽略空格差异，可选）
+      // 找到文本内容完全匹配的节点（不使用.trim()，避免有空格节点和没空格节点会识别成同一个）
       if (currentNode.textContent === targetText) {
         return currentNode;
       }
@@ -507,13 +515,34 @@ export class TextSelectionHandler {
   }
 
   /**
-   * 清理状态（组件卸载时调用）
+   * 移除单个编辑器引用（组件卸载时调用）
+   * @param nodeId - 要移除的节点ID
+   */
+  removeEditor(nodeId: string) {
+    delete this.editors[nodeId];
+    this.globalListenerRefCount--;
+
+    // 当所有编辑器都被移除时，移除全局监听器
+    if (this.globalListenerRefCount <= 0) {
+      document.removeEventListener('mousedown', this.handleGlobalMousedown, true);
+      this.globalListenerRefCount = 0; // 防止负数
+    }
+  }
+
+  /**
+   * 清理所有状态（全局销毁时调用）
    */
   destroy() {
     this.isEditing = false;
     this.currentSelection = null;
     this.isClickingToolbar = false;
     this.editors = {};
+
+    // 确保移除全局监听器
+    if (this.globalListenerRefCount > 0) {
+      document.removeEventListener('mousedown', this.handleGlobalMousedown, true);
+      this.globalListenerRefCount = 0;
+    }
   }
 
   // 新增：设置选中范围（供外部调用，比如双击全选时）

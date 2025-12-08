@@ -226,7 +226,7 @@ import {
   // Text as IconText, // 新增图标
 } from '@icon-park/vue-next';
 import { ToolManager } from '@/core/ToolManager';
-import { IconFontColors, IconMenu } from '@arco-design/web-vue/es/icon';
+import { IconMenu } from '@arco-design/web-vue/es/icon';
 const store = useCanvasStore();
 const toolManagerRef = inject<Ref<ToolManager>>('toolManager');
 // 使用 useStyleSync 进行属性绑定
