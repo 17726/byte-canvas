@@ -472,8 +472,8 @@ export class ToolManager {
           return;
         }
       }
+      console.log('toolmanager中进入编辑态的节点id:', id);
       this.textSelectionHandler.enterEditing(e, id);
-      console.log('进入编辑态');
     }
 
     this.store.isInteracting = false;
@@ -557,10 +557,18 @@ export class ToolManager {
    * 初始化文本编辑器（供文本组件调用，复用现有逻辑）
    * @param editor - 文本编辑器 DOM 引用
    */
-  initTextEditor(editor: HTMLElement | null) {
-    this.textSelectionHandler.init(editor);
-    // 注册全局事件
-    document.addEventListener('mousedown', this.textSelectionHandler.handleGlobalMousedown, true);
+  initTextEditor(id: string, editor: HTMLElement | undefined) {
+    if (!editor) return;
+    // init 方法内部已经处理了全局监听器的注册
+    this.textSelectionHandler.init(id, editor);
+  }
+
+  /**
+   * 移除文本编辑器（组件卸载时调用）
+   * @param id - 要移除的节点ID
+   */
+  removeTextEditor(id: string) {
+    this.textSelectionHandler.removeEditor(id);
   }
 
   /**
@@ -698,6 +706,23 @@ export class ToolManager {
   handleColorChange(id: string, newColor: string) {
     this.textSelectionHandler.updateGlobalStyles(id, this.store, 'color', newColor, false);
     this.textSelectionHandler.updatePartialInlineStyle(id, this.store, 'color', newColor, false);
+  }
+
+  handleFontFamilyChange(id: string, newFontFamily: string) {
+    this.textSelectionHandler.updateGlobalStyles(
+      id,
+      this.store,
+      'fontFamily',
+      newFontFamily,
+      false
+    );
+    this.textSelectionHandler.updatePartialInlineStyle(
+      id,
+      this.store,
+      'fontFamily',
+      newFontFamily,
+      false
+    );
   }
 
   //这里没用了
