@@ -45,6 +45,7 @@ import type { TextState } from '@/types/state';
 import { getDomStyle } from '@/core/renderers/dom';
 import type { ToolManager } from '@/core/ToolManager';
 import { useCanvasStore } from '@/store/canvasStore';
+import { getCurrentInstance } from 'vue';
 
 const props = defineProps<{
   node: TextState;
@@ -60,9 +61,13 @@ const isComposing = ref(false);
 
 // 2. 收集当前节点的editor ref
 const collectCurrentEditorRef = () => {
+  const proxy = getCurrentInstance()?.proxy; // 先定义并获取proxy
   const refKey = `editor_${props.node.id}`;
-  // @ts-expect-error 解决$refs类型提示问题（如果需要严格类型，可扩展Vue的Refs类型）
-  editorRefs.value[props.node.id] = proxy.$refs[refKey] as HTMLElement;
+  const editorEl = proxy?.$refs[refKey] as HTMLElement | undefined; // 安全取值
+  if (editorEl) {
+    // 加保护
+    editorRefs.value[props.node.id] = editorEl;
+  }
 };
 
 // 计算属性：文本HTML渲染（不变）
