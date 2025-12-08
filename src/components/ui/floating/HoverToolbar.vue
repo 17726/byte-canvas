@@ -19,22 +19,22 @@
               size="mini"
               v-model="fillColor"
               trigger="hover"
-              disabled-alpha
             />
           </a-tooltip>
         </div>
         <div class="divider"></div>
         <div class="tool-item">
-          <a-popover trigger="click" position="top" content-class="toolbar-popover-content">
+          <a-popover trigger="hover" position="top" content-class="toolbar-popover-content">
             <a-button size="mini" type="text" padding="0">
-              <icon-menu style="font-size: 20px; width: 24px" />
+              <icon-sort style="font-size: 20px; width: 24px" />
             </a-button>
             <template #content>
               <div class="popover-grid" style="display: flex; gap: 10px; align-items: center">
+                边框：
                 <a-tooltip content="边框颜色" :mouse-enter-delay="0.5">
                   <a-color-picker
                     position="left"
-                    popup-offset="30"
+                    popup-offset="60"
                     size="mini"
                     v-model="strokeColor"
                     trigger="hover"
@@ -44,10 +44,11 @@
                   <a-input-number
                     size="mini"
                     v-model="strokeWidth"
-                    style="width: 50px"
+                    style="width: 80px"
                     class="input-demo"
                     :min="0"
                     :max="100"
+                    mode="button"
                   />
                 </a-tooltip>
               </div>
@@ -79,6 +80,7 @@
               @change="handleColorChange"
               trigger="hover"
             >
+              <icon-font-colors style="font-size: 20px; width: 24px; color: #165dff" />
             </a-color-picker>
           </a-tooltip>
         </div>
@@ -185,7 +187,7 @@
         </div>
         <div class="divider"></div>
         <div class="tool-item">
-          <a-popover trigger="click" position="right" content-class="layer-popover">
+          <a-popover trigger="hover" position="right" content-class="layer-popover">
             <a-tooltip placement="top" content="图层顺序">
               <a-button fontsize="24px" type="text">
                 <icon-layers />
@@ -235,7 +237,7 @@ import {
   Layers as IconLayers,
 } from '@icon-park/vue-next';
 import { ToolManager } from '@/core/ToolManager';
-import { IconMenu } from '@arco-design/web-vue/es/icon';
+import { IconFontColors, IconSort } from '@arco-design/web-vue/es/icon';
 const store = useCanvasStore();
 const toolManagerRef = inject<Ref<ToolManager>>('toolManager');
 
@@ -290,7 +292,7 @@ const positionStyle = computed<CSSProperties>(() => {
     top: `${clientPos.y + 50}px`,
     left: `${clientPos.x}px`,
     transform: 'translate(-50%, -100%)',
-    zIndex: 1002, // 确保层级最高
+    zIndex: 900, // 确保层级最高
   };
 });
 
@@ -603,8 +605,9 @@ const handleDelete = () => {
 /* 按钮行样式优化 */
 .popover-row {
   display: flex;
-  flex-direction: column; /* 按钮垂直排列 */
-  gap: 4px; /* 按钮之间的间距 */
+  flex-direction: column;
+  gap: 4px;
+  z-index: 1001;
 }
 
 .arco-btn-size-mini {
