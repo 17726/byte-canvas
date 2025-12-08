@@ -1,50 +1,12 @@
 /**
  * @file TransformHandler.ts
- *
- * 职责 (Responsibilities):
- *   - 负责处理画布中节点的变换操作，包括单节点和多节点的拖拽、缩放、旋转等。
- *   - 管理节点变换过程中的状态，确保变换操作的流畅性和正确性。
- *   - 实现多节点缩放时的坐标变换、比例保持、最小尺寸限制及防止节点翻转。
- *
- * 特点 (Features):
- *   - 支持单节点和多节点的拖拽与缩放，自动适配不同的变换场景。
- *   - 多节点缩放时，采用相对中心点的坐标变换算法，保证各节点在缩放过程中的对齐和比例一致。
- *   - 内置最小宽高限制，防止节点被缩放到不可见或反向（翻转）状态。
- *   - 支持节点旋转，变换过程中使用旋转矩阵进行坐标转换，确保变换的准确性。
- *   - 变换逻辑与画布状态解耦，便于维护和扩展。
- *
- * 状态管理 (State Management):
- *   - 内部维护拖拽状态（InternalDragState）、单节点缩放状态（InternalResizeState）、多节点缩放状态（InternalMultiResizeState）。
- *   - 记录变换起始点、节点初始位置、尺寸、旋转角度、中心点等信息，用于计算变换后的节点属性。
- *   - 多节点缩放时，记录每个节点相对于整体边界框的偏移和比例，便于统一缩放和对齐。
- *
- * 包含方法列表 (Method List):
- *   - startDrag(nodeId: string, ...): 开始节点拖拽
- *   - onDragMove(event: MouseEvent): 拖拽过程处理
- *   - endDrag(): 结束拖拽
- *   - startResize(nodeId: string, handle: ResizeHandle, ...): 开始节点缩放
- *   - onResizeMove(event: MouseEvent): 缩放过程处理
- *   - endResize(): 结束缩放
- *   - startMultiResize(nodeIds: string[], handle: ResizeHandle, ...): 开始多节点缩放
- *   - onMultiResizeMove(event: MouseEvent): 多节点缩放过程处理
- *   - endMultiResize(): 结束多节点缩放
- *   - 其他辅助方法：坐标变换、旋转矩阵计算、最小尺寸判断等
- *
- * 复杂变换逻辑说明 (Complex Transformation Logic):
- *   - 坐标旋转矩阵：节点旋转时，使用二维旋转矩阵将节点的顶点坐标从本地坐标系转换到全局坐标系，反之亦然。
- *     公式：x' = cos(θ) * (x - cx) - sin(θ) * (y - cy) + cx
- *           y' = sin(θ) * (x - cx) + cos(θ) * (y - cy) + cy
- *     其中 (cx, cy) 为旋转中心，θ 为旋转角度。
- *   - 多节点缩放算法：以多选边界框的中心为基准，计算每个节点相对于中心的偏移和缩放比例，缩放时保持节点间的相对位置和比例不变。
- *   - 防翻转与最小尺寸：在缩放过程中，实时判断节点尺寸，防止宽高小于最小值或出现负值（翻转）。
- *
- * 维护者可参考 ToolManager.ts、SelectionHandler.ts、GroupService.ts 的文档风格，便于理解和扩展本文件的变换逻辑。
+ * @description 节点变换处理器 - 处理节点的拖拽和缩放（修复多选缩放逻辑 + 增加最小宽高限制及防翻转）
  */
 
 import { useCanvasStore } from '@/store/canvasStore';
 import type { BaseNodeState } from '@/types/state';
 import type { ResizeHandle } from '@/types/editor';
-import { eventToWorld } from '@/core/utils/geometry';
+import { NodeType } from '@/types/state';
 
 /** 拖拽类型 */
 type DragType = 'node' | 'area';
@@ -57,7 +19,8 @@ interface InternalDragState {
   isDragging: boolean;
   type: DragType | null;
   nodeId: string;
-  startMouseWorld: { x: number; y: number }; // 【修复】存储世界坐标
+  startX: number;
+  startY: number;
   startNodeX: number;
   startNodeY: number;
   /** 多节点拖拽时，每个节点的初始变换 */
@@ -73,7 +36,8 @@ interface InternalResizeState {
   nodeId: string;
 
   // 鼠标初始状态
-  startMouseWorld: { x: number; y: number }; // 【修复】存储世界坐标
+  startMouseX: number;
+  startMouseY: number;
 
   // 节点初始变换状态
   startNodeX: number;
@@ -118,7 +82,8 @@ interface InternalMultiResizeState {
   handle: ResizeHandle | null;
   nodeIds: string[];
   startBounds: { x: number; y: number; width: number; height: number };
-  startMouseWorld: { x: number; y: number }; // 【修复】存储世界坐标
+  startMouseX: number;
+  startMouseY: number;
   nodeStartStates: Record<string, NodeStartState>;
   // 新增以下字段
   startCenterX: number;
@@ -144,14 +109,14 @@ const edgeConfig: EdgeConfig = {
 
 export class TransformHandler {
   private store: ReturnType<typeof useCanvasStore>;
-  private stageEl: HTMLElement | null; // 【修复】添加 stageEl 依赖
 
   /** 拖拽状态 */
   private dragState: InternalDragState = {
     isDragging: false,
     type: null,
     nodeId: '',
-    startMouseWorld: { x: 0, y: 0 },
+    startX: 0,
+    startY: 0,
     startNodeX: 0,
     startNodeY: 0,
     startTransformMap: {},
@@ -163,7 +128,8 @@ export class TransformHandler {
     isResizing: false,
     handle: null,
     nodeId: '',
-    startMouseWorld: { x: 0, y: 0 },
+    startMouseX: 0,
+    startMouseY: 0,
     startNodeX: 0,
     startNodeY: 0,
     startWidth: 0,
@@ -185,16 +151,16 @@ export class TransformHandler {
     handle: null,
     nodeIds: [],
     startBounds: { x: 0, y: 0, width: 0, height: 0 },
-    startMouseWorld: { x: 0, y: 0 },
+    startMouseX: 0,
+    startMouseY: 0,
     nodeStartStates: {},
     startCenterX: 0,
     startCenterY: 0,
     startRotation: 0,
   };
 
-  constructor(store: ReturnType<typeof useCanvasStore>, stageEl: HTMLElement | null = null) {
+  constructor(store: ReturnType<typeof useCanvasStore>) {
     this.store = store;
-    this.stageEl = stageEl; // 【修复】保存 stageEl
   }
 
   // ==================== 辅助方法 ====================
@@ -246,6 +212,37 @@ export class TransformHandler {
       bottomRight: { x: x + width, y: y + height },
       bottomLeft: { x, y: y + height },
     };
+  }
+
+  /**
+   * 根据控制点确定影响的边和顶点
+   */
+  private getAffectedEdges(handle: ResizeHandle): {
+    left: boolean;
+    right: boolean;
+    top: boolean;
+    bottom: boolean;
+  } {
+    switch (handle) {
+      case 'nw':
+        return { left: true, right: false, top: true, bottom: false };
+      case 'n':
+        return { left: false, right: false, top: true, bottom: false };
+      case 'ne':
+        return { left: false, right: true, top: true, bottom: false };
+      case 'e':
+        return { left: false, right: true, top: false, bottom: false };
+      case 'se':
+        return { left: false, right: true, top: false, bottom: true };
+      case 's':
+        return { left: false, right: false, top: false, bottom: true };
+      case 'sw':
+        return { left: true, right: false, top: false, bottom: true };
+      case 'w':
+        return { left: true, right: false, top: false, bottom: false };
+      default:
+        return { left: false, right: false, top: false, bottom: false };
+    }
   }
 
   /**
@@ -302,14 +299,12 @@ export class TransformHandler {
       }
     });
 
-    // 【修复】使用 eventToWorld 记录起始世界坐标
-    const startWorldPos = eventToWorld(e, this.stageEl, this.store.viewport);
-
     this.dragState = {
       isDragging: true,
       type: 'node',
       nodeId,
-      startMouseWorld: { x: startWorldPos.x, y: startWorldPos.y },
+      startX: e.clientX,
+      startY: e.clientY,
       startNodeX: node.transform.x,
       startNodeY: node.transform.y,
       startTransformMap,
@@ -323,11 +318,9 @@ export class TransformHandler {
   updateDrag(e: MouseEvent) {
     if (!this.dragState.isDragging) return;
 
-    // 【修复】使用 eventToWorld 计算位移
-    const { startMouseWorld, startTransformMap } = this.dragState;
-    const currentWorldPos = eventToWorld(e, this.stageEl, this.store.viewport);
-    const dx = currentWorldPos.x - startMouseWorld.x;
-    const dy = currentWorldPos.y - startMouseWorld.y;
+    const { startX, startY, startTransformMap } = this.dragState;
+    const dx = (e.clientX - startX) / this.store.viewport.zoom;
+    const dy = (e.clientY - startY) / this.store.viewport.zoom;
 
     Object.entries(startTransformMap).forEach(([id, startPos]) => {
       const node = this.store.nodes[id];
@@ -383,15 +376,13 @@ export class TransformHandler {
     const centerX = x + width / 2;
     const centerY = y + height / 2;
 
-    // 【修复】使用 eventToWorld 记录起始世界坐标
-    const startWorldPos = eventToWorld(e, this.stageEl, this.store.viewport);
-
     // 记录初始状态
     this.resizeState = {
       isResizing: true,
       handle,
       nodeId,
-      startMouseWorld: { x: startWorldPos.x, y: startWorldPos.y },
+      startMouseX: e.clientX,
+      startMouseY: e.clientY,
       startNodeX: x,
       startNodeY: y,
       startWidth: width,
@@ -412,7 +403,8 @@ export class TransformHandler {
     const {
       handle,
       nodeId,
-      startMouseWorld,
+      startMouseX,
+      startMouseY,
       startNodeX,
       startNodeY,
       startWidth,
@@ -425,27 +417,31 @@ export class TransformHandler {
     const node = this.store.nodes[nodeId];
     if (!node) return;
 
-    // 标记：是否为角点缩放（双轴）/ 四边缩放（单轴）
+    // ========== 新增：判断是否为图片节点 + 图片角点强制等比标记 ==========
+    const isImageNode = node.type === NodeType.IMAGE;
     const isCorner = ['nw', 'ne', 'se', 'sw'].includes(handle);
     const isEdge = ['n', 's', 'e', 'w'].includes(handle);
+    // 图片+角点：强制等比（优先级最高，覆盖Shift键判断）
+    const forceImageRatio = isImageNode && isCorner;
 
-    // 【修复】使用 eventToWorld 获取当前世界坐标
-    const currentWorldPos = eventToWorld(e, this.stageEl, this.store.viewport);
+    // 获取视口信息
+    const { zoom } = this.store.viewport;
 
     // --- 1. 坐标转换：将鼠标位移转换到未旋转坐标系 ---
-    // 将鼠标点反向旋转到未旋转坐标系（以节点初始中心为旋转中心）
+    const startMouseCanvas = { x: startMouseX / zoom, y: startMouseY / zoom };
+    const currentMouseCanvas = { x: e.clientX / zoom, y: e.clientY / zoom };
+
     const startUnrotated = this.unrotatePoint(
-      startMouseWorld,
+      startMouseCanvas,
       { x: startCenterX, y: startCenterY },
       startRotation
     );
     const currentUnrotated = this.unrotatePoint(
-      { x: currentWorldPos.x, y: currentWorldPos.y },
+      currentMouseCanvas,
       { x: startCenterX, y: startCenterY },
       startRotation
     );
 
-    // 计算未旋转坐标系下的总位移
     let unrotatedDx = currentUnrotated.x - startUnrotated.x;
     let unrotatedDy = currentUnrotated.y - startUnrotated.y;
 
@@ -456,8 +452,6 @@ export class TransformHandler {
     let movableY = startNodeY + startHeight;
 
     // --- 3. 位移计算：确定 fixed/movable 点的**基础**位置（增加 Clamp 逻辑禁止翻转） ---
-    // 逻辑说明：如果正在拖动右边(movableX)，则它不能小于 左边(fixedX) + MIN_SIZE。
-    // 如果正在拖动左边(fixedX)，则它不能大于 右边(movableX) - MIN_SIZE。
     switch (handle) {
       // 四边缩放：仅单轴位移，另一轴锁定
       case 'e':
@@ -504,141 +498,180 @@ export class TransformHandler {
         break;
     }
 
-    // --- 4. 处理 Shift 键等比缩放（仅角点生效） ---
-    if (e.shiftKey && isCorner) {
-      const startRatio = startWidth / Math.max(startHeight, 1e-6); // 避免除零
-
-      // 计算当前宽度和高度
-      const currentWidth = Math.abs(movableX - fixedX);
-      const currentHeight = Math.abs(movableY - fixedY);
-
-      // 基于鼠标位移的主方向计算统一缩放比例
-      const scaleX = currentWidth / startWidth;
-      const scaleY = currentHeight / startHeight;
-      // 选取绝对值更大的比例作为主导比例
-      const scale = Math.abs(scaleX) > Math.abs(scaleY) ? scaleX : scaleY;
-
-      // 计算等比目标尺寸（增加最小尺寸保护）
-      let targetWidth = Math.max(startWidth * Math.abs(scale), MIN_SIZE);
-      let targetHeight = Math.max(startHeight * Math.abs(scale), MIN_SIZE);
-
-      // 确保符合比例（以宽为准或以高为准，这里重新对齐比例）
-      if (Math.abs(targetWidth / targetHeight - startRatio) > 1e-6) {
-        // 简单逻辑：取较大的一边作为基准，保证另一边也大于 MIN_SIZE
-        // 但由于 startWidth/Height 已经保证 > MIN_SIZE (假设)，乘积通常没问题
-        // 这里再次校准
-        if (targetWidth / startRatio < MIN_SIZE) {
-          targetWidth = MIN_SIZE * startRatio;
-          targetHeight = MIN_SIZE;
-        } else {
-          targetHeight = targetWidth / startRatio;
-        }
-      }
-
-      // 基于 fixed/movable 点和目标尺寸，修正可动点的位置
-      switch (handle) {
-        case 'nw': // 固定右下角 (movableX, movableY)
-          fixedX = movableX - targetWidth;
-          fixedY = movableY - targetHeight;
-          break;
-        case 'ne': // 固定左下角 (fixedX, movableY)
-          movableX = fixedX + targetWidth;
-          fixedY = movableY - targetHeight;
-          break;
-        case 'se': // 固定左上角 (fixedX, fixedY)
-          movableX = fixedX + targetWidth;
-          movableY = fixedY + targetHeight;
-          break;
-        case 'sw': // 固定右上角 (movableX, fixedY)
-          fixedX = movableX - targetWidth;
-          movableY = fixedY + targetHeight;
-          break;
-      }
-    }
-
     // --- 5. 处理 Alt 键中心缩放（Alt缩放必须以 startCenterX/Y 为中心） ---
     if (e.altKey) {
-      // 缩放中心必须是初始中心点
       const centerX = startCenterX;
       const centerY = startCenterY;
+      const ratio = startWidth / startHeight;
 
-      if (isCorner) {
-        // 角点中心缩放：总位移应用到宽度/高度，并对称修正fixed/movable
+      // ========== 修复1：明确拆分图片强制等比和Shift等比逻辑 ==========
+      // 图片角点：强制等比（无视Shift）；非图片角点：Shift触发等比
+      const isShiftRatio = e.shiftKey && isCorner;
+      const shouldForceRatio = forceImageRatio || isShiftRatio;
 
-        // 1. 计算宽度/高度的变化量（这里是半边变化量）
+      if (shouldForceRatio) {
+        // 1. 定义初始尺寸向量（从中心到角点）
+        const halfStartW = startWidth / 2;
+        const halfStartH = startHeight / 2;
+
+        // 2. 确定初始对角线方向的向量 (vx, vy)
+        let vx = 0,
+          vy = 0;
+        if (handle.includes('e')) vx = halfStartW;
+        else if (handle.includes('w')) vx = -halfStartW;
+        if (handle.includes('s')) vy = halfStartH;
+        else if (handle.includes('n')) vy = -halfStartH;
+
+        // 检查初始尺寸，防止除以零
+        const mag = Math.sqrt(vx * vx + vy * vy);
+        if (mag === 0) {
+          const newW = MIN_SIZE;
+          const newH = MIN_SIZE;
+          fixedX = centerX - newW / 2;
+          movableX = centerX + newW / 2;
+          fixedY = centerY - newH / 2;
+          movableY = centerY + newH / 2;
+          return;
+        }
+
+        // 3. 归一化单位向量
+        const uvx = vx / mag;
+        const uvy = vy / mag;
+
+        // 4. 计算鼠标位移在对角线单位向量上的投影
+        const effectiveMoveDistance = unrotatedDx * uvx + unrotatedDy * uvy;
+
+        // 5. 计算新的对角线半长度（应用最小限制）
+        const MIN_DIAGONAL_HALF = Math.sqrt((MIN_SIZE / 2) ** 2 + (MIN_SIZE / 2) ** 2);
+        let newHalfMag = Math.max(mag + effectiveMoveDistance, MIN_DIAGONAL_HALF);
+
+        // 6. 计算新的缩放因子和等比尺寸
+        const scaleFactor = newHalfMag / mag;
+        let newW = Math.max(startWidth * scaleFactor, MIN_SIZE);
+        let newH = Math.max(startHeight * scaleFactor, MIN_SIZE);
+
+        // 7. 重新计算fixed/movable，确保中心对称
+        fixedX = centerX - newW / 2;
+        movableX = centerX + newW / 2;
+        fixedY = centerY - newH / 2;
+        movableY = centerY + newH / 2;
+      } else if (isCorner) {
+        // 角点中心缩放（Alt 非等比）：仅非图片+非Shift触发
         let deltaW = 0;
         let deltaH = 0;
-
-        // 根据 handle 确定 x/y 轴位移的正负（dx/dy 代表鼠标在未旋转坐标系下的位移）
         if (handle.includes('e')) deltaW = unrotatedDx;
         if (handle.includes('w')) deltaW = -unrotatedDx;
         if (handle.includes('s')) deltaH = unrotatedDy;
         if (handle.includes('n')) deltaH = -unrotatedDy;
 
-        // 计算新尺寸并应用最小限制
         const newW = Math.max(startWidth + deltaW * 2, MIN_SIZE);
         const newH = Math.max(startHeight + deltaH * 2, MIN_SIZE);
-
-        // 2. 重新计算 fixed/movable，使其关于 startCenter 对称
         fixedX = centerX - newW / 2;
         movableX = centerX + newW / 2;
         fixedY = centerY - newH / 2;
         movableY = centerY + newH / 2;
       } else if (isEdge) {
-        // 边中心缩放：仅单轴变化，该轴对称，另一轴保持不变
+        // 边中心缩放（Alt 单轴对称）：原有逻辑完全保留
         switch (handle) {
           case 'e':
           case 'w': {
-            // 仅 X 轴对称
-            const deltaW = handle === 'e' ? unrotatedDx : -unrotatedDx;
+            let deltaW = handle === 'e' ? unrotatedDx : -unrotatedDx;
             const newW = Math.max(startWidth + deltaW * 2, MIN_SIZE);
             fixedX = centerX - newW / 2;
             movableX = centerX + newW / 2;
-            // Y 轴保持不变（使用初始坐标）
             fixedY = startNodeY;
             movableY = startNodeY + startHeight;
             break;
           }
           case 'n':
           case 's': {
-            // 仅 Y 轴对称
-            const deltaH = handle === 's' ? unrotatedDy : -unrotatedDy;
+            let deltaH = handle === 's' ? unrotatedDy : -unrotatedDy;
             const newH = Math.max(startHeight + deltaH * 2, MIN_SIZE);
             fixedY = centerY - newH / 2;
             movableY = centerY + newH / 2;
-            // X 轴保持不变（使用初始坐标）
             fixedX = startNodeX;
             movableX = startNodeX + startWidth;
             break;
           }
         }
       }
-    }
+    } else {
+      // ========== 修复2：补充非Alt分支的Shift等比逻辑 ==========
+      // 图片角点：强制等比；非图片角点：Shift触发等比
+      const shiftForceRatio = !isImageNode && e.shiftKey && isCorner;
+      const needRatio = forceImageRatio || shiftForceRatio;
 
+      if (needRatio) {
+        // 非Alt模式下等比逻辑（兼容图片/非图片+Shift）
+        const ratio = startWidth / startHeight;
+        // 防止除以零（初始比例异常时兜底）
+        const safeRatio = ratio === 0 || isNaN(ratio) ? 1 : ratio;
+
+        // 计算基础宽高变化
+        let tempNewWidth = Math.abs(movableX - fixedX);
+        let tempNewHeight = Math.abs(movableY - fixedY);
+
+        // ========== 修复3：动态选择等比基准（按鼠标主导位移） ==========
+        // 计算鼠标X/Y位移绝对值，判断主导轴（避免固定宽度基准导致比例偏差）
+        const dxAbs = Math.abs(unrotatedDx);
+        const dyAbs = Math.abs(unrotatedDy);
+        const isXMain = dxAbs > dyAbs;
+
+        switch (handle) {
+          case 'nw':
+          case 'ne':
+          case 'se':
+          case 'sw':
+            // 主导轴为X：以宽度定高度；主导轴为Y：以高度定宽度
+            if (isXMain) {
+              tempNewHeight = tempNewWidth / safeRatio;
+            } else {
+              tempNewWidth = tempNewHeight * safeRatio;
+            }
+
+            // 修正fixed/movable坐标（适配等比尺寸）
+            // X轴修正
+            if (handle.includes('w')) {
+              fixedX = movableX - tempNewWidth;
+            } else {
+              movableX = fixedX + tempNewWidth;
+            }
+            // Y轴修正
+            if (handle.includes('n')) {
+              fixedY = movableY - tempNewHeight;
+            } else {
+              movableY = fixedY + tempNewHeight;
+            }
+            break;
+        }
+
+        // 应用最小尺寸限制（保证尺寸有效）
+        tempNewWidth = Math.max(tempNewWidth, MIN_SIZE);
+        tempNewHeight = Math.max(tempNewHeight, MIN_SIZE);
+
+        // 最终修正坐标（防止翻转）
+        fixedX = Math.min(fixedX, movableX);
+        movableX = Math.max(fixedX, movableX);
+        fixedY = Math.min(fixedY, movableY);
+        movableY = Math.max(fixedY, movableY);
+      }
+    }
     // --- 6. 直接计算最终尺寸（移除最小尺寸限制 -> 已在上面步骤中集成限制） ---
-    const newWidth = Math.abs(movableX - fixedX);
-    const newHeight = Math.abs(movableY - fixedY);
+    let newWidth = Math.abs(movableX - fixedX);
+    let newHeight = Math.abs(movableY - fixedY);
 
     // --- 7. 旋转坐标系转换（恢复旋转，精准计算最终位置） ---
-    // 未旋转坐标系的新左上角
     const newUnrotatedX = Math.min(fixedX, movableX);
     const newUnrotatedY = Math.min(fixedY, movableY);
-
-    // 未旋转坐标系的新中心点
     const newUnrotatedCenter = {
       x: newUnrotatedX + newWidth / 2,
       y: newUnrotatedY + newHeight / 2,
     };
-
-    // 将新中心点旋转回原旋转坐标系
-    // 注意：这里的旋转仍以 startCenterX/Y 为中心，这是正确的。
     const rotatedCenter = this.rotatePoint(
       newUnrotatedCenter,
       { x: startCenterX, y: startCenterY },
       startRotation
     );
-
-    // 最终渲染的左上角坐标（基于旋转后的中心点）
     const finalX = rotatedCenter.x - newWidth / 2;
     const finalY = rotatedCenter.y - newHeight / 2;
 
@@ -660,7 +693,6 @@ export class TransformHandler {
       });
     }
   }
-
   /**
    * 结束单节点缩放
    */
@@ -678,92 +710,11 @@ export class TransformHandler {
   /**
    * 开始多选缩放（修复：记录节点相对中心的偏移，避免比例计算错误）
    */
-  startMultiResize(
-    e: MouseEvent,
-    handle: ResizeHandle,
-    startBounds: { x: number; y: number; width: number; height: number },
-    nodeIds: string[],
-    isSpacePressed: boolean
-  ) {
-    if (isSpacePressed) return;
-    // 检查：如果当前有任何变换操作正在进行，则直接退出！
-    if (this.isTransforming) return;
-
-    this.dragState.isDragging = false;
-    this.dragState.type = null;
-    this.dragState.nodeId = '';
-    this.dragState.startTransformMap = {};
-    this.resizeState.isResizing = false;
-
-    const validNodeIds = nodeIds.filter((id) => {
-      const node = this.store.nodes[id];
-      return node && !node.isLocked;
-    });
-    if (validNodeIds.length === 0) return;
-
-    // 修正：重新计算可靠的包围盒（避免传入的startBounds异常）
-    const calcStartBounds = this.getNodesBounds(validNodeIds);
-    // 计算整体边界框的初始中心（对齐单节点缩放逻辑）
-    const startCenterX = calcStartBounds.x + calcStartBounds.width / 2;
-    const startCenterY = calcStartBounds.y + calcStartBounds.height / 2;
-    // 多选边界框默认轴对齐，旋转为0弧度（可根据实际需求调整）
-    const startRotation = 0;
-
-    const nodeStartStates: Record<string, NodeStartState> = {};
-    validNodeIds.forEach((id) => {
-      const node = this.store.nodes[id] as BaseNodeState;
-      if (!node) return;
-
-      // 偏移为**像素值**（非比例），避免边界框尺寸为0时的NaN
-      const offsetX = node.transform.x - calcStartBounds.x;
-      const offsetY = node.transform.y - calcStartBounds.y;
-
-      // 修复2：尺寸比例增加除零保护
-      const scaleX = calcStartBounds.width > 0 ? node.transform.width / calcStartBounds.width : 1;
-      const scaleY =
-        calcStartBounds.height > 0 ? node.transform.height / calcStartBounds.height : 1;
-
-      // 修复3：记录节点相对于整体中心的偏移比例（用于中心缩放对齐）
-      const nodeCenterX = node.transform.x + node.transform.width / 2;
-      const nodeCenterY = node.transform.y + node.transform.height / 2;
-      const centerOffsetX = (nodeCenterX - startCenterX) / (calcStartBounds.width || 1);
-      const centerOffsetY = (nodeCenterY - startCenterY) / (calcStartBounds.height || 1);
-
-      nodeStartStates[id] = {
-        x: node.transform.x,
-        y: node.transform.y,
-        width: node.transform.width,
-        height: node.transform.height,
-        offsetX, // 像素偏移（原比例改为像素）
-        offsetY,
-        scaleX,
-        scaleY,
-        centerOffsetX, // 新增：相对中心偏移比例
-        centerOffsetY,
-      };
-    });
-
-    // 【修复】使用 eventToWorld 记录起始世界坐标
-    const startWorldPos = eventToWorld(e, this.stageEl, this.store.viewport);
-
-    this.multiResizeState = {
-      isMultiResizing: true,
-      handle,
-      nodeIds: validNodeIds,
-      startBounds: { ...calcStartBounds }, // 使用计算的包围盒
-      startMouseWorld: { x: startWorldPos.x, y: startWorldPos.y },
-      nodeStartStates,
-      // 新增：整体边界框的中心和旋转（对齐单节点缩放）
-      startCenterX,
-      startCenterY,
-      startRotation,
-    };
-
-    this.store.isInteracting = true;
-  }
-
   /**
-   * 更新多选缩放（核心修复：组合快捷键、相对位置、负尺寸处理、禁止翻转）
+   * 更新多选缩放（严格按照单选矩形逻辑：Shift=等比缩放，Alt=中心缩放，Shift+Alt=等比中心缩放）
+   */
+  /**
+   * 更新多选缩放（完全按照单选逻辑：为每个节点确定固定点和可动点）
    */
   updateMultiResize(e: MouseEvent) {
     const {
@@ -771,7 +722,8 @@ export class TransformHandler {
       handle,
       nodeIds,
       startBounds,
-      startMouseWorld,
+      startMouseX,
+      startMouseY,
       nodeStartStates,
       startCenterX,
       startCenterY,
@@ -780,232 +732,385 @@ export class TransformHandler {
 
     if (!isMultiResizing || !handle || nodeIds.length === 0) return;
 
-    // ========== 1. 基础参数初始化（修复：精度处理） ==========
+    // ========== 1. 基础参数初始化 ==========
+    const { zoom } = this.store.viewport;
     const isCorner = ['nw', 'ne', 'se', 'sw'].includes(handle);
     const isEdge = ['n', 's', 'e', 'w'].includes(handle);
     const hasShift = e.shiftKey;
     const hasAlt = e.altKey;
 
-    // ========== 2. 坐标转换（修复：使用 eventToWorld） ==========
-    // 【修复】使用 eventToWorld 获取当前世界坐标
-    const currentWorldPos = eventToWorld(e, this.stageEl, this.store.viewport);
+    // ========== 2. 坐标转换 ==========
+    const startMouseCanvas = { x: startMouseX / zoom, y: startMouseY / zoom };
+    const currentMouseCanvas = { x: e.clientX / zoom, y: e.clientY / zoom };
 
-    // 反向旋转到未旋转坐标系（多选边界框默认旋转0，此处保留逻辑可扩展）
+    // 反向旋转到未旋转坐标系
     const startUnrotated = this.unrotatePoint(
-      startMouseWorld,
+      startMouseCanvas,
       { x: startCenterX, y: startCenterY },
       startRotation
     );
     const currentUnrotated = this.unrotatePoint(
-      { x: currentWorldPos.x, y: currentWorldPos.y },
+      currentMouseCanvas,
       { x: startCenterX, y: startCenterY },
       startRotation
     );
 
-    // 计算未旋转坐标系下的鼠标位移（精度修正）
-    const unrotatedDx = Math.round((currentUnrotated.x - startUnrotated.x) * 1000) / 1000;
-    const unrotatedDy = Math.round((currentUnrotated.y - startUnrotated.y) * 1000) / 1000;
+    // 计算未旋转坐标系下的鼠标位移
+    const unrotatedDx = currentUnrotated.x - startUnrotated.x;
+    const unrotatedDy = currentUnrotated.y - startUnrotated.y;
 
-    // ========== 3. 初始化固定点/可动点（修复：反向缩放逻辑） ==========
+    // ========== 3. 计算整体边界框的新尺寸（基于固定边角逻辑） ==========
     let fixedX = startBounds.x;
     let fixedY = startBounds.y;
     let movableX = startBounds.x + startBounds.width;
     let movableY = startBounds.y + startBounds.height;
 
-    // ========== 4. 按手柄方向更新固定点/可动点（修复：反向拖拽逻辑 + 最小尺寸限制） ==========
-    // 关键修复：不再交换 fixed/movable，而是使用 Math.max/min 钳位，防止反向翻转
+    // 根据手柄确定固定点和可动点
     switch (handle) {
-      case 'e':
+      // 边缩放：固定对边
+      case 'e': // 固定左边，移动右边
         movableX = Math.max(startBounds.x + startBounds.width + unrotatedDx, fixedX + MIN_SIZE);
         break;
-      case 'w':
+      case 'w': // 固定右边，移动左边
         fixedX = Math.min(startBounds.x + unrotatedDx, movableX - MIN_SIZE);
         break;
-      case 's':
+      case 's': // 固定上边，移动下边
         movableY = Math.max(startBounds.y + startBounds.height + unrotatedDy, fixedY + MIN_SIZE);
         break;
-      case 'n':
+      case 'n': // 固定下边，移动上边
         fixedY = Math.min(startBounds.y + unrotatedDy, movableY - MIN_SIZE);
         break;
-      case 'nw':
-        fixedX = Math.min(startBounds.x + unrotatedDx, movableX - MIN_SIZE);
-        fixedY = Math.min(startBounds.y + unrotatedDy, movableY - MIN_SIZE);
+
+      // 角缩放：固定对角
+      case 'nw': // 固定右下角，移动左上角
+        fixedX = Math.min(
+          startBounds.x + unrotatedDx,
+          startBounds.x + startBounds.width - MIN_SIZE
+        );
+        fixedY = Math.min(
+          startBounds.y + unrotatedDy,
+          startBounds.y + startBounds.height - MIN_SIZE
+        );
+        movableX = startBounds.x + startBounds.width;
+        movableY = startBounds.y + startBounds.height;
         break;
-      case 'ne':
-        movableX = Math.max(startBounds.x + startBounds.width + unrotatedDx, fixedX + MIN_SIZE);
-        fixedY = Math.min(startBounds.y + unrotatedDy, movableY - MIN_SIZE);
+      case 'ne': // 固定左下角，移动右上角
+        movableX = Math.max(
+          startBounds.x + startBounds.width + unrotatedDx,
+          startBounds.x + MIN_SIZE
+        );
+        fixedY = Math.min(
+          startBounds.y + unrotatedDy,
+          startBounds.y + startBounds.height - MIN_SIZE
+        );
+        fixedX = startBounds.x;
+        movableY = startBounds.y + startBounds.height;
         break;
-      case 'se':
-        movableX = Math.max(startBounds.x + startBounds.width + unrotatedDx, fixedX + MIN_SIZE);
-        movableY = Math.max(startBounds.y + startBounds.height + unrotatedDy, fixedY + MIN_SIZE);
+      case 'se': // 固定左上角，移动右下角
+        movableX = Math.max(
+          startBounds.x + startBounds.width + unrotatedDx,
+          startBounds.x + MIN_SIZE
+        );
+        movableY = Math.max(
+          startBounds.y + startBounds.height + unrotatedDy,
+          startBounds.y + MIN_SIZE
+        );
+        fixedX = startBounds.x;
+        fixedY = startBounds.y;
         break;
-      case 'sw':
-        fixedX = Math.min(startBounds.x + unrotatedDx, movableX - MIN_SIZE);
-        movableY = Math.max(startBounds.y + startBounds.height + unrotatedDy, fixedY + MIN_SIZE);
+      case 'sw': // 固定右上角，移动左下角
+        fixedX = Math.min(
+          startBounds.x + unrotatedDx,
+          startBounds.x + startBounds.width - MIN_SIZE
+        );
+        movableY = Math.max(
+          startBounds.y + startBounds.height + unrotatedDy,
+          startBounds.y + MIN_SIZE
+        );
+        movableX = startBounds.x + startBounds.width;
+        fixedY = startBounds.y;
         break;
     }
 
-    // ========== 5. Shift等比缩放（修复：Shift+Alt组合逻辑 + 最小尺寸） ==========
-    let targetWidth = Math.abs(movableX - fixedX);
-    let targetHeight = Math.abs(movableY - fixedY);
+    // ========== 4. 计算基础尺寸 ==========
+    let newWidth = Math.abs(movableX - fixedX);
+    let newHeight = Math.abs(movableY - fixedY);
 
-    if (hasShift && isCorner) {
-      const startRatio = startBounds.width / Math.max(startBounds.height, 1e-6);
-      // 修复：等比缩放基于初始比例，而非当前位移
-      if (Math.abs(targetWidth / targetHeight - startRatio) > 1e-3) {
-        if (Math.abs(unrotatedDx) > Math.abs(unrotatedDy)) {
-          targetHeight = Math.max(targetWidth / startRatio, MIN_SIZE);
-          targetWidth = Math.max(targetWidth, MIN_SIZE); // 确保宽也符合
-        } else {
-          targetWidth = Math.max(targetHeight * startRatio, MIN_SIZE);
-          targetHeight = Math.max(targetHeight, MIN_SIZE); // 确保高也符合
-        }
-      }
-
-      // 重新计算movable点以匹配等比尺寸 (因为不能翻转，方向是固定的)
-      switch (handle) {
-        case 'nw':
-          // 固定点是 movableX, movableY (右下)，修改 fixedX, fixedY
-          // 但这里 fixedX/Y 已经是被修改过的，所以要基于 anchor 计算
-          // anchor 是 movableX (右), movableY (下)
-          fixedX = movableX - targetWidth;
-          fixedY = movableY - targetHeight;
-          break;
-        case 'ne':
-          // anchor: fixedX (左), movableY (下) -> 修正 movableX, fixedY
-          // 注意：switch里的 case 'ne' 已经确定了 movableX 变, fixedY 变
-          // 但因为等比约束，需要互相迁就。
-          // 逻辑简化：根据方向应用尺寸
-          movableX = fixedX + targetWidth;
-          fixedY = movableY - targetHeight;
-          break;
-        case 'se':
-          movableX = fixedX + targetWidth;
-          movableY = fixedY + targetHeight;
-          break;
-        case 'sw':
-          fixedX = movableX - targetWidth;
-          movableY = fixedY + targetHeight;
-          break;
-      }
-    }
-
-    // ========== 6. Alt中心缩放（修复：组合快捷键兼容 + 最小尺寸） ==========
+    // ========== 5. 应用快捷键逻辑 ==========
     if (hasAlt) {
       const centerX = startCenterX;
       const centerY = startCenterY;
 
-      // 当前拖拽形成的尺寸（已含 clamp）
-      const currentWidth = Math.abs(movableX - fixedX);
-      const currentHeight = Math.abs(movableY - fixedY);
+      if (hasShift && isCorner) {
+        // Shift+Alt: 等比中心缩放
+        const startRatio = startBounds.width / Math.max(startBounds.height, 0.001);
+        const scale = newWidth / Math.max(startBounds.width, 0.001);
 
-      if (isCorner) {
-        // 中心缩放：以初始中心为基准，对称扩展/收缩
-        const scaleX = currentWidth / (startBounds.width || 1);
-        const scaleY = currentHeight / (startBounds.height || 1);
-        const finalScale = hasShift ? Math.max(scaleX, scaleY) : (scaleX + scaleY) / 2;
+        newWidth = Math.max(startBounds.width * scale, MIN_SIZE);
+        newHeight = Math.max(newWidth / startRatio, MIN_SIZE);
 
-        targetWidth = Math.max(startBounds.width * finalScale, MIN_SIZE);
-        targetHeight = Math.max(startBounds.height * finalScale, MIN_SIZE);
+        // 以中心点对称缩放
+        fixedX = centerX - newWidth / 2;
+        movableX = centerX + newWidth / 2;
+        fixedY = centerY - newHeight / 2;
+        movableY = centerY + newHeight / 2;
+      } else if (isCorner) {
+        // Alt: 中心缩放（角点）
+        const scaleX = newWidth / Math.max(startBounds.width, 0.001);
+        const scaleY = newHeight / Math.max(startBounds.height, 0.001);
 
-        // 重新计算边界框（基于初始中心）
-        fixedX = centerX - targetWidth / 2;
-        fixedY = centerY - targetHeight / 2;
-        movableX = centerX + targetWidth / 2;
-        movableY = centerY + targetHeight / 2;
+        newWidth = Math.max(startBounds.width * scaleX, MIN_SIZE);
+        newHeight = Math.max(startBounds.height * scaleY, MIN_SIZE);
+
+        fixedX = centerX - newWidth / 2;
+        movableX = centerX + newWidth / 2;
+        fixedY = centerY - newHeight / 2;
+        movableY = centerY + newHeight / 2;
       } else if (isEdge) {
-        // 单边中心缩放
-        if (edgeConfig.left || edgeConfig.right) {
-          const scaleX = currentWidth / (startBounds.width || 1);
-          targetWidth = Math.max(startBounds.width * scaleX, MIN_SIZE);
-          fixedX = centerX - targetWidth / 2;
-          movableX = centerX + targetWidth / 2;
-        } else {
-          const scaleY = currentHeight / (startBounds.height || 1);
-          targetHeight = Math.max(startBounds.height * scaleY, MIN_SIZE);
-          fixedY = centerY - targetHeight / 2;
-          movableY = centerY + targetHeight / 2;
+        // Alt: 中心缩放（边）
+        switch (handle) {
+          case 'e':
+          case 'w':
+            const scaleX = newWidth / Math.max(startBounds.width, 0.001);
+            newWidth = Math.max(startBounds.width * scaleX, MIN_SIZE);
+            fixedX = centerX - newWidth / 2;
+            movableX = centerX + newWidth / 2;
+            // Y轴保持不变
+            fixedY = startBounds.y;
+            movableY = startBounds.y + startBounds.height;
+            break;
+          case 'n':
+          case 's':
+            const scaleY = newHeight / Math.max(startBounds.height, 0.001);
+            newHeight = Math.max(startBounds.height * scaleY, MIN_SIZE);
+            fixedY = centerY - newHeight / 2;
+            movableY = centerY + newHeight / 2;
+            // X轴保持不变
+            fixedX = startBounds.x;
+            movableX = startBounds.x + startBounds.width;
+            break;
         }
+      }
+    } else if (hasShift && isCorner) {
+      // Shift: 等比缩放
+      const startRatio = startBounds.width / Math.max(startBounds.height, 0.001);
+
+      // 根据主要移动方向确定主导轴
+      const dxAbs = Math.abs(unrotatedDx);
+      const dyAbs = Math.abs(unrotatedDy);
+      const isXMain = dxAbs > dyAbs;
+
+      if (isXMain) {
+        // X轴主导：以宽度定高度
+        newHeight = newWidth / startRatio;
+      } else {
+        // Y轴主导：以高度定宽度
+        newWidth = newHeight * startRatio;
+      }
+
+      // 确保不小于最小尺寸
+      newWidth = Math.max(newWidth, MIN_SIZE);
+      newHeight = Math.max(newHeight, MIN_SIZE);
+
+      // 根据手柄修正坐标
+      switch (handle) {
+        case 'nw':
+          fixedX = movableX - newWidth;
+          fixedY = movableY - newHeight;
+          break;
+        case 'ne':
+          movableX = fixedX + newWidth;
+          fixedY = movableY - newHeight;
+          break;
+        case 'se':
+          movableX = fixedX + newWidth;
+          movableY = fixedY + newHeight;
+          break;
+        case 'sw':
+          fixedX = movableX - newWidth;
+          movableY = fixedY + newHeight;
+          break;
       }
     }
 
-    // ========== 7. 计算最终边界框（修复：坐标映射） ==========
+    // ========== 6. 计算最终边界框 ==========
     const finalBounds = {
       x: Math.min(fixedX, movableX),
       y: Math.min(fixedY, movableY),
-      width: Math.max(targetWidth, Math.abs(movableX - fixedX)),
-      height: Math.max(targetHeight, Math.abs(movableY - fixedY)),
+      width: Math.max(newWidth, MIN_SIZE),
+      height: Math.max(newHeight, MIN_SIZE),
     };
 
-    // ========== 8. 同步更新所有节点（核心修复：相对位置计算） ==========
+    // ========== 7. 确定每个节点的固定边角 ==========
+    // 关键修复：为每个节点计算固定边角，而不是统一使用边界框左上角
+    const scaleX = finalBounds.width / Math.max(startBounds.width, 0.001);
+    const scaleY = finalBounds.height / Math.max(startBounds.height, 0.001);
+
     nodeIds.forEach((id) => {
       const startState = nodeStartStates[id];
       const node = this.store.nodes[id] as BaseNodeState;
       if (!node || !startState) return;
 
-      // 修复1：基于像素偏移计算新位置（而非比例）
-      const newNodeX =
-        finalBounds.x + startState.offsetX * (finalBounds.width / (startBounds.width || 1));
-      const newNodeY =
-        finalBounds.y + startState.offsetY * (finalBounds.height / (startBounds.height || 1));
+      // 关键：为每个节点计算固定边角
+      let nodeFixedX = startState.x;
+      let nodeFixedY = startState.y;
+      let nodeMovableX = startState.x + startState.width;
+      let nodeMovableY = startState.y + startState.height;
 
-      // 修复2：尺寸按比例缩放（增加除零保护）
-      const newNodeWidth = startState.scaleX * finalBounds.width;
-      const newNodeHeight = startState.scaleY * finalBounds.height;
+      // 根据手柄确定节点的固定点和可动点
+      // 注意：这里需要根据节点的位置关系来确定
+      const nodeStartBounds = {
+        x: startState.x,
+        y: startState.y,
+        width: startState.width,
+        height: startState.height,
+      };
 
-      // 修复3：中心缩放时的位置修正
+      // 计算节点相对于整体边界框的位置
+      const nodeRelativeLeft =
+        (nodeStartBounds.x - startBounds.x) / Math.max(startBounds.width, 0.001);
+      const nodeRelativeTop =
+        (nodeStartBounds.y - startBounds.y) / Math.max(startBounds.height, 0.001);
+      const nodeRelativeRight =
+        (nodeStartBounds.x + nodeStartBounds.width - startBounds.x) /
+        Math.max(startBounds.width, 0.001);
+      const nodeRelativeBottom =
+        (nodeStartBounds.y + nodeStartBounds.height - startBounds.y) /
+        Math.max(startBounds.height, 0.001);
+
+      // 计算新边界框中的节点位置
+      const newNodeX = finalBounds.x + nodeRelativeLeft * finalBounds.width;
+      const newNodeY = finalBounds.y + nodeRelativeTop * finalBounds.height;
+      const newNodeWidth = startState.width * scaleX;
+      const newNodeHeight = startState.height * scaleY;
+
+      // 根据缩放类型调整位置
       if (hasAlt) {
+        // 中心缩放：基于节点中心点计算
+        const nodeCenterX = startState.x + startState.width / 2;
+        const nodeCenterY = startState.y + startState.height / 2;
+
+        // 计算节点中心点相对于整体中心点的偏移
+        const centerOffsetX = nodeCenterX - startCenterX;
+        const centerOffsetY = nodeCenterY - startCenterY;
+
+        // 计算新的整体中心点
         const newCenterX = finalBounds.x + finalBounds.width / 2;
         const newCenterY = finalBounds.y + finalBounds.height / 2;
-        // 基于相对中心偏移修正节点位置
-        const nodeCenterX = newCenterX + startState.centerOffsetX * finalBounds.width;
-        const nodeCenterY = newCenterY + startState.centerOffsetY * finalBounds.height;
 
-        // 从中心反算左上角坐标
-        const centerAdjustedX = nodeCenterX - newNodeWidth / 2;
-        const centerAdjustedY = nodeCenterY - newNodeHeight / 2;
+        // 基于中心点偏移计算节点新位置
+        const newCenterOffsetX = centerOffsetX * ((scaleX + scaleY) / 2);
+        const newCenterOffsetY = centerOffsetY * ((scaleX + scaleY) / 2);
 
-        // 更新节点（防抖）
-        const isSame =
-          Math.abs(centerAdjustedX - node.transform.x) < 1e-3 &&
-          Math.abs(centerAdjustedY - node.transform.y) < 1e-3 &&
-          Math.abs(newNodeWidth - node.transform.width) < 1e-3 &&
-          Math.abs(newNodeHeight - node.transform.height) < 1e-3;
+        const centerAdjustedX = newCenterX + newCenterOffsetX - newNodeWidth / 2;
+        const centerAdjustedY = newCenterY + newCenterOffsetY - newNodeHeight / 2;
 
-        if (!isSame) {
-          this.store.updateNode(id, {
-            transform: {
-              ...node.transform,
-              x: centerAdjustedX,
-              y: centerAdjustedY,
-              width: Math.abs(newNodeWidth),
-              height: Math.abs(newNodeHeight),
-            },
-          });
-        }
+        // 更新节点
+        this.store.updateNode(id, {
+          transform: {
+            ...node.transform,
+            x: centerAdjustedX,
+            y: centerAdjustedY,
+            width: Math.max(newNodeWidth, MIN_SIZE),
+            height: Math.max(newNodeHeight, MIN_SIZE),
+          },
+        });
       } else {
-        // 普通缩放：直接使用像素偏移
-        const isSame =
-          Math.abs(newNodeX - node.transform.x) < 1e-3 &&
-          Math.abs(newNodeY - node.transform.y) < 1e-3 &&
-          Math.abs(newNodeWidth - node.transform.width) < 1e-3 &&
-          Math.abs(newNodeHeight - node.transform.height) < 1e-3;
-
-        if (!isSame) {
-          this.store.updateNode(id, {
-            transform: {
-              ...node.transform,
-              x: newNodeX,
-              y: newNodeY,
-              width: Math.abs(newNodeWidth),
-              height: Math.abs(newNodeHeight),
-            },
-          });
-        }
+        // 普通缩放：直接使用相对位置
+        this.store.updateNode(id, {
+          transform: {
+            ...node.transform,
+            x: newNodeX,
+            y: newNodeY,
+            width: Math.max(newNodeWidth, MIN_SIZE),
+            height: Math.max(newNodeHeight, MIN_SIZE),
+          },
+        });
       }
     });
   }
 
+  /**
+   * 重新设计的多选缩放开始函数
+   */
+  startMultiResize(
+    e: MouseEvent,
+    handle: ResizeHandle,
+    startBounds: { x: number; y: number; width: number; height: number },
+    nodeIds: string[],
+    isSpacePressed: boolean
+  ) {
+    if (isSpacePressed) return;
+    if (this.isTransforming) return;
+
+    // 重置其他状态
+    this.dragState.isDragging = false;
+    this.dragState.type = null;
+    this.dragState.nodeId = '';
+    this.resizeState.isResizing = false;
+
+    // 过滤有效节点
+    const validNodeIds = nodeIds.filter((id) => {
+      const node = this.store.nodes[id];
+      return node && !node.isLocked;
+    });
+    if (validNodeIds.length === 0) return;
+
+    // 重新计算可靠的包围盒
+    const calcStartBounds = this.getNodesBounds(validNodeIds);
+
+    // 计算中心点
+    const startCenterX = calcStartBounds.x + calcStartBounds.width / 2;
+    const startCenterY = calcStartBounds.y + calcStartBounds.height / 2;
+
+    // 记录每个节点的初始状态
+    const nodeStartStates: Record<string, any> = {};
+    validNodeIds.forEach((id) => {
+      const node = this.store.nodes[id] as BaseNodeState;
+      if (!node) return;
+
+      // 记录节点的完整变换状态
+      nodeStartStates[id] = {
+        x: node.transform.x,
+        y: node.transform.y,
+        width: node.transform.width,
+        height: node.transform.height,
+        rotation: node.transform.rotation,
+
+        // 相对于整体边界框的位置关系（用于固定边角计算）
+        relativeLeft:
+          (node.transform.x - calcStartBounds.x) / Math.max(calcStartBounds.width, 0.001),
+        relativeTop:
+          (node.transform.y - calcStartBounds.y) / Math.max(calcStartBounds.height, 0.001),
+        relativeRight:
+          (node.transform.x + node.transform.width - calcStartBounds.x) /
+          Math.max(calcStartBounds.width, 0.001),
+        relativeBottom:
+          (node.transform.y + node.transform.height - calcStartBounds.y) /
+          Math.max(calcStartBounds.height, 0.001),
+
+        // 中心点相对于整体中心点的偏移
+        centerOffsetX: node.transform.x + node.transform.width / 2 - startCenterX,
+        centerOffsetY: node.transform.y + node.transform.height / 2 - startCenterY,
+      };
+    });
+
+    // 初始化多选缩放状态
+    this.multiResizeState = {
+      isMultiResizing: true,
+      handle,
+      nodeIds: validNodeIds,
+      startBounds: { ...calcStartBounds },
+      startMouseX: e.clientX,
+      startMouseY: e.clientY,
+      nodeStartStates,
+      startCenterX,
+      startCenterY,
+      startRotation: 0, // 多选边界框无旋转
+    };
+
+    this.store.isInteracting = true;
+  }
   /**
    * 结束多选缩放
    */

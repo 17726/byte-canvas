@@ -565,7 +565,7 @@ const rotateHandleStyle = computed(() => {
   return {
     // 旋转 handle 元素本身，使其图标始终正向朝上
     transform: `translateX(-50%) rotate(${-rotation}deg) scale(${scale})`,
-    bottom: `${0.3 * quarterHeight}px`,
+    bottom: `${-1.5 * quarterHeight}px`,
     left: '50%',
   };
 });
