@@ -169,7 +169,6 @@
             style="width: 60px; margin-left: 4px"
             size="mini"
             :tooltip-visible="false"
-            ref="toolbarRef"
           />
         </div>
         <div class="divider"></div>
@@ -208,7 +207,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, inject, type Ref } from 'vue';
+import { computed, inject, type Ref, type CSSProperties } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
 import { useStyleSync } from '@/composables/useStyleSync';
 import { NodeType, type TextDecorationValue, type TextState } from '@/types/state';
@@ -246,7 +245,7 @@ const {
 const isVisible = computed(() => !!activeNode.value && !store.isInteracting && !isGroup.value);
 
 // 计算位置 - 修改为 fixed 定位以配合 Teleport
-const positionStyle = computed(() => {
+const positionStyle = computed<CSSProperties>(() => {
   if (!activeNode.value) return {};
   const absTransform =
     store.getAbsoluteTransform(activeNode.value.id) || activeNode.value.transform;
@@ -265,7 +264,7 @@ const positionStyle = computed(() => {
     top: `${clientPos.y + 50}px`,
     left: `${clientPos.x}px`,
     transform: 'translate(-50%, -100%)',
-    zIndex: 9999, // 确保层级最高
+    zIndex: 1002, // 确保层级最高
   };
 });
 
@@ -426,8 +425,6 @@ const handleDelete = () => {
 <style scoped>
 /* 注意：由于使用了 Teleport，scoped 样式依然生效，但结构上 .context-toolbar 直接位于 body 下 */
 .context-toolbar {
-  /* position: absolute;  <-- 这行被 js 中的 fixed 覆盖了，这里可以保留或删除 */
-  /* z-index: 1000;       <-- 这行被 js 中的 9999 覆盖了 */
   display: flex;
   align-items: center;
   padding: 6px 12px;
