@@ -3,7 +3,7 @@
   <div class="text-layer-wrapper" :style="style">
     <!-- 透明矩形内部写文字，即文本框 -->
     <div
-      ref="editor"
+      :ref="`editor_${props.node.id}`"
       class="textBox"
       :class="{ 'is-editing': isEditing }"
       contenteditable="true"
@@ -54,8 +54,16 @@ const props = defineProps<{
 const toolManagerRef = inject<Ref<ToolManager | null>>('toolManager');
 
 const store = useCanvasStore();
-const editor = ref<HTMLElement | null>(null);
+// 每个组件实例的editorRefs，只存当前节点的DOM（对象里只有一个键）
+const editorRefs = ref<Record<string, HTMLElement | null>>({});
 const isComposing = ref(false);
+
+// 2. 收集当前节点的editor ref
+const collectCurrentEditorRef = () => {
+  const refKey = `editor_${props.node.id}`;
+  // @ts-expect-error 解决$refs类型提示问题（如果需要严格类型，可扩展Vue的Refs类型）
+  editorRefs.value[props.node.id] = proxy.$refs[refKey] as HTMLElement;
+};
 
 // 计算属性：文本HTML渲染（不变）
 const HTMLstring = computed(() => getDomStyle(props.node));
@@ -185,6 +193,8 @@ const handleSelectionChange = (id: string) => {
 };
 
 const enterEditing = (e: MouseEvent, id: string) => {
+  console.log('双击的节点：', e.target);
+  console.log('即将进入编辑态的节点id：', id);
   toolManagerRef?.value?.handleNodeDoubleClick(e, id); // 调用 ToolManager 节点双击事件（内部路由到文本编辑）
 };
 
@@ -229,9 +239,13 @@ const handleTextBoxClick = (e: MouseEvent, id: string) => {
   toolManagerRef?.value?.handleTextClick(e, id); // 调用 ToolManager 文本点击处理
 };
 
-// 3. 组件生命周期：只调用 ToolManager 方法
+// 3. 修改onMounted：传入「节点ID + 对应editor」初始化
 onMounted(() => {
-  toolManagerRef?.value?.initTextEditor(editor.value); // 调用 ToolManager 初始化文本编辑器
+  collectCurrentEditorRef();
+  const currentEditor = editorRefs.value[props.node.id];
+  if (!currentEditor) return;
+  // 调用修改后的initTextEditor，传入节点ID和editor
+  toolManagerRef?.value?.initTextEditor(props.node.id, currentEditor);
 });
 
 onUnmounted(() => {

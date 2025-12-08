@@ -472,8 +472,8 @@ export class ToolManager {
           return;
         }
       }
+      console.log('toolmanager中进入编辑态的节点id:', id);
       this.textSelectionHandler.enterEditing(e, id);
-      console.log('进入编辑态');
     }
 
     this.store.isInteracting = false;
@@ -557,8 +557,9 @@ export class ToolManager {
    * 初始化文本编辑器（供文本组件调用，复用现有逻辑）
    * @param editor - 文本编辑器 DOM 引用
    */
-  initTextEditor(editor: HTMLElement | null) {
-    this.textSelectionHandler.init(editor);
+  initTextEditor(id: string, editor: HTMLElement | undefined) {
+    if (!editor) return;
+    this.textSelectionHandler.init(id, editor);
     // 注册全局事件
     document.addEventListener('mousedown', this.textSelectionHandler.handleGlobalMousedown, true);
   }

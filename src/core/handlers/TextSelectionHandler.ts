@@ -40,7 +40,8 @@ export class TextSelectionHandler {
 
   // 私有状态：内部使用
   private isClickingToolbar = false;
-  private editor: HTMLElement | null = null;
+  // 新增：维护所有editor的ref映射，key=节点ID，value=DOM元素
+  private editors: Record<string, HTMLElement | null> = {};
 
   /**
    * 构造函数（适配 ToolManager 实例化参数）
@@ -62,8 +63,9 @@ export class TextSelectionHandler {
     this.handleGlobalMousedown = this.handleGlobalMousedown.bind(this);
   }
 
-  init(editor: HTMLElement | null) {
-    this.editor = editor;
+  // 接收nodeId和对应的editor，存入映射
+  init(nodeId: string, editor: HTMLElement | null) {
+    this.editors[nodeId] = editor; // 按节点ID存储editor
   }
 
   // 公共方法，更新全局选区
@@ -80,7 +82,7 @@ export class TextSelectionHandler {
     if (this.transformHandler.isTransforming || this.viewportHandler.isPanning) {
       return;
     }
-
+    console.log('handler中处理进入编辑态的节点id:', id);
     // 通过 id 获取节点
     const node = this.store.nodes[id] as TextState;
     if (!node || node.type !== NodeType.TEXT) return;
@@ -90,13 +92,16 @@ export class TextSelectionHandler {
     if (!isSelected) this.store.setActive([id]);
 
     this.isEditing = true;
+
+    const editor = this.editors[id];
     nextTick(() => {
-      if (this.editor) {
+      if (editor) {
         // 1. DOM 层面全选文本（原有逻辑不变）
-        this.editor.focus();
+        editor.focus();
         const selection = window.getSelection();
         const range = document.createRange();
-        range.selectNodeContents(this.editor); // 选中编辑器内所有内容
+        console.log('editor节点：', editor);
+        range.selectNodeContents(editor); // 选中编辑器内所有内容
         selection?.removeAllRanges();
         selection?.addRange(range);
         console.log('双击全选');
@@ -169,7 +174,8 @@ export class TextSelectionHandler {
    */
   public handleSelectionChange(id: string) {
     const node = this.store.nodes[id] as TextState;
-    if (!this.isEditing || !this.editor) {
+    const editor = this.editors[id];
+    if (!this.isEditing || !editor) {
       this.currentSelection = null;
       return;
     }
@@ -184,7 +190,7 @@ export class TextSelectionHandler {
      * 避免用户选中编辑器外的内容（比如页面其他文字）时误触发
      */
     const range = selection.getRangeAt(0); // 获取第一个（也是唯一）选区的范围
-    if (!this.editor.contains(range.commonAncestorContainer)) {
+    if (!editor.contains(range.commonAncestorContainer)) {
       /**
        * commonAncestorContainer：选区内所有节点的共同父节点，判断是否在编辑器内
        */
@@ -215,12 +221,12 @@ export class TextSelectionHandler {
     // 计算选区的「绝对起始索引」（totalStart）
     const startNode = range.startContainer; // 选区开始的节点（比如某个文本节点）
     const startOffset = range.startOffset; // 相对startNode的偏移量（比如在startNode第2个字符后）
-    const baseOffset = getTextOffset(startNode, this.editor);
+    const baseOffset = getTextOffset(startNode, editor);
     const totalStart = baseOffset + startOffset;
 
     const endNode = range.endContainer;
     const endOffset = range.endOffset;
-    const endBaseOffset = getTextOffset(endNode, this.editor); // endNode的绝对偏移
+    const endBaseOffset = getTextOffset(endNode, editor); // endNode的绝对偏移
     const totalEnd = endBaseOffset + endOffset; // 最终：选区在整个文本中的绝对结束索引
 
     // 统一选区方向：确保 start ≤ end（用户可能从后往前选，比如从第8个字符选到第2个）
@@ -249,6 +255,7 @@ export class TextSelectionHandler {
    * @param node 文本节点数据
    */
   handleTextBoxClick(e: MouseEvent, id: string) {
+    const editor = this.editors[id];
     if (!this.isEditing) {
       console.log('没有在编辑状态');
       // 阻止文本框聚焦（避免单击时光标出现，不进入编辑态）
@@ -258,7 +265,7 @@ export class TextSelectionHandler {
       const isSelected = this.store.activeElementIds.has(id);
       if (!isSelected) this.store.setActive([id]);
       // 强制让文本框失焦（兜底，避免意外聚焦）
-      this.editor?.blur();
+      editor?.blur();
     } else {
       if (this.currentSelection && this.currentSelection.end - this.currentSelection.start > 0) {
         e.preventDefault();
@@ -273,12 +280,12 @@ export class TextSelectionHandler {
       // 修复：点击时如果当前是全选状态，清除全选并将光标设置到点击位置
       // 使用 nextTick 确保在浏览器处理完点击事件后再处理
       nextTick(() => {
-        if (this.editor) {
+        if (editor) {
           const selection = window.getSelection();
           if (selection && selection.rangeCount > 0) {
             const range = selection.getRangeAt(0);
             // 检查是否是全选状态（选区覆盖整个编辑器内容）
-            const editorText = this.editor.textContent || '';
+            const editorText = editor.textContent || '';
             const selectedText = range.toString();
 
             // 如果选中的文本长度等于编辑器文本长度，说明是全选
@@ -309,7 +316,7 @@ export class TextSelectionHandler {
               }
 
               // 如果成功获取到点击位置，设置光标到该位置
-              if (targetNode && this.editor.contains(targetNode)) {
+              if (targetNode && editor.contains(targetNode)) {
                 const newRange = document.createRange();
                 newRange.setStart(targetNode, offset);
                 newRange.collapse(true);
@@ -319,7 +326,7 @@ export class TextSelectionHandler {
                 this.handleSelectionChange(id);
               } else {
                 // 降级方案：将光标设置到文本末尾
-                const lastTextNode = this.getLastTextNode(this.editor);
+                const lastTextNode = this.getLastTextNode(editor);
                 if (lastTextNode) {
                   const textLength = lastTextNode.textContent?.length || 0;
                   const newRange = document.createRange();
@@ -383,7 +390,10 @@ export class TextSelectionHandler {
    * @param savedPos 保存的位置信息
    */
   restoreCursorPosition(savedPos: { parent: Node | null; offset: number; textContent: string }) {
-    if (!this.editor || !savedPos.parent || !this.isEditing || !savedPos.textContent) {
+    const id = Array.from(this.store.activeElementIds)[0];
+    if (!id) return;
+    const editor = this.editors[id];
+    if (!editor || !savedPos.parent || !this.isEditing || !savedPos.textContent) {
       return;
     }
 
@@ -393,7 +403,7 @@ export class TextSelectionHandler {
     // 确保DOM完全更新（用nextTick确保渲染完成，避免早了找不到节点）
     nextTick(() => {
       // 在新DOM树中找到「和保存时文本内容一致」的文本节点
-      const targetNode = this.findTextNodeByContent(this.editor!, savedPos.textContent);
+      const targetNode = this.findTextNodeByContent(editor, savedPos.textContent);
       if (!targetNode) return;
 
       //偏移量边界校验（避免超出文本长度）
@@ -423,7 +433,7 @@ export class TextSelectionHandler {
 
     while ((currentNode = walker.nextNode())) {
       // 找到文本内容完全匹配的节点（忽略空格差异，可选）
-      if (currentNode.textContent?.trim() === targetText.trim()) {
+      if (currentNode.textContent === targetText) {
         return currentNode;
       }
     }
@@ -470,10 +480,11 @@ export class TextSelectionHandler {
    */
   public handleBlur(id: string) {
     const node = this.store.nodes[id];
-    if (!node) return;
+    const editor = this.editors[id];
+    if (!node || !editor) return;
 
     if (this.isClickingToolbar) {
-      this.editor?.focus();
+      editor.focus();
     } else {
       this.isEditing = false;
       if (!this.store.activeElementIds.has(id)) {
@@ -502,7 +513,7 @@ export class TextSelectionHandler {
     this.isEditing = false;
     this.currentSelection = null;
     this.isClickingToolbar = false;
-    this.editor = null;
+    this.editors = {};
   }
 
   // 新增：设置选中范围（供外部调用，比如双击全选时）
