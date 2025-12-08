@@ -225,7 +225,6 @@ import {
   Layers as IconLayers,
 } from '@icon-park/vue-next';
 import { ToolManager } from '@/core/ToolManager';
-import { IconMenu } from '@arco-design/web-vue/es/icon';
 import { IconFontColors, IconSort } from '@arco-design/web-vue/es/icon';
 const store = useCanvasStore();
 const toolManagerRef = inject<Ref<ToolManager>>('toolManager');
@@ -266,7 +265,7 @@ const positionStyle = computed<CSSProperties>(() => {
     top: `${clientPos.y + 50}px`,
     left: `${clientPos.x}px`,
     transform: 'translate(-50%, -100%)',
-    zIndex: 1002, // 确保层级最高
+    zIndex: 900, // 确保层级最高
   };
 });
 
@@ -511,6 +510,7 @@ const handleDelete = () => {
   display: flex;
   flex-direction: column;
   gap: 4px;
+  z-index: 1001;
 }
 .arco-btn-size-mini {
   height: 24px;
