@@ -6,11 +6,6 @@
       </div>
       <div class="panel-section">
         <div class="panel-section">
-          <div class="section-title">网格</div>
-          <div class="prop-item">
-            <span class="label">显示网格</span>
-            <a-switch v-model:checked="store.viewport.isGridVisible" />
-          </div>
           <div class="prop-item">
             <span class="label">样式</span>
             <a-radio-group v-model="store.viewport.gridStyle" size="mini">
@@ -55,46 +50,65 @@
         </div>
       </div>
     </div>
-
     <div v-else>
-      <div v-if="!hasSelection" class="empty-state">
+      <div v-if="!displayNode" class="empty-state">
         <a-empty description="未选中元素" />
       </div>
-
       <div v-else class="panel-content">
         <div class="panel-header">
-          <span class="node-type">
-            {{
-              selectionCount > 1
-                ? `已选中 ${selectionCount} 个元素`
-                : displayNode?.type?.toUpperCase()
-            }}
-          </span>
-          <span class="node-id" v-if="selectionCount === 1">#{{ displayNode?.id?.slice(-4) }}</span>
+          <template v-if="isMultiSelect">
+            <span class="node-type">多选</span>
+            <span class="node-id">{{ store.activeElements.length }} 个元素</span>
+          </template>
+          <template v-else>
+            <span class="node-type">{{ displayNode?.type?.toUpperCase() }}</span>
+            <span class="node-id">#{{ displayNode?.id?.slice(-4) }}</span>
+          </template>
         </div>
-
         <div class="panel-section">
           <div class="section-title">变换</div>
           <a-row :gutter="8" class="prop-row">
             <a-col :span="12">
-              <a-input-number v-model="batchX" size="small" :precision="2">
+              <a-input-number
+                v-model="displayX"
+                size="small"
+                :precision="2"
+                :disabled="isMultiSelect"
+              >
                 <template #prefix>X</template>
               </a-input-number>
             </a-col>
             <a-col :span="12">
-              <a-input-number v-model="batchY" size="small" :precision="2">
+              <a-input-number
+                v-model="displayY"
+                size="small"
+                :precision="2"
+                :disabled="isMultiSelect"
+              >
                 <template #prefix>Y</template>
               </a-input-number>
             </a-col>
           </a-row>
           <a-row :gutter="8" class="prop-row">
             <a-col :span="12">
-              <a-input-number v-model="batchWidth" size="small" :min="1" :precision="2">
+              <a-input-number
+                v-model="displayW"
+                size="small"
+                :min="1"
+                :precision="2"
+                :disabled="isMultiSelect"
+              >
                 <template #prefix>W</template>
               </a-input-number>
             </a-col>
             <a-col :span="12">
-              <a-input-number v-model="batchHeight" size="small" :min="1" :precision="2">
+              <a-input-number
+                v-model="displayH"
+                size="small"
+                :min="1"
+                :precision="2"
+                :disabled="isMultiSelect"
+              >
                 <template #prefix>H</template>
               </a-input-number>
             </a-col>
@@ -103,29 +117,28 @@
             <a-col :span="24">
               <span class="section-title">旋转角度</span>
               <a-slider
-                v-model="batchRotation"
+                v-model="transformRotation"
                 :min="-180"
                 :max="180"
                 :step="0.1"
                 show-input
                 size="small"
-                @dblclick="batchRotation = 0"
+                @dblclick="resetRotationToZero"
               />
             </a-col>
           </a-row>
         </div>
         <a-divider style="margin: 12px 0" />
-
         <div class="panel-section">
           <div class="label">外观</div>
           <div class="prop-item" v-if="canEditShapeStyle && !isImage">
-            <span class="label">填充</span>
+            <span class="section-title">填充</span>
             <div class="flex-row">
               <a-color-picker v-model="fillColorTemp" size="small" @change="applyFillColor" />
             </div>
           </div>
           <div class="prop-item" v-if="canEditShapeStyle">
-            <span class="label">描边</span>
+            <span class="section-title">描边</span>
             <div class="flex-row">
               <a-color-picker
                 v-model="strokeColorTemp"
@@ -145,21 +158,13 @@
           </div>
           <div class="prop-item">
             <div class="section-title">不透明度</div>
-            <a-slider
-              v-model="batchOpacity"
-              :min="0"
-              :max="1"
-              :step="0.01"
-              show-input
-              size="small"
-            />
+            <a-slider v-model="opacity" :min="0" :max="1" :step="0.01" show-input size="small" />
           </div>
-
           <template v-if="isRect">
             <div class="prop-item">
-              <span class="label">圆角 (%)</span>
+              <span class="section-title">圆角 (%)</span>
               <a-slider
-                v-model="batchCornerRadius"
+                v-model="cornerRadius"
                 :min="0"
                 :max="50"
                 :step="1"
@@ -170,12 +175,17 @@
           </template>
         </div>
         <a-divider style="margin: 12px 0" />
-
         <div class="panel-section" v-if="isText || isShape || isImage || isGroup">
-          <div class="section-title">属性</div>
+          <div class="label">属性</div>
           <div class="common">
-            <span class="label">z-Index</span>
-            <a-input-number v-model="batchZIndex" size="small" :min="1" mode="button" />
+            <span class="section-title">z-Index</span>
+            <a-input-number
+              v-model="displayZIndex"
+              size="small"
+              :min="1"
+              mode="button"
+              style="margin-top: 8px"
+            />
           </div>
           <br />
           <template v-if="canEditText">
@@ -196,10 +206,9 @@
             </div>
             <div class="prop-item">
               <div class="section-title">颜色</div>
-              <a-color-picker v-model="textColor" show-text size="small" />
+              <a-color-picker :value="textColor" show-text size="small" />
             </div>
           </template>
-
           <template v-if="isImage">
             <div class="prop-item">
               <span class="label">滤镜</span>
@@ -256,7 +265,6 @@
               </div>
             </div>
             <div class="prop-item">
-              <div class="section-title">滤镜参数</div>
               <div class="filter-param-item">
                 <div class="filter-param-label">灰度</div>
                 <a-slider
@@ -269,6 +277,7 @@
                   @dblclick="grayscale = 0"
                 />
               </div>
+
               <div class="filter-param-item">
                 <div class="filter-param-label">模糊</div>
                 <a-slider
@@ -281,6 +290,7 @@
                   @dblclick="blur = 0"
                 />
               </div>
+
               <div class="filter-param-item">
                 <div class="filter-param-label">亮度</div>
                 <a-slider
@@ -293,6 +303,7 @@
                   @dblclick="brightness = 100"
                 />
               </div>
+
               <div class="filter-param-item">
                 <div class="filter-param-label">对比度</div>
                 <a-slider
@@ -305,6 +316,7 @@
                   @dblclick="contrast = 100"
                 />
               </div>
+
               <div class="filter-param-item">
                 <div class="filter-param-label">饱和度</div>
                 <a-slider
@@ -317,6 +329,7 @@
                   @dblclick="saturate = 100"
                 />
               </div>
+
               <div class="filter-param-item">
                 <div class="filter-param-label">色相旋转</div>
                 <a-slider
@@ -329,6 +342,7 @@
                   @dblclick="hueRotate = 0"
                 />
               </div>
+
               <div class="filter-param-item">
                 <div class="filter-param-label">滤镜透明度</div>
                 <a-slider
@@ -341,6 +355,7 @@
                   @dblclick="filterOpacity = 100"
                 />
               </div>
+
               <div class="filter-param-item">
                 <div class="filter-param-label">反转</div>
                 <a-slider
@@ -353,6 +368,7 @@
                   @dblclick="invert = 0"
                 />
               </div>
+
               <div class="filter-param-item">
                 <div class="filter-param-label">棕褐色</div>
                 <a-slider
@@ -372,12 +388,10 @@
     </div>
   </div>
 </template>
-
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
 import { useUIStore } from '@/store/uiStore';
-// 依然保留 useStyleSync 获取一些基础状态，但我们会覆盖掉其中的单点更新逻辑
 import { useStyleSync } from '@/composables/useStyleSync';
 import {
   NodeType,
@@ -390,342 +404,108 @@ import { DEFAULT_CANVAS_THEMES, DEFAULT_IMAGE_FILTERS, DEFAULT_IMAGE_URL } from 
 
 const store = useCanvasStore();
 const ui = useUIStore();
-const { activeNode: syncActiveNode } = useStyleSync();
 
-// --- Core Multi-Selection Logic ---
+// 使用 useStyleSync 进行属性绑定（基础变换和通用属性）
+// 拦截原生的 activeNode 和 isGroup，以便在多选时进行重写
+const {
+  activeNode: syncActiveNode,
+  isShape,
+  isText,
+  isImage,
+  isGroup: syncIsGroup,
+  isRect,
+  x: transformX,
+  y: transformY,
+  width: transformW,
+  height: transformH,
+  rotation: transformRotation,
+  opacity,
+  cornerRadius,
+} = useStyleSync();
 
-// 1. 计算是否选中了元素
-const selectionCount = computed(() => store.activeElementIds.size);
-const hasSelection = computed(() => selectionCount.value > 0);
+// --- 多选逻辑扩展 (Multi-Selection Logic) ---
 
-// 2. 获取"显示节点" (Display Node)
-// 当多选时，我们通常使用最后选中的那个节点作为 UI 回显的基准 (Primary Selection)
-// 或者使用 activeNode (如果 useStyleSync 返回的是单个有效节点)
-const displayNode = computed<NodeState | null>(() => {
+// 判断是否为多选模式：当前无单一聚焦节点，但 store 中有多个选中元素
+const isMultiSelect = computed(() => {
+  return !syncActiveNode.value && store.activeElements.length > 1;
+});
+
+// 计算多选时的包围盒（虚拟节点的尺寸）
+const selectionBounds = computed(() => {
+  if (!isMultiSelect.value) return null;
+  const elements = store.activeElements.filter(Boolean);
+  if (elements.length === 0) return null;
+
+  const minX = Math.min(...elements.map((e) => e!.transform.x));
+  const minY = Math.min(...elements.map((e) => e!.transform.y));
+  const maxX = Math.max(...elements.map((e) => e!.transform.x + e!.transform.width));
+  const maxY = Math.max(...elements.map((e) => e!.transform.y + e!.transform.height));
+
+  return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+});
+
+// 构建用于显示的 Node 代理
+// 如果是单选，返回 syncActiveNode；如果是多选，返回一个虚拟的 GROUP 节点
+const displayNode = computed(() => {
   if (syncActiveNode.value) return syncActiveNode.value;
-  const ids = Array.from(store.activeElementIds);
-  if (ids.length === 0) return null;
-  // 获取最后一个选中的ID作为主节点
-  const lastId = ids[ids.length - 1];
-  return store.nodes[lastId!] || null;
+  if (isMultiSelect.value && selectionBounds.value) {
+    // 创建一个假的 Group 节点结构，骗过 UI 渲染
+    return {
+      id: 'selection-group-temp',
+      type: NodeType.GROUP,
+      x: selectionBounds.value.x,
+      y: selectionBounds.value.y,
+      width: selectionBounds.value.width,
+      height: selectionBounds.value.height,
+      rotation: 0,
+      children: store.activeElements.map((e) => e!.id),
+      style: {
+        zIndex: Math.max(...store.activeElements.map((e) => e!.style.zIndex || 1)),
+        opacity: 1, // 默认不透明度
+      },
+      props: {},
+    } as unknown as NodeState;
+  }
+  return null;
 });
 
-// 3. 辅助判断类型 (基于 displayNode)
-const isGroup = computed(() => displayNode.value?.type === NodeType.GROUP);
-const isRect = computed(() => displayNode.value?.type === NodeType.RECT);
-const isShape = computed(
-  () => displayNode.value?.type === NodeType.RECT || displayNode.value?.type === NodeType.CIRCLE
-);
-const isText = computed(() => displayNode.value?.type === NodeType.TEXT);
-const isImage = computed(() => displayNode.value?.type === NodeType.IMAGE);
+// 重写 activeNode 供内部逻辑使用
+const activeNode = displayNode;
 
-// --- Batch Update Helpers ---
+// 重写 isGroup：如果是原生的 Group 或者是多选模式（视为临时 Group）
+const isGroup = computed(() => syncIsGroup.value || isMultiSelect.value);
 
-/**
- * 批量更新所有选中的节点
- * @param updateFn 回调函数，接收 nodeId 和 node 对象，返回要更新的 Partial<NodeState> 或 null
- */
-const batchUpdate = (updateFn: (id: string, node: NodeState) => Partial<NodeState> | null) => {
-  store.activeElementIds.forEach((id) => {
-    const node = store.nodes[id];
-    if (!node) return;
-    const patch = updateFn(id, node);
-    if (patch) {
-      store.updateNode(id, patch);
-    }
-  });
-};
-
-// --- Transform Bindings (Batch) ---
-
-// 创建一个计算属性生成器，用于 Transform 属性
-const createBatchTransform = (key: keyof NodeState['transform']) => {
-  return computed({
-    get: () => displayNode.value?.transform[key] ?? 0,
-    set: (val: number) => {
-      batchUpdate((id, node) => ({
-        transform: { ...node.transform, [key]: val },
-      }));
-    },
-  });
-};
-
-const batchX = createBatchTransform('x');
-const batchY = createBatchTransform('y');
-const batchWidth = createBatchTransform('width');
-const batchHeight = createBatchTransform('height');
-const batchRotation = createBatchTransform('rotation');
-
-// --- Appearance Bindings (Batch) ---
-
-const batchOpacity = computed({
-  get: () => displayNode.value?.style.opacity ?? 1,
-  set: (val: number) => {
-    batchUpdate((id, node) => ({
-      style: { ...node.style, opacity: val },
-    }));
+// --- 显示用的变换属性 ---
+// 如果是单选，双向绑定到 useStyleSync 的 ref
+// 如果是多选，只读显示计算出的包围盒数据 (避免直接修改导致逻辑复杂，或者需要 store 支持批量更新)
+const displayX = computed({
+  get: () => (isMultiSelect.value ? (selectionBounds.value?.x ?? 0) : transformX.value),
+  set: (val) => {
+    if (!isMultiSelect.value) transformX.value = val;
+  },
+});
+const displayY = computed({
+  get: () => (isMultiSelect.value ? (selectionBounds.value?.y ?? 0) : transformY.value),
+  set: (val) => {
+    if (!isMultiSelect.value) transformY.value = val;
+  },
+});
+const displayW = computed({
+  get: () => (isMultiSelect.value ? (selectionBounds.value?.width ?? 0) : transformW.value),
+  set: (val) => {
+    if (!isMultiSelect.value) transformW.value = val;
+  },
+});
+const displayH = computed({
+  get: () => (isMultiSelect.value ? (selectionBounds.value?.height ?? 0) : transformH.value),
+  set: (val) => {
+    if (!isMultiSelect.value) transformH.value = val;
   },
 });
 
-const batchZIndex = computed({
-  get: () => displayNode.value?.style.zIndex ?? 0,
-  set: (val: number) => {
-    batchUpdate((id, node) => ({
-      style: { ...node.style, zIndex: val },
-    }));
-  },
-});
+// 说明：PropertyPanel 有两种模式：'canvas' (显示画布设置) 与 'node' (显示节点属性)
+// 由 store.activePanel 决定，store.isPanelExpanded 控制面板折叠/展开
 
-const batchCornerRadius = computed({
-  get: () => (displayNode.value as any)?.props?.cornerRadius ?? 0,
-  set: (val: number) => {
-    batchUpdate((id, node) => {
-      if (node.type === NodeType.RECT) {
-        return { props: { ...node.props, cornerRadius: val } } as any;
-      }
-      return null;
-    });
-  },
-});
-
-// Style Logic (Fill & Stroke)
-const fillColorTemp = ref('#ffffff');
-const strokeColorTemp = ref('#000000');
-const strokeWidthTemp = ref(0);
-const ignoreFillChange = ref(false);
-const ignoreStrokeColorChange = ref(false);
-const isSyncingShapeStyle = ref(false);
-
-const canEditShapeStyle = computed(
-  () => isShape.value || isGroup.value || selectionCount.value > 1
-);
-// Helper: 提取颜色值
-const extractColorValue = (input: unknown, fallback: string) => {
-  if (typeof input === 'string') return input;
-  if (typeof input === 'object' && input) {
-    if ('hex' in input) return (input as { hex: string }).hex;
-    if ('value' in input) return (input as { value: string }).value;
-  }
-  return fallback;
-};
-const extractNumericValue = (input: unknown, fallback: number) => {
-  if (typeof input === 'number') return input;
-  // 简单处理，实际可复用原有的 robust logic
-  return Number(input) || fallback;
-};
-
-// Sync Logic: 当 displayNode 变化时更新临时变量
-const syncShapeStyleTemps = () => {
-  if (!displayNode.value) return;
-  // 简化的同步逻辑：直接取 displayNode 的样式
-  isSyncingShapeStyle.value = true;
-  ignoreFillChange.value = true;
-  ignoreStrokeColorChange.value = true;
-
-  fillColorTemp.value = displayNode.value.style.backgroundColor || '#ffffff';
-  strokeColorTemp.value = displayNode.value.style.borderColor || '#000000';
-  strokeWidthTemp.value = displayNode.value.style.borderWidth || 0;
-
-  nextTick(() => {
-    ignoreFillChange.value = false;
-    ignoreStrokeColorChange.value = false;
-    isSyncingShapeStyle.value = false;
-  });
-};
-
-watch(() => displayNode.value?.id, syncShapeStyleTemps, { immediate: true });
-
-const applyFillColor = (newColor?: unknown) => {
-  if (isSyncingShapeStyle.value) return;
-  if (newColor !== undefined && ignoreFillChange.value) {
-    ignoreFillChange.value = false;
-    return;
-  }
-  const color = extractColorValue(newColor, fillColorTemp.value);
-  fillColorTemp.value = color;
-
-  // 批量应用填充色
-  batchUpdate((id, node) => {
-    // 只有形状和组合可以设置背景色
-    if (
-      node.type === NodeType.RECT ||
-      node.type === NodeType.CIRCLE ||
-      node.type === NodeType.GROUP
-    ) {
-      return { style: { ...node.style, backgroundColor: color } };
-    }
-    return null;
-  });
-};
-
-const handleStrokeColorChange = (value: unknown) => {
-  if (isSyncingShapeStyle.value) return;
-  if (ignoreStrokeColorChange.value) {
-    ignoreStrokeColorChange.value = false;
-    return;
-  }
-  const color = extractColorValue(value, strokeColorTemp.value);
-  strokeColorTemp.value = color;
-
-  batchUpdate((id, node) => {
-    if (
-      node.type === NodeType.RECT ||
-      node.type === NodeType.CIRCLE ||
-      node.type === NodeType.GROUP
-    ) {
-      return { style: { ...node.style, borderColor: color } };
-    }
-    return null;
-  });
-};
-
-const handleStrokeWidthChange = (value: unknown) => {
-  if (isSyncingShapeStyle.value) return;
-  const width = extractNumericValue(value, strokeWidthTemp.value);
-  strokeWidthTemp.value = width;
-
-  batchUpdate((id, node) => {
-    if (
-      node.type === NodeType.RECT ||
-      node.type === NodeType.CIRCLE ||
-      node.type === NodeType.GROUP
-    ) {
-      return { style: { ...node.style, borderWidth: width } };
-    }
-    return null;
-  });
-};
-
-// --- Text Specific (Batch) ---
-
-// 收集所有选中的文本节点（包括组合内的）
-const allSelectedTextNodes = computed(() => {
-  const nodes: TextState[] = [];
-  store.activeElementIds.forEach((id) => {
-    const node = store.nodes[id];
-    if (!node) return;
-    if (node.type === NodeType.TEXT) {
-      nodes.push(node as TextState);
-    } else if (node.type === NodeType.GROUP) {
-      // 简单递归查找组合内的文本（可选，保持与原逻辑一致）
-      // 原逻辑 collectGroupDescendants
-      const traverse = (childIds: string[]) => {
-        childIds.forEach((cid) => {
-          const child = store.nodes[cid];
-          if (child?.type === NodeType.TEXT) nodes.push(child as TextState);
-          if (child?.type === NodeType.GROUP) traverse((child as GroupState).children);
-        });
-      };
-      traverse((node as GroupState).children);
-    }
-  });
-  return nodes;
-});
-
-const canEditText = computed(() => allSelectedTextNodes.value.length > 0);
-const primaryTextNode = computed(() => allSelectedTextNodes.value[0] || null);
-
-const applyTextProps = (propsPatch: Partial<TextState['props']>) => {
-  allSelectedTextNodes.value.forEach((node) => {
-    store.updateNode(node.id, { props: propsPatch } as any);
-  });
-};
-
-// Text Computed Props
-const textContent = computed({
-  get: () => primaryTextNode.value?.props.content || '',
-  set: (val) => applyTextProps({ content: val }),
-});
-const fontSize = computed({
-  get: () => primaryTextNode.value?.props.fontSize || 12,
-  set: (val) => applyTextProps({ fontSize: val }),
-});
-const fontWeight = computed({
-  get: () => primaryTextNode.value?.props.fontWeight || 400,
-  set: (val) => applyTextProps({ fontWeight: val }),
-});
-const textColor = computed({
-  get: () => primaryTextNode.value?.props.color || '#000000',
-  set: (val) => applyTextProps({ color: val }),
-});
-
-// --- Image & Filters (Batch) ---
-// 预览图片仅使用主节点
-const previewImage = computed(
-  () => (displayNode.value as ImageState)?.props?.imageUrl || DEFAULT_IMAGE_URL
-);
-const defaultImage = DEFAULT_IMAGE_URL;
-const selectedFilter = ref<string | null>(null);
-
-// 批量生成滤镜计算属性
-function createFilterComputed(
-  filterKey: keyof ImageState['props']['filters'],
-  defaultValue: number
-) {
-  return computed({
-    get: () => (displayNode.value as ImageState)?.props?.filters?.[filterKey] ?? defaultValue,
-    set: (val: number) => {
-      batchUpdate((id, node) => {
-        if (node.type === NodeType.IMAGE) {
-          const imgNode = node as ImageState;
-          return {
-            props: {
-              ...imgNode.props,
-              filters: { ...imgNode.props.filters, [filterKey]: val },
-            },
-          } as any;
-        }
-        return null;
-      });
-    },
-  });
-}
-
-const grayscale = createFilterComputed('grayscale', 0);
-const blur = createFilterComputed('blur', 0);
-const brightness = createFilterComputed('brightness', 100);
-const contrast = createFilterComputed('contrast', 100);
-const saturate = createFilterComputed('saturate', 100);
-const hueRotate = createFilterComputed('hueRotate', 0);
-const filterOpacity = createFilterComputed('filterOpacity', 100);
-const invert = createFilterComputed('invert', 0);
-const sepia = createFilterComputed('sepia', 0);
-
-// Filter Presets (Batch Applied)
-const applyFilterPreset = (preset: Partial<ImageState['props']['filters']>) => {
-  batchUpdate((id, node) => {
-    if (node.type === NodeType.IMAGE) {
-      // 合并默认滤镜和预设滤镜
-      return {
-        props: {
-          ...(node as ImageState).props,
-          filters: { ...DEFAULT_IMAGE_FILTERS, ...preset },
-        },
-      } as any;
-    }
-    return null;
-  });
-};
-
-const selectFilter = (filterType: string) => {
-  selectedFilter.value = filterType;
-  switch (filterType) {
-    case 'grayscale':
-      applyFilterPreset({ grayscale: 100, contrast: 110, brightness: 95 });
-      break;
-    case 'blur':
-      applyFilterPreset({ blur: 8, brightness: 98, filterOpacity: 95 });
-      break;
-    case 'vintage':
-      applyFilterPreset({ sepia: 60, contrast: 115, brightness: 95, saturate: 85, hueRotate: -10 });
-      break;
-    case 'reset':
-      applyFilterPreset({}); // Reset to defaults
-      break;
-  }
-};
-
-// --- Canvas Settings ---
 const isCanvas = computed(() => ui.activePanel === 'canvas');
 const presets = DEFAULT_CANVAS_THEMES as {
   name: string;
@@ -734,6 +514,9 @@ const presets = DEFAULT_CANVAS_THEMES as {
   gridSize: number;
 }[];
 
+/**
+ * 应用预设主题到视口：包括背景色、网格颜色与间距
+ */
 function applyPreset(theme: {
   name: string;
   background: string;
@@ -744,6 +527,616 @@ function applyPreset(theme: {
   store.viewport.gridDotColor = theme.gridColor;
   store.viewport.gridSize = theme.gridSize;
 }
+
+// --- Helpers ---
+// isShape, isText, isImage, isGroup 已从 useStyleSync 导入
+
+function collectGroupDescendants(group: GroupState): NodeState[] {
+  const result: NodeState[] = [];
+  const traverse = (childIds: string[]) => {
+    childIds.forEach((childId) => {
+      const child = store.nodes[childId];
+      if (!child) return;
+      result.push(child);
+      if (child.type === NodeType.GROUP) {
+        traverse((child as GroupState).children);
+      }
+    });
+  };
+  traverse(group.children);
+  return result;
+}
+
+const groupDescendants = computed(() => {
+  if (!isGroup.value || !activeNode.value) return [];
+  // 如果是多选造成的虚拟 group，其 children 已经在构造 activeNode 时填充了 ID 列表
+  // 但对于真实的 GroupState 结构，需要类型断言
+  const node = activeNode.value as GroupState;
+  // 安全检查：如果 children 不存在（例如虚拟节点构建不完全），返回空
+  if (!node.children) return store.activeElements; // 多选模式直接返回 activeElements
+
+  return collectGroupDescendants(node);
+});
+
+const groupTextNodes = computed(() =>
+  groupDescendants.value.filter((node): node is TextState => node!.type === NodeType.TEXT)
+);
+
+const canEditShapeStyle = computed(() => isShape.value || isGroup.value);
+
+const textTargets = computed<TextState[]>(() => {
+  if (isText.value && activeNode.value?.type === NodeType.TEXT) {
+    return [activeNode.value as TextState];
+  }
+  if (isGroup.value) {
+    return groupTextNodes.value;
+  }
+  return [];
+});
+
+const primaryTextNode = computed(() => textTargets.value[0] ?? null);
+const canEditText = computed(() => textTargets.value.length > 0);
+
+function applyTextProps(propsPatch: Partial<TextState['props']>) {
+  textTargets.value.forEach((node) => {
+    store.updateNode(node.id, { props: propsPatch } as Partial<TextState>);
+  });
+}
+
+// --- Transform Bindings ---
+// transformX, transformY, transformW, transformH, transformRotation 已从 useStyleSync 导入
+
+const resetRotationToZero = () => {
+  if (!activeNode.value) return;
+  transformRotation.value = 0;
+};
+
+// --- Appearance Bindings ---
+const fillColorTemp = ref('#ffffff');
+const strokeColorTemp = ref('#000000');
+const strokeWidthTemp = ref(0);
+const isSyncingShapeStyle = ref(false);
+const ignoreFillChange = ref(false);
+const ignoreStrokeColorChange = ref(false);
+
+const extractColorValue = (input: unknown, fallback: string) => {
+  if (typeof input === 'string') return input;
+  if (typeof input === 'object' && input) {
+    if ('hex' in input && typeof (input as { hex?: string }).hex === 'string') {
+      return (input as { hex: string }).hex;
+    }
+    if ('value' in input && typeof (input as { value?: string }).value === 'string') {
+      return (input as { value: string }).value;
+    }
+  }
+  return fallback;
+};
+
+const extractNumericValue = (input: unknown, fallback: number) => {
+  if (typeof input === 'number' && !Number.isNaN(input)) return input;
+  if (typeof input === 'string' && input.trim() !== '' && !Number.isNaN(Number(input))) {
+    return Number(input);
+  }
+  if (typeof input === 'object' && input) {
+    if ('value' in input) {
+      const candidate = (input as { value?: number | string }).value;
+      if (typeof candidate === 'number' && !Number.isNaN(candidate)) return candidate;
+      if (
+        typeof candidate === 'string' &&
+        candidate.trim() !== '' &&
+        !Number.isNaN(Number(candidate))
+      ) {
+        return Number(candidate);
+      }
+    }
+  }
+  return fallback;
+};
+
+// 记录最后选中的子节点ID（用于退出编辑模式时读取正确的样式）
+const lastSelectedChildId = ref<string | null>(null);
+
+// Reset lastSelectedChildId when active node changes to a different group, to null, or to a non-shape/non-group node
+watch(
+  () => activeNode.value?.id,
+  (newId, oldId) => {
+    if (newId !== oldId) {
+      const node = activeNode.value;
+      // Reset if switching groups or to non-shape/non-group nodes
+      if (
+        !node ||
+        (node.type !== NodeType.RECT &&
+          node.type !== NodeType.CIRCLE &&
+          node.type !== NodeType.GROUP)
+      ) {
+        lastSelectedChildId.value = null;
+      }
+    }
+  }
+);
+const syncShapeStyleTemps = () => {
+  if (!activeNode.value || !canEditShapeStyle.value) return;
+
+  // 多选模式下：简单取第一个元素的样式作为显示
+  if (isMultiSelect.value) {
+    const firstShape = store.activeElements.find(
+      (e) => e!.type === NodeType.RECT || e!.type === NodeType.CIRCLE
+    );
+    if (firstShape) {
+      fillColorTemp.value = firstShape.style.backgroundColor || '#ffffff';
+      strokeColorTemp.value = firstShape.style.borderColor || '#000000';
+      strokeWidthTemp.value = firstShape.style.borderWidth || 0;
+    } else {
+      // 如果多选中没有形状，给默认值
+      fillColorTemp.value = '#ffffff';
+      strokeColorTemp.value = '#000000';
+      strokeWidthTemp.value = 0;
+    }
+    return;
+  }
+
+  // 对于组合节点，不读取组合节点本身的 style，而是读取最后选中的形状子节点的 style
+  // 如果没有最后选中的子节点，则读取第一个形状子节点的 style
+  // 这样可以避免在退出编辑模式时触发样式同步
+  if (isGroup.value) {
+    const groupNode = activeNode.value as GroupState;
+    // 优先使用最后选中的子节点
+    let targetChild: NodeState | null = null;
+    if (lastSelectedChildId.value) {
+      const child = store.nodes[lastSelectedChildId.value];
+      if (
+        child &&
+        (child.type === NodeType.RECT || child.type === NodeType.CIRCLE) &&
+        groupNode.children.includes(child.id)
+      ) {
+        targetChild = child;
+      }
+    }
+    // 如果没有最后选中的子节点，或者最后选中的子节点不是形状节点，则使用第一个形状子节点
+    if (!targetChild) {
+      targetChild =
+        groupNode.children
+          .map((id) => store.nodes[id])
+          .find(
+            (child) => child && (child.type === NodeType.RECT || child.type === NodeType.CIRCLE)
+          ) || null;
+    }
+
+    if (targetChild) {
+      isSyncingShapeStyle.value = true;
+      ignoreFillChange.value = true;
+      ignoreStrokeColorChange.value = true;
+      fillColorTemp.value = targetChild.style.backgroundColor || '#ffffff';
+      strokeColorTemp.value = targetChild.style.borderColor || '#000000';
+      strokeWidthTemp.value = targetChild.style.borderWidth || 0;
+      nextTick(() => {
+        ignoreFillChange.value = false;
+        ignoreStrokeColorChange.value = false;
+        isSyncingShapeStyle.value = false;
+      });
+    } else {
+      // 如果没有形状子节点，使用默认值
+      ignoreFillChange.value = true;
+      ignoreStrokeColorChange.value = true;
+      fillColorTemp.value = '#ffffff';
+      strokeColorTemp.value = '#000000';
+      strokeWidthTemp.value = 0;
+      nextTick(() => {
+        ignoreFillChange.value = false;
+        ignoreStrokeColorChange.value = false;
+      });
+    }
+    return;
+  }
+  // 对于非组合节点，记录当前节点ID（可能是子节点）
+  if (activeNode.value.type === NodeType.RECT || activeNode.value.type === NodeType.CIRCLE) {
+    lastSelectedChildId.value = activeNode.value.id;
+  }
+  isSyncingShapeStyle.value = true;
+  ignoreFillChange.value = true;
+  ignoreStrokeColorChange.value = true;
+  fillColorTemp.value = activeNode.value.style.backgroundColor || '#ffffff';
+  strokeColorTemp.value = activeNode.value.style.borderColor || '#000000';
+  strokeWidthTemp.value = activeNode.value.style.borderWidth || 0;
+  nextTick(() => {
+    ignoreFillChange.value = false;
+    ignoreStrokeColorChange.value = false;
+    isSyncingShapeStyle.value = false;
+  });
+};
+
+watch(
+  () => ({
+    id: activeNode.value?.id,
+    bg: activeNode.value?.style.backgroundColor,
+    borderColor: activeNode.value?.style.borderColor,
+    borderWidth: activeNode.value?.style.borderWidth,
+    canEdit: canEditShapeStyle.value,
+  }),
+  () => {
+    syncShapeStyleTemps();
+  },
+  { immediate: true }
+);
+
+// 如果是多选模式，应用颜色到所有选中的形状
+const applyFillColor = (newColor?: unknown) => {
+  // 修改逻辑：支持多选
+  if (!canEditShapeStyle.value) return;
+  if (!activeNode.value && !isMultiSelect.value) return;
+
+  if (newColor !== undefined && ignoreFillChange.value) {
+    ignoreFillChange.value = false;
+    return;
+  }
+  if (isSyncingShapeStyle.value && newColor !== undefined) return;
+  const color = extractColorValue(newColor, fillColorTemp.value);
+  fillColorTemp.value = color;
+
+  // 多选处理：更新所有选中的形状
+  if (isMultiSelect.value) {
+    store.activeElements.forEach((node) => {
+      if (!node) return;
+      if (node.type === NodeType.RECT || node.type === NodeType.CIRCLE) {
+        if (node.style.backgroundColor !== color) {
+          store.updateNode(node.id, { style: { ...node.style, backgroundColor: color } });
+        }
+      }
+    });
+    return;
+  }
+
+  // 单选处理
+  if (!activeNode.value) return;
+  if (activeNode.value.style.backgroundColor === color) return;
+  store.updateNode(activeNode.value.id, {
+    style: { ...activeNode.value.style, backgroundColor: color },
+  });
+};
+
+const applyStrokeStyle = (options?: { color?: unknown; width?: number }) => {
+  if (!canEditShapeStyle.value) return;
+  if (!activeNode.value && !isMultiSelect.value) return;
+
+  if (options?.color !== undefined) {
+    if (ignoreStrokeColorChange.value) {
+      ignoreStrokeColorChange.value = false;
+      return;
+    }
+    if (isSyncingShapeStyle.value) return;
+    strokeColorTemp.value = extractColorValue(options.color, strokeColorTemp.value);
+  } else if (isSyncingShapeStyle.value) {
+    return;
+  }
+  if (typeof options?.width === 'number') {
+    strokeWidthTemp.value = options.width;
+  }
+
+  const nextColor = strokeColorTemp.value;
+  const nextWidth = strokeWidthTemp.value;
+
+  // 多选处理
+  if (isMultiSelect.value) {
+    store.activeElements.forEach((node) => {
+      if (!node) return;
+      if (node.type === NodeType.RECT || node.type === NodeType.CIRCLE) {
+        const colorChanged = node.style.borderColor !== nextColor;
+        const widthChanged = node.style.borderWidth !== nextWidth;
+        if (colorChanged || widthChanged) {
+          store.updateNode(node.id, {
+            style: { ...node.style, borderColor: nextColor, borderWidth: nextWidth },
+          });
+        }
+      }
+    });
+    return;
+  }
+
+  // 单选处理
+  const colorChanged = activeNode.value!.style.borderColor !== nextColor;
+  const widthChanged = activeNode.value!.style.borderWidth !== nextWidth;
+
+  if (!colorChanged && !widthChanged) return;
+
+  store.updateNode(activeNode.value!.id, {
+    style: {
+      ...activeNode.value!.style,
+      borderColor: nextColor,
+      borderWidth: nextWidth,
+    },
+  });
+};
+
+const handleStrokeColorChange = (value: unknown) => {
+  applyStrokeStyle({ color: value });
+};
+
+const handleStrokeWidthChange = (value: unknown) => {
+  if (isSyncingShapeStyle.value) return;
+  const width = extractNumericValue(value, strokeWidthTemp.value);
+  applyStrokeStyle({ width });
+};
+// opacity 已从 useStyleSync 导入
+
+// 修改 zIndex 计算属性以支持多选显示 (取最大值)
+const displayZIndex = computed({
+  get: () => {
+    if (isMultiSelect.value) {
+      return Math.max(...store.activeElements.map((e) => e!.style.zIndex || 1));
+    }
+    return activeNode.value?.style.zIndex ?? 1;
+  },
+  set: (val) => {
+    const newZ = val as number;
+    if (isMultiSelect.value) {
+      store.activeElements.forEach((node) => {
+        if (!node) return;
+        store.updateNode(node.id, { style: { ...node.style, zIndex: newZ } });
+      });
+      return;
+    }
+    if (activeNode.value) {
+      store.updateNode(activeNode.value.id, {
+        style: { ...activeNode.value.style, zIndex: newZ },
+      });
+    }
+  },
+});
+
+// --- Specific Bindings ---
+// Text
+const textContent = computed({
+  get: () => primaryTextNode.value?.props.content || '',
+  set: (val) => {
+    if (!canEditText.value) return;
+    applyTextProps({ content: val as string });
+  },
+});
+const fontSize = computed({
+  get: () => primaryTextNode.value?.props.fontSize || 12,
+  set: (val) => {
+    if (!canEditText.value) return;
+    applyTextProps({ fontSize: val as number });
+  },
+});
+const fontWeight = computed({
+  get: () => primaryTextNode.value?.props.fontWeight || 400,
+  set: (val) => {
+    if (!canEditText.value) return;
+    applyTextProps({ fontWeight: val as number });
+  },
+});
+const textColor = computed({
+  get: () => primaryTextNode.value?.props.color || '#000000',
+  set: (val) => {
+    if (!canEditText.value) return;
+    applyTextProps({ color: val as string });
+  },
+});
+
+// Shape
+// cornerRadius 已从 useStyleSync 导入
+
+//Image
+// 选中的滤镜
+const selectedFilter = ref<string | null>(null);
+// 预览图片（可以使用当前选中图片的缩略图）
+const previewImage = computed(() => {
+  // 这里可以返回当前选中图片的URL
+  return (activeNode.value as ImageState)?.props?.imageUrl || DEFAULT_IMAGE_URL;
+});
+// 默认预览图片（当没有选中图片时使用）
+const defaultImage = DEFAULT_IMAGE_URL;
+// 滤镜参数计算属性
+// 灰度
+const grayscale = computed({
+  get: () => (activeNode.value as ImageState)?.props?.filters?.grayscale ?? 0,
+  set: (val) => {
+    if (!activeNode.value || activeNode.value.type !== NodeType.IMAGE) return;
+    store.updateNode(activeNode.value.id, {
+      props: {
+        ...activeNode.value.props,
+        filters: {
+          ...activeNode.value.props.filters,
+          grayscale: val as number,
+        },
+      },
+    } as Partial<ImageState>);
+  },
+});
+// 模糊
+const blur = computed({
+  get: () => (activeNode.value as ImageState)?.props?.filters?.blur ?? 0,
+  set: (val) => {
+    if (!activeNode.value || activeNode.value.type !== NodeType.IMAGE) return;
+    store.updateNode(activeNode.value.id, {
+      props: {
+        ...activeNode.value.props,
+        filters: {
+          ...activeNode.value.props.filters,
+          blur: val as number,
+        },
+      },
+    } as Partial<ImageState>);
+  },
+});
+// 亮度
+const brightness = computed({
+  get: () => (activeNode.value as ImageState)?.props?.filters?.brightness ?? 100,
+  set: (val) => {
+    if (!activeNode.value || activeNode.value.type !== NodeType.IMAGE) return;
+    store.updateNode(activeNode.value.id, {
+      props: {
+        ...activeNode.value.props,
+        filters: {
+          ...activeNode.value.props.filters,
+          brightness: val as number,
+        },
+      },
+    } as Partial<ImageState>);
+  },
+});
+// 对比度
+const contrast = computed({
+  get: () => (activeNode.value as ImageState)?.props?.filters?.contrast ?? 100,
+  set: (val) => {
+    if (!activeNode.value || activeNode.value.type !== NodeType.IMAGE) return;
+    store.updateNode(activeNode.value.id, {
+      props: {
+        ...activeNode.value.props,
+        filters: {
+          ...activeNode.value.props.filters,
+          contrast: val as number,
+        },
+      },
+    } as Partial<ImageState>);
+  },
+});
+// 饱和度
+const saturate = computed({
+  get: () => (activeNode.value as ImageState)?.props?.filters?.saturate ?? 100,
+  set: (val) => {
+    if (!activeNode.value || activeNode.value.type !== NodeType.IMAGE) return;
+    store.updateNode(activeNode.value.id, {
+      props: {
+        ...activeNode.value.props,
+        filters: {
+          ...activeNode.value.props.filters,
+          saturate: val as number,
+        },
+      },
+    } as Partial<ImageState>);
+  },
+});
+// 色相旋转
+const hueRotate = computed({
+  get: () => (activeNode.value as ImageState)?.props?.filters?.hueRotate ?? 0,
+  set: (val) => {
+    if (!activeNode.value || activeNode.value.type !== NodeType.IMAGE) return;
+    store.updateNode(activeNode.value.id, {
+      props: {
+        ...activeNode.value.props,
+        filters: {
+          ...activeNode.value.props.filters,
+          hueRotate: val as number,
+        },
+      },
+    } as Partial<ImageState>);
+  },
+});
+// 滤镜透明度
+// Helper to create filter computed properties
+function createFilterComputed(
+  filterKey: keyof ImageState['props']['filters'],
+  defaultValue: number
+) {
+  return computed({
+    get: () => (activeNode.value as ImageState)?.props?.filters?.[filterKey] ?? defaultValue,
+    set: (val) => {
+      if (!activeNode.value || activeNode.value.type !== NodeType.IMAGE) return;
+      store.updateNode(activeNode.value.id, {
+        props: {
+          ...activeNode.value.props,
+          filters: {
+            ...activeNode.value.props.filters,
+            [filterKey]: val as number,
+          },
+        },
+      } as Partial<ImageState>);
+    },
+  });
+}
+
+const filterOpacity = createFilterComputed('filterOpacity', 100);
+// 反相
+const invert = createFilterComputed('invert', 0);
+// 棕褐色调
+const sepia = createFilterComputed('sepia', 0);
+// 选择滤镜
+const selectFilter = (filterType: string) => {
+  selectedFilter.value = filterType;
+
+  switch (filterType) {
+    case 'grayscale':
+      grayscaleFilter();
+      break;
+    case 'blur':
+      blurFilter();
+      break;
+    case 'vintage':
+      vintageFilter();
+      break;
+    case 'reset':
+      resetFilter();
+      break;
+  }
+};
+
+const grayscaleFilter = () => {
+  store.activeElements.forEach((element) => {
+    if (element && element.id && element.type === 'image') {
+      store.updateNode(element.id, {
+        props: {
+          ...element.props,
+          filters: {
+            grayscale: 100,
+            contrast: 110,
+            brightness: 95,
+          },
+        },
+      });
+    }
+  });
+};
+
+const blurFilter = () => {
+  store.activeElements.forEach((element) => {
+    if (element && element.id && element.type === 'image') {
+      store.updateNode(element.id, {
+        props: {
+          ...element.props,
+          filters: {
+            blur: 8,
+            brightness: 98,
+            filterOpacity: 95,
+          },
+        },
+      });
+    }
+  });
+};
+
+const vintageFilter = () => {
+  store.activeElements.forEach((element) => {
+    if (element && element.id && element.type === 'image') {
+      store.updateNode(element.id, {
+        props: {
+          ...element.props,
+          filters: {
+            sepia: 60, // 棕褐色调
+            contrast: 115, // 增强对比度
+            brightness: 95, // 降低亮度
+            saturate: 85, // 降低饱和度
+            hueRotate: -10, // 轻微色相偏移
+          },
+        },
+      });
+    }
+  });
+};
+
+const resetFilter = () => {
+  store.activeElements.forEach((element) => {
+    if (element && element.id && element.type === 'image') {
+      store.updateNode(element.id, {
+        props: {
+          ...element.props,
+          filters: DEFAULT_IMAGE_FILTERS,
+        },
+      });
+    }
+  });
+};
 </script>
 
 <style scoped>
@@ -799,7 +1192,7 @@ function applyPreset(theme: {
   font-size: 12px;
   font-weight: bold;
   color: var(--color-text-2);
-  margin-bottom: 4px;
+  margin-bottom: 8px;
 }
 
 .flex-row {
@@ -815,8 +1208,8 @@ function applyPreset(theme: {
 .filter-options {
   display: flex;
   gap: 10px;
-  max-width: 100%;
-  overflow-x: auto;
+  max-width: 100%; /* 或者固定宽度 */
+  overflow-x: auto; /* 水平方向滚动 */
   padding: 5px;
 }
 
@@ -831,12 +1224,13 @@ function applyPreset(theme: {
   width: 60px;
   height: 60px;
   border-radius: 8px;
-  border: 2px solid #e5e5e5;
+  border: 2px solid #e5e5e5; /* 边框保留在父层，无滤镜 */
   transition: all 0.2s ease;
-  position: relative;
-  overflow: hidden;
+  position: relative; /* 作为内部层的定位容器 */
+  overflow: hidden; /* 裁剪内部层的圆角，和父层保持一致 */
 }
 
+/* 新增：承载背景图和滤镜的内部层 */
 .filter-preview-inner {
   position: absolute;
   top: 0;
@@ -845,6 +1239,7 @@ function applyPreset(theme: {
   height: 100%;
   background-size: cover;
   background-position: center;
+  /* 滤镜仅作用于这个内部层，边框层不受影响 */
 }
 
 .filter-preview.active {
@@ -862,6 +1257,7 @@ function applyPreset(theme: {
   color: #666;
 }
 
+/* 滤镜参数调节样式 */
 .filter-param-item {
   margin-bottom: 12px;
 }
