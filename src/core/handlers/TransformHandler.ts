@@ -1,6 +1,37 @@
 /**
  * @file TransformHandler.ts
- * @description 节点变换处理器 - 处理节点的拖拽和缩放（修复多选缩放逻辑 + 增加最小宽高限制及防翻转）
+ * @description
+ * 节点变换处理器（TransformHandler）
+ *
+ * 主要职责：
+ *   - 处理画布节点的拖拽、单节点缩放、旋转、多节点缩放等变换操作
+ *   - 支持多选节点的统一缩放与对齐，修复多选缩放逻辑
+ *   - 增加最小宽高限制及防止节点翻转
+ *
+ * 状态管理：
+ *   - 使用 InternalDragState 跟踪拖拽状态（单节点/区域框）
+ *   - 使用 InternalResizeState 跟踪单节点缩放与旋转状态
+ *   - 使用 InternalMultiResizeState 跟踪多节点缩放状态，包含每个节点的初始偏移与比例
+ *
+ * 关键变换算法：
+ *   - 节点旋转采用二维旋转矩阵公式：
+ *       [x', y'] = [cosθ, -sinθ; sinθ, cosθ] * ([x, y] - center) + center
+ *   - 多节点缩放时，节点位置和尺寸按中心点和比例动态调整，确保整体对齐
+ *   - 防止节点翻转：缩放时检测宽高方向，限制最小尺寸
+ *
+ * 方法概览：
+ *   - startDrag, updateDrag, endDrag
+ *   - startResize, updateResize, endResize
+ *   - startMultiResize, updateMultiResize, endMultiResize
+ *   - 辅助方法：计算旋转、缩放、边界检测等
+ *
+ * 相关文件/集成点：
+ *   - 依赖 @/store/canvasStore 进行全局状态同步
+ *   - 与 SelectionHandler、NodeHandler 等交互以实现复合编辑功能
+ *
+ * 维护提示：
+ *   - 变换逻辑涉及多坐标系转换，注意旋转与缩放的顺序和中心点计算
+ *   - 多节点缩放需保持节点间相对位置和比例，防止错位
  */
 
 import { useCanvasStore } from '@/store/canvasStore';
