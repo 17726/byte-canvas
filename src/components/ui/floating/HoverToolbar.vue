@@ -83,6 +83,18 @@
           </a-tooltip>
         </div>
         <div class="tool-item">
+          <!-- 字体选择下拉菜单 -->
+          <a-select
+            style="width: 180px; margin-bottom: 10px"
+            placeholder="选择字体"
+            @change="handleFontFamilyChange"
+          >
+            <a-option v-for="font in fontList" :key="font.value" :value="font.value">
+              {{ font.label }}
+            </a-option>
+          </a-select>
+        </div>
+        <div class="tool-item">
           <a-tooltip content="加粗" :mouse-enter-delay="0.5">
             <a-button size="mini" :type="isBold ? 'primary' : 'text'" @click="toggleBold">
               <icon-text-bold />
@@ -224,7 +236,6 @@ import {
 } from '@icon-park/vue-next';
 import { ToolManager } from '@/core/ToolManager';
 import { IconMenu } from '@arco-design/web-vue/es/icon';
-
 const store = useCanvasStore();
 const toolManagerRef = inject<Ref<ToolManager>>('toolManager');
 
@@ -241,15 +252,30 @@ const {
   fontSize,
 } = useStyleSync();
 
-// 显示条件
+// 定义字体列表（包含常用中文字体和西文字体）
+const fontList = [
+  { label: '微软雅黑', value: 'Microsoft YaHei' },
+  { label: '宋体', value: 'SimSun' },
+  { label: '黑体', value: 'SimHei' },
+  { label: '楷体', value: 'KaiTi' },
+  { label: 'Arial', value: 'Arial' },
+  { label: 'Times New Roman', value: 'Times New Roman' },
+  { label: 'Courier New', value: 'Courier New' },
+];
+// 计算属性工具栏在屏幕中的位置，用 worldToClient 将世界坐标转换为 DOM 客户端坐标
+// 说明：由于 ContextToolbar 本身放在视口外层 (不受 viewport transform)，因此需要将节点的世界坐标映射到 client 坐标
+// 计算工具栏在页面中的绝对位置：以节点的中心为锚点向上偏移
+// 显示条件：有且仅有一个选中节点，并且不在其他交互中（如拖拽）
 const isVisible = computed(() => !!activeNode.value && !store.isInteracting && !isGroup.value);
 
 // 计算位置 - 修改为 fixed 定位以配合 Teleport
 const positionStyle = computed<CSSProperties>(() => {
   if (!activeNode.value) return {};
+  // 使用绝对坐标，保证组合编辑模式下子元素位置正确
   const absTransform =
     store.getAbsoluteTransform(activeNode.value.id) || activeNode.value.transform;
   const { x, y, width } = absTransform;
+  // 计算节点在屏幕上的位置（相对于 CanvasStage 容器）
   const worldCenter = {
     x: x + width / 2,
     y: y,
@@ -268,6 +294,9 @@ const positionStyle = computed<CSSProperties>(() => {
   };
 });
 
+// 类型判断和基础属性已从 useStyleSync 导入
+
+// --- Common Actions (对选中节点的操作，例如置于最前 / 置于最底 / 删除) ---
 const bringToFront = () => {
   if (!activeNode.value) return;
   const id = activeNode.value.id;
@@ -293,7 +322,12 @@ const sendToBack = () => {
     store.version++;
   }
 };
-
+// --- Shape Actions ---
+// fillColor, strokeColor, strokeWidth 已从 useStyleSync 导入
+// --- Text Actions ---
+// fontSize, textColor 已从 useStyleSync 导入
+// 1. 安全获取当前文本节点 (Computed)
+// 这样后面就不用每次都写 (activeNode.value as TextState) 了
 const activeTextNode = computed(() => {
   const node = store.activeElements[0];
   if (node?.type === NodeType.TEXT) {
@@ -301,31 +335,57 @@ const activeTextNode = computed(() => {
   }
   return null;
 });
+// const textColor = computed({
+//   //NOTE: 关于调色板图标样式的响应还有待商榷 这个get响应逻辑是错的但先不改（可画不变）
+//   get: () => activeTextNode.value?.props.color || '#000000',
+//   set: (val) =>
+//     activeTextNode.value && toolManagerRef?.value.handleColorChange(activeTextNode.value.id, val),
+// });
 
 const handleColorChange = (selectedColor: string) => {
+  // 1. 过滤无效值（和你之前修复的逻辑一致）
   if (!selectedColor) return;
+  // 2. 触发原有修改颜色的逻辑
   if (activeTextNode.value && toolManagerRef?.value) {
     toolManagerRef.value.handleColorChange(activeTextNode.value.id, selectedColor);
   }
 };
+const handleFontFamilyChange = (fontFamily: string) => {
+  if (!fontFamily) return;
 
-// --- Font Style Toggles (保持不变) ---
+  if (activeTextNode.value && toolManagerRef?.value) {
+    toolManagerRef.value.handleFontFamilyChange(activeTextNode.value.id, fontFamily);
+  }
+};
+// --- 样式开关 (Toggle) ---
+
+//粗体
 const isBold = computed(() => {
   const selection = toolManagerRef?.value.getCurrentSelection();
   if (!activeTextNode.value || !selection) return false;
+
   const { start, end } = selection;
   const { inlineStyles = [], fontWeight: globalFontWeight } = activeTextNode.value.props;
+
+  // 1. 检查行内样式：是否有覆盖选中范围的 bold 样式
   const hasInlineBold = inlineStyles.some(
     (style) =>
       style.start <= start &&
       style.end >= end &&
+      // 行内样式的 fontWeight 可能是 'bold' 或 700（两种都表示加粗）
       (style.styles.fontWeight === 'bold' || style.styles.fontWeight === 700)
   );
   if (hasInlineBold) return true;
+
+  // 2. 检查全局样式：若没有行内样式覆盖，且全局是加粗，则返回 true
+  // 全局样式的 fontWeight 可能是 'bold' 或 number 类型（700 对应加粗）
   const isGlobalBold = globalFontWeight === 'bold' || globalFontWeight === 700;
+
+  // 检查选中范围是否被行内样式覆盖（只要有行内样式修改 fontWeight，就不算全局生效）
   const hasInlineOverride = inlineStyles.some(
-    (style) => style.start <= start && style.end >= end && style.styles.fontWeight !== undefined
+    (style) => style.start <= start && style.end >= end && style.styles.fontWeight !== undefined // 只要设置了行内 fontWeight，无论值是什么，都算覆盖
   );
+
   return isGlobalBold && !hasInlineOverride;
 });
 
@@ -336,19 +396,28 @@ const toggleBold = () => {
   }
 };
 
+//斜体
 const isItalic = computed(() => {
   const selection = toolManagerRef?.value.getCurrentSelection();
   if (!activeTextNode.value || !selection) return false;
+
   const { start, end } = selection;
   const { inlineStyles = [], fontStyle: globalFontStyle } = activeTextNode.value.props;
+
+  // 1. 检查行内样式：是否有覆盖选中范围的 italic 样式
   const hasInlineItalic = inlineStyles.some(
     (style) => style.start <= start && style.end >= end && style.styles.fontStyle === 'italic'
   );
   if (hasInlineItalic) return true;
+
+  // 2. 检查全局样式：若没有行内样式覆盖，且全局是 italic，则返回 true
   const isGlobalItalic = globalFontStyle === 'italic';
+
+  // 检查选中范围是否被行内样式覆盖（只要有行内样式修改 fontStyle，就不算全局生效）
   const hasInlineOverride = inlineStyles.some(
-    (style) => style.start <= start && style.end >= end && style.styles.fontStyle !== undefined
+    (style) => style.start <= start && style.end >= end && style.styles.fontStyle !== undefined // 只要设置了行内 fontStyle，无论值是什么，都算覆盖
   );
+
   return isGlobalItalic && !hasInlineOverride;
 });
 
@@ -359,24 +428,36 @@ const toggleItalic = () => {
   }
 };
 
+//下划线
 const isUnderline = computed(() => {
   const selection = toolManagerRef?.value.getCurrentSelection();
   if (!activeTextNode.value || !selection) return false;
+
   const { start, end } = selection;
   const { inlineStyles = [], textDecoration: globalTextDecoration } = activeTextNode.value.props;
+
+  // 辅助函数：判断 textDecoration 是否包含下划线
   const hasUnderlineValue = (value?: TextDecorationValue) => {
     if (!value) return false;
+    // 处理多值情况（如 "underline line-through" 同时存在下划线和删除线）
     return value.split(' ').includes('underline');
   };
+
+  // 1. 检查行内样式：是否有覆盖选中范围的下划线样式
   const hasInlineUnderline = inlineStyles.some(
     (style) =>
       style.start <= start && style.end >= end && hasUnderlineValue(style.styles.textDecoration)
   );
   if (hasInlineUnderline) return true;
+
+  // 2. 检查全局样式：若没有行内样式覆盖，且全局有下划线，则返回 true
   const isGlobalUnderline = hasUnderlineValue(globalTextDecoration);
+
+  // 检查选中范围是否被行内样式覆盖（只要有行内样式修改 textDecoration，就不算全局生效）
   const hasInlineOverride = inlineStyles.some(
-    (style) => style.start <= start && style.end >= end && style.styles.textDecoration !== undefined
+    (style) => style.start <= start && style.end >= end && style.styles.textDecoration !== undefined // 只要设置了行内 textDecoration，无论值是什么，都算覆盖
   );
+
   return isGlobalUnderline && !hasInlineOverride;
 });
 
@@ -387,24 +468,36 @@ const toggleUnderline = () => {
   }
 };
 
+//删除线
 const isStrikethrough = computed(() => {
   const selection = toolManagerRef?.value.getCurrentSelection();
   if (!activeTextNode.value || !selection) return false;
+
   const { start, end } = selection;
   const { inlineStyles = [], textDecoration: globalTextDecoration } = activeTextNode.value.props;
+
+  // 辅助函数：判断 textDecoration 是否包含删除线
   const hasStrikethroughValue = (value?: TextDecorationValue) => {
     if (!value) return false;
+    // 处理可能的多值情况（如 "underline line-through"）
     return value.split(' ').includes('line-through');
   };
+
+  // 1. 检查行内样式：是否有覆盖选中范围的删除线样式
   const hasInlineStrikethrough = inlineStyles.some(
     (style) =>
       style.start <= start && style.end >= end && hasStrikethroughValue(style.styles.textDecoration)
   );
   if (hasInlineStrikethrough) return true;
+
+  // 2. 检查全局样式：若没有行内样式覆盖，且全局有删除线，则返回 true
   const isGlobalStrikethrough = hasStrikethroughValue(globalTextDecoration);
+
+  // 检查选中范围是否被行内样式覆盖（只要有行内样式修改 textDecoration，就不算全局生效）
   const hasInlineOverride = inlineStyles.some(
-    (style) => style.start <= start && style.end >= end && style.styles.textDecoration !== undefined
+    (style) => style.start <= start && style.end >= end && style.styles.textDecoration !== undefined // 只要设置了行内 textDecoration，无论值是什么，都算覆盖
   );
+
   return isGlobalStrikethrough && !hasInlineOverride;
 });
 
@@ -424,6 +517,7 @@ const handleDelete = () => {
 
 <style scoped>
 /* 注意：由于使用了 Teleport，scoped 样式依然生效，但结构上 .context-toolbar 直接位于 body 下 */
+/* merged */
 .context-toolbar {
   display: flex;
   align-items: center;
@@ -494,22 +588,25 @@ const handleDelete = () => {
   color: #666;
 }
 .layer-popover {
-  padding: 8px !important;
-  min-width: 120px;
+  padding: 8px !important; /* 调整内边距 */
+  min-width: 120px; /* 固定最小宽度，避免文字挤压 */
 }
+/* 提示文字样式 */
 .popover-tip {
-  text-align: center;
-  font-size: 12px;
-  color: #666;
-  padding: 0 0 6px 0;
-  border-bottom: 1px solid #f0f0f0;
+  text-align: center; /* 文字居中 */
+  font-size: 12px; /* 字号适配 mini 按钮 */
+  color: #666; /* 浅灰色，区分按钮文字 */
+  padding: 0 0 6px 0; /* 与按钮保持间距 */
+  border-bottom: 1px solid #f0f0f0; /* 加分割线，视觉更清晰 */
   margin-bottom: 6px;
 }
+/* 按钮行样式优化 */
 .popover-row {
   display: flex;
-  flex-direction: column;
-  gap: 4px;
+  flex-direction: column; /* 按钮垂直排列 */
+  gap: 4px; /* 按钮之间的间距 */
 }
+
 .arco-btn-size-mini {
   height: 24px;
   padding: 0 1px;
