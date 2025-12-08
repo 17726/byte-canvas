@@ -62,6 +62,9 @@
       X: {{ store.viewport.offsetX.toFixed(0) }} <br />
       Y: {{ store.viewport.offsetY.toFixed(0) }}
     </div>
+
+    <!-- 性能测试面板 -->
+    <PerformanceTestPanel />
   </div>
 </template>
 
@@ -86,6 +89,7 @@ import ImageLayer from './layers/ImageLayer.vue';
 import RectLayer from './layers/RectLayer.vue';
 import TextLayer from './layers/TextLayer.vue';
 import SelectionOverlay from './SelectionOverlay.vue';
+import PerformanceTestPanel from '../performance/PerformanceTestPanel.vue';
 
 const store = useCanvasStore();
 const stageRef = ref<HTMLElement | null>(null);
