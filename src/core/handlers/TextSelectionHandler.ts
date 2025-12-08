@@ -543,27 +543,38 @@ export class TextSelectionHandler {
     }
 
     // 情况2：重叠部分（如 3-6）→ 移除目标样式属性
-    if (targetStart < origEnd && targetEnd > origStart) {
+    if (targetStart <= origEnd && targetEnd >= origStart) {
       const overlapStart = Math.max(origStart, targetStart);
       const overlapEnd = Math.min(origEnd, targetEnd);
       // 移除目标属性，保留其他样式
       const remainingStyles = { ...origStyles };
 
+      console.log('remaining:', remainingStyles);
+
       // 处理textDecoration多值移除
       if (styleKey === 'textDecoration' && styleValue) {
         const targetValue = styleValue.toString().trim();
-        const origValues = remainingStyles.textDecoration?.split(/\s+/) || [];
-        // 只过滤掉目标值，保留其他值（如移除underline，保留line-through）
-        const newValues = origValues.filter((v) => v !== targetValue);
-        if (newValues.length > 0) {
-          remainingStyles.textDecoration = newValues.join(' ') as TextDecorationValue;
-        } else {
-          // 无剩余值则删除整个属性
-          delete remainingStyles.textDecoration;
+        const origValues = remainingStyles.textDecoration?.toString().split(/\s+/) || [];
+        const hasTargetDecoration = origValues.includes(targetValue);
+        console.log('targetValue:', targetValue);
+        console.log('origValues:', origValues);
+        console.log('hasTargetDecoration:', hasTargetDecoration);
+        if (hasTargetDecoration) {
+          // 已有，过滤掉目标值，保留其他值（如移除underline，保留line-through）
+          const newValues = origValues.filter((v) => v !== targetValue);
+          if (newValues.length > 0) {
+            remainingStyles.textDecoration = newValues.join(' ') as TextDecorationValue;
+          } else {
+            // 无剩余值则删除整个属性
+            delete remainingStyles.textDecoration;
+          }
         }
       } else {
         // 非textDecoration：删除整个属性（原有逻辑）
         delete remainingStyles[styleKey];
+        console.log('已删除原有属性');
+        console.log('删除后的remaining:', remainingStyles);
+        console.log('删除后的remaining长度:', Object.keys(remainingStyles).length);
       }
 
       if (Object.keys(remainingStyles).length > 0) {
@@ -584,7 +595,7 @@ export class TextSelectionHandler {
         styles: { ...origStyles }, // 保留原样式
       });
     }
-
+    console.log('newStyles:', JSON.stringify(newStyles));
     return newStyles;
   }
 
@@ -595,6 +606,7 @@ export class TextSelectionHandler {
     styleValue: InlineStyleProps[keyof InlineStyleProps],
     toggle = true
   ) {
+    console.log('开始处理部分属性');
     // 1. 安全校验：获取有效文本节点（原有逻辑）
     const node = store.nodes[id] as TextState | undefined;
     if (!node || node.type !== NodeType.TEXT) return;
@@ -614,6 +626,7 @@ export class TextSelectionHandler {
     // ===================== 修复核心：全局样式联动逻辑 =====================
     // 2.1 提取全局样式当前值
     const globalStyleValue = (node.props as TextGlobalStyleProps)[styleKey];
+    console.log('全局样式值：', globalStyleValue);
     // 标记是否需要取消全局样式
     let needClearGlobalStyle = false;
     // 存储从全局拆分出的内联样式（未选中区域+选中区域）
@@ -638,74 +651,41 @@ export class TextSelectionHandler {
         }));
 
       // ========== 步骤2：根据 toggle + 全局值与目标值的关系处理选中区域 ==========
+      // toggle==true 原封不动把全局属性传进去 toggle==false 不加入
       let selectedStyles: Array<{ start: number; end: number; styles: InlineStyleProps }> = [];
-
-      if (toggle) {
-        // Toggle=true 场景：智能切换（核心修复）
-        if (globalStyleValue === styleValue) {
-          // 全局值 = 目标值 → 选中区域取消该样式（不添加）
-          console.debug(
-            `toggle=true：全局${styleKey}=${globalStyleValue}（与目标值相同）→ 选中区域取消该样式`
-          );
-        } else {
-          // 全局值 ≠ 目标值 → 选中区域应用目标值（styleValue）
-          selectedStyles = [
-            {
-              start: selectionStart,
-              end: selectionEnd,
-              styles: { [styleKey]: styleValue } as InlineStyleProps,
-            },
-          ];
-          console.debug(
-            `toggle=true：全局${styleKey}=${globalStyleValue}（与目标值不同）→ 选中区域应用${styleValue}`
-          );
-        }
-      } else {
-        // Toggle=false 场景：强制覆盖 → 选中区域应用目标值（无论全局值是什么）
+      if (toggle)
         selectedStyles = [
           {
             start: selectionStart,
             end: selectionEnd,
-            styles: { [styleKey]: styleValue } as InlineStyleProps,
+            styles: { [styleKey]: globalStyleValue } as InlineStyleProps,
           },
         ];
-        console.debug(`toggle=false：强制覆盖 → 选中区域应用${styleKey}=${styleValue}`);
-      }
-
       // ========== 合并：未选中区域样式 + 选中区域样式 ==========
-      globalSplitStyles = [...unselectedStyles, ...selectedStyles];
+      globalSplitStyles = [...unselectedStyles, ...selectedStyles]; //从全局属性中拆出来的三部分 要加入到内联样式数组中
     }
-
-    // ===================== 原有逻辑：预处理现有样式（无修改） =====================
+    console.log('globalSplitStyles:', JSON.stringify(globalSplitStyles));
+    // ===================== 预处理现有样式（无修改） =====================
     const validInlineStyles = [
       ...inlineStyles.filter((style) => style.start < style.end),
       ...globalSplitStyles,
-    ];
+    ]; //原有内联样式数组+全局拆分处理得到的内联样式数组（就是对全局样式做简单拆分）
+    console.log('validInlineStyles:', JSON.stringify(validInlineStyles));
 
-    // 4. 核心重构：处理范围重叠（原有逻辑完全保留）
-    let targetStyleExistsInRange = false;
+    // 4. 处理范围重叠
     const updatedStyles: Array<{ start: number; end: number; styles: InlineStyleProps }> = [];
+    console.log('初始updatedstyles:', JSON.stringify(updatedStyles));
 
     for (const style of validInlineStyles) {
       if (style.end <= selectionStart || style.start >= selectionEnd) {
+        //完全不在选中范围内（无重叠） 直接保留
         updatedStyles.push(style);
+        console.log('style:', JSON.stringify(style));
+        console.log('updatedstyles:', JSON.stringify(updatedStyles));
         continue;
       }
 
-      if (style.styles[styleKey] !== undefined) {
-        if (styleKey === 'textDecoration') {
-          const targetValue = styleValue?.toString().trim() || '';
-          if (targetValue) {
-            const origValues = style.styles.textDecoration?.toString().split(/\s+/) || [];
-            targetStyleExistsInRange = origValues.includes(targetValue);
-          } else {
-            targetStyleExistsInRange = true;
-          }
-        } else {
-          targetStyleExistsInRange = true;
-        }
-      }
-
+      //有范围重叠 得到所有范围要【保留】的原样式属性
       const splitStyles = this.splitOverlappingStyle(
         style,
         selectionStart,
@@ -714,29 +694,52 @@ export class TextSelectionHandler {
         styleValue
       );
       updatedStyles.push(...splitStyles);
+      console.log('splitStyles:', JSON.stringify(splitStyles));
+      console.log('处理重叠范围后的updatedstyles:', JSON.stringify(updatedStyles));
     }
 
-    // 5. 处理样式的添加/切换逻辑（仅全局无属性时生效）
+    //5. 处理样式的【添加】
+    // 步骤1：判断选中区域是否已存在目标样式值（兼容textDecoration多值）
+    let hasTargetStyle = false;
+    // 遍历现有样式，检查选中范围内是否包含目标值
+    for (const style of validInlineStyles) {
+      // 仅检查与选中区域重叠的样式
+      if (style.start < selectionEnd && style.end > selectionStart) {
+        if (styleKey === 'textDecoration' && styleValue) {
+          // textDecoration特判：判断是否包含目标值（而非全等）
+          const targetValue = styleValue.toString().trim();
+          const currentTextDeco = style.styles.textDecoration;
+          if (currentTextDeco) {
+            const currentValues = currentTextDeco.toString().split(/\s+/).filter(Boolean);
+            if (currentValues.includes(targetValue)) {
+              hasTargetStyle = true;
+              break; // 找到目标值，终止遍历
+            }
+          }
+        } else {
+          // 普通属性：判断是否存在该属性且值完全匹配
+          if (style.styles[styleKey] === styleValue) {
+            hasTargetStyle = true;
+            break;
+          }
+        }
+      }
+    }
     if (toggle) {
-      if (
-        !targetStyleExistsInRange ||
-        globalSplitStyles === undefined ||
-        globalStyleValue !== styleValue
-      ) {
+      if (!hasTargetStyle) {
         updatedStyles.push({
           start: selectionStart,
           end: selectionEnd,
           styles: { [styleKey]: styleValue } as InlineStyleProps,
         });
       }
+      // 若hasTargetStyle=true，说明已有该样式，toggle逻辑下不添加（相当于移除）
     } else {
-      if (globalSplitStyles === undefined || globalStyleValue !== styleValue) {
-        updatedStyles.push({
-          start: selectionStart,
-          end: selectionEnd,
-          styles: { [styleKey]: styleValue } as InlineStyleProps,
-        });
-      }
+      updatedStyles.push({
+        start: selectionStart,
+        end: selectionEnd,
+        styles: { [styleKey]: styleValue } as InlineStyleProps,
+      });
     }
 
     // 6. 去重+排序（原有逻辑）
@@ -782,7 +785,7 @@ export class TextSelectionHandler {
     // ===================== 1. 基础安全校验 =====================
     const node = store.nodes[id] as TextState | undefined;
     if (!node || node.type !== NodeType.TEXT) {
-      console.warn(`updateGlobalStyles: 节点${id}不存在或非文本节点，跳过更新`);
+      console.log(`updateGlobalStyles: 节点${id}不存在或非文本节点，跳过更新`);
       return;
     }
 
@@ -791,7 +794,7 @@ export class TextSelectionHandler {
     const contentLength = content.length;
     // 无文本内容时直接返回（无需设置样式）
     if (contentLength === 0) {
-      console.debug(`updateGlobalStyles: 节点${id}无文本内容，跳过更新`);
+      console.log(`updateGlobalStyles: 节点${id}无文本内容，跳过更新`);
       return;
     }
 
@@ -805,7 +808,7 @@ export class TextSelectionHandler {
     }
     // 有有效选中范围时，不修改全局样式
     if (hasValidSelection) {
-      console.debug(`updateGlobalStyles: 节点${id}存在有效选中范围，跳过更新`);
+      console.log(`updateGlobalStyles: 节点${id}存在有效选中范围，跳过更新`);
       return;
     }
 
@@ -870,7 +873,7 @@ export class TextSelectionHandler {
 
     if (!toggle) {
       // -------------------- 场景1：toggle=false 强制覆盖 --------------------
-      console.debug(`updateGlobalStyles: 节点${id}强制设置全局样式 ${styleKey}=${styleValue}`);
+      console.log(`updateGlobalStyles: 节点${id}强制设置全局样式 ${styleKey}=${styleValue}`);
       // 修复点2：显式类型断言，兼容TextGlobalStyleProps的属性类型
       finalGlobalStyles[styleKey] = styleValue as string | number | undefined;
       // 清理所有内联样式中的该属性
@@ -883,41 +886,121 @@ export class TextSelectionHandler {
         .filter((style) => Object.keys(style.styles).length > 0); // 过滤空样式
     } else {
       // -------------------- 场景2：toggle=true 智能切换 --------------------
-      // 子场景A：内联有该样式但未覆盖全部文本 → 全局应用，清理内联
+      // 子场景A：内联有该样式但未覆盖全部文本 → 全局应用（合并值），清理内联
       if (styleRanges.length > 0 && !isInlineCoversAll) {
-        console.debug(
+        console.log(
           `updateGlobalStyles: 节点${id}内联样式未全覆盖，全局应用 ${styleKey}=${styleValue}`
         );
-        finalGlobalStyles[styleKey] = styleValue as string | number | undefined;
-        // 清理内联样式中的该属性
+        // 核心修改：textDecoration合并值，非textDecoration直接赋值
+        if (styleKey === 'textDecoration' && styleValue) {
+          const targetValue = styleValue.toString().trim();
+          // 读取原有全局textDecoration值
+          const currentGlobalTextDeco = (nodeProps as TextGlobalStyleProps).textDecoration;
+          // 拆分原有值（无则为空数组）
+          const currentValues = currentGlobalTextDeco
+            ? currentGlobalTextDeco.toString().split(/\s+/).filter(Boolean)
+            : [];
+          // 合并目标值并去重（避免重复值，如多次添加underline）
+          const newValues = Array.from(new Set([...currentValues, targetValue]));
+          // 赋值合并后的值
+          finalGlobalStyles[styleKey] = newValues.join(' ') as TextDecorationValue;
+        } else {
+          // 非textDecoration属性：直接赋值（原有逻辑）
+          finalGlobalStyles[styleKey] = styleValue as string | number | undefined;
+        }
+
+        // 清理内联样式（精准移除目标值，保留其他值）
         finalInlineStyles = inlineStyles
           .map((style) => {
             const newStyles = { ...style.styles };
-            delete newStyles[styleKey];
+            if (styleKey === 'textDecoration' && styleValue) {
+              const targetValue = styleValue.toString().trim();
+              const currentTextDeco = newStyles.textDecoration;
+
+              if (currentTextDeco) {
+                const currentValues = currentTextDeco.toString().split(/\s+/).filter(Boolean);
+                const remainingValues = currentValues.filter((v) => v !== targetValue);
+
+                if (remainingValues.length > 0) {
+                  newStyles.textDecoration = remainingValues.join(' ') as TextDecorationValue;
+                } else {
+                  delete newStyles.textDecoration;
+                }
+              }
+            } else {
+              delete newStyles[styleKey];
+            }
             return { ...style, styles: newStyles };
           })
           .filter((style) => Object.keys(style.styles).length > 0);
       }
-      // 子场景B：内联全覆盖 或 全局已应用 → 取消全局+清理内联
+      // 子场景B：内联全覆盖 或 全局已应用 → 取消全局（精准移除）+ 清理内联
       else if (isInlineCoversAll || isGlobalApplied) {
         console.debug(`updateGlobalStyles: 节点${id}样式全覆盖/全局已应用，取消 ${styleKey}`);
-        // 取消全局样式（设为undefined）
-        finalGlobalStyles[styleKey] = undefined;
-        // 清理内联样式中的该属性
+        // 取消全局样式（精准移除textDecoration目标值）
+        if (styleKey === 'textDecoration' && styleValue) {
+          const currentGlobalTextDeco = (nodeProps as TextGlobalStyleProps).textDecoration;
+          const targetValue = styleValue.toString().trim();
+
+          if (currentGlobalTextDeco) {
+            const currentValues = currentGlobalTextDeco.toString().split(/\s+/).filter(Boolean);
+            const remainingValues = currentValues.filter((v) => v !== targetValue);
+
+            if (remainingValues.length > 0) {
+              finalGlobalStyles[styleKey] = remainingValues.join(' ') as TextDecorationValue;
+            } else {
+              finalGlobalStyles[styleKey] = undefined;
+            }
+          } else {
+            finalGlobalStyles[styleKey] = undefined;
+          }
+        } else {
+          finalGlobalStyles[styleKey] = undefined;
+        }
+
+        // 清理内联样式（精准移除目标值）
         finalInlineStyles = inlineStyles
           .map((style) => {
             const newStyles = { ...style.styles };
-            delete newStyles[styleKey];
+            if (styleKey === 'textDecoration' && styleValue) {
+              const targetValue = styleValue.toString().trim();
+              const currentTextDeco = newStyles.textDecoration;
+
+              if (currentTextDeco) {
+                const currentValues = currentTextDeco.toString().split(/\s+/).filter(Boolean);
+                const remainingValues = currentValues.filter((v) => v !== targetValue);
+
+                if (remainingValues.length > 0) {
+                  newStyles.textDecoration = remainingValues.join(' ') as TextDecorationValue;
+                } else {
+                  delete newStyles.textDecoration;
+                }
+              }
+            } else {
+              delete newStyles[styleKey];
+            }
             return { ...style, styles: newStyles };
           })
           .filter((style) => Object.keys(style.styles).length > 0);
       }
-      // 子场景C：无内联样式且全局未应用 → 全局应用该样式
+      // 子场景C：无内联样式且全局未应用 → 全局应用（合并值）
       else {
         console.debug(
           `updateGlobalStyles: 节点${id}无相关样式，全局应用 ${styleKey}=${styleValue}`
         );
-        finalGlobalStyles[styleKey] = styleValue as string | number | undefined;
+        // 核心修改：textDecoration合并值，非textDecoration直接赋值
+        if (styleKey === 'textDecoration' && styleValue) {
+          const targetValue = styleValue.toString().trim();
+          const currentGlobalTextDeco = (nodeProps as TextGlobalStyleProps).textDecoration;
+          const currentValues = currentGlobalTextDeco
+            ? currentGlobalTextDeco.toString().split(/\s+/).filter(Boolean)
+            : [];
+          // 合并目标值并去重
+          const newValues = Array.from(new Set([...currentValues, targetValue]));
+          finalGlobalStyles[styleKey] = newValues.join(' ') as TextDecorationValue;
+        } else {
+          finalGlobalStyles[styleKey] = styleValue as string | number | undefined;
+        }
       }
     }
 

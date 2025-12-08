@@ -1,12 +1,13 @@
 <template>
   <div v-if="isVisible" class="context-toolbar" :style="positionStyle" @mousedown.stop>
     <!-- Shape Controls -->
-    <template v-if="isShape">
+    <template v-if="isShape || isText">
       <div class="tool-item">
-        <a-tooltip position="bottom" content="填充色">
+        <a-tooltip content="填充颜色" :mouse-enter-delay="0.5">
           <a-color-picker
-            :popup-offset="-150"
-            :popup-translate="[-100, -160]"
+            position="left"
+            popup-offset="30"
+            :popup-translate="[0, 50]"
             size="mini"
             v-model="fillColor"
             trigger="hover"
@@ -16,95 +17,93 @@
       </div>
       <div class="divider"></div>
       <div class="tool-item">
-        <a-tooltip position="bottom" content="边框色">
-          <a-color-picker
-            :popup-offset="-150"
-            :popup-translate="[-100, -160]"
-            size="mini"
-            v-model="strokeColor"
-            trigger="hover"
-          />
-        </a-tooltip>
-      </div>
-      <div class="divider"></div>
-      <div class="tool-item">
-        <span style="width: 50px">边框：</span>
-        <a-input-number
-          size="mini"
-          v-model="strokeWidth"
-          style="width: 50px"
-          class="input-demo"
-          :min="0"
-          :max="100"
-        />
-      </div>
-    </template>
-
-    <!-- Text Controls -->
-    <template v-if="isText">
-      <div class="tool-item" style="width: 85px">
-        字号:
-        <a-input-number
-          size="mini"
-          v-model="fontSize"
-          style="width: 50px; margin-left: 2px"
-          class="input-demo"
-          :min="12"
-          :max="100"
-        />
-      </div>
-      <div class="divider"></div>
-      <div class="tool-item">
         <a-popover trigger="click" position="top" content-class="toolbar-popover-content">
-          <a-tooltip position="top" content="文本样式">
-            <a-button size="mini" type="text">
-              <icon-text />
-            </a-button>
-          </a-tooltip>
+          <a-button size="mini" type="text" padding="0">
+            <icon-menu style="font-size: 20px; width: 24px" />
+          </a-button>
           <template #content>
-            <div class="popover-grid">
-              <a-tooltip content="加粗" :mouse-enter-delay="0.5">
-                <a-button size="mini" :type="isBold ? 'primary' : 'text'" @click="toggleBold">
-                  <icon-text-bold />
-                </a-button>
-              </a-tooltip>
-              <a-tooltip content="倾斜" :mouse-enter-delay="0.5">
-                <a-button size="mini" :type="isItalic ? 'primary' : 'text'" @click="toggleItalic">
-                  <icon-text-italic />
-                </a-button>
-              </a-tooltip>
-              <a-tooltip content="下划线" :mouse-enter-delay="0.5">
-                <a-button
+            <div class="popover-grid" style="display: flex; gap: 10px; align-items: center">
+              <a-tooltip content="边框颜色" :mouse-enter-delay="0.5">
+                <a-color-picker
+                  position="left"
+                  popup-offset="30"
                   size="mini"
-                  :type="isUnderline ? 'primary' : 'text'"
-                  @click="toggleUnderline"
-                >
-                  <icon-text-underline />
-                </a-button>
+                  v-model="strokeColor"
+                  trigger="hover"
+                />
               </a-tooltip>
-              <a-tooltip content="删除线" :mouse-enter-delay="0.5">
-                <a-button
+              <a-tooltip content="边框大小" :mouse-enter-delay="0.5">
+                <a-input-number
                   size="mini"
-                  :type="isStrikethrough ? 'primary' : 'text'"
-                  @click="toggleStrikethrough"
-                >
-                  <icon-strikethrough />
-                </a-button>
+                  v-model="strokeWidth"
+                  style="width: 50px"
+                  class="input-demo"
+                  :min="0"
+                  :max="100"
+                />
               </a-tooltip>
             </div>
           </template>
         </a-popover>
       </div>
+    </template>
+
+    <!-- Text Controls -->
+    <template v-if="isText">
+      <div class="tool-item" style="width: 100px">
+        <a-input-number
+          size="mini"
+          v-model="fontSize"
+          style="width: 90px; margin-left: 2px"
+          class="input-demo"
+          :min="12"
+          :max="100"
+          mode="button"
+        />
+      </div>
       <div class="divider"></div>
       <div class="tool-item">
-        <a-tooltip position="bottom" content="文本颜色">
+        <a-tooltip content="文本颜色" :mouse-enter-delay="0.5">
           <a-color-picker
             :popup-offset="-150"
             :popup-translate="[-100, -160]"
             size="mini"
-            v-model="textColor"
+            @change="handleColorChange"
             trigger="hover"
-          />
+          >
+          </a-color-picker>
+        </a-tooltip>
+      </div>
+      <div class="tool-item">
+        <a-tooltip content="加粗" :mouse-enter-delay="0.5">
+          <a-button size="mini" :type="isBold ? 'primary' : 'text'" @click="toggleBold">
+            <icon-text-bold />
+          </a-button>
+        </a-tooltip>
+      </div>
+      <div class="tool-item">
+        <a-tooltip content="倾斜" :mouse-enter-delay="0.5">
+          <a-button size="mini" :type="isItalic ? 'primary' : 'text'" @click="toggleItalic">
+            <icon-text-italic />
+          </a-button>
+        </a-tooltip>
+      </div>
+      <div class="tool-item">
+        <a-tooltip content="下划线" :mouse-enter-delay="0.5">
+          <a-button size="mini" :type="isUnderline ? 'primary' : 'text'" @click="toggleUnderline">
+            <icon-text-underline />
+          </a-button>
+        </a-tooltip>
+      </div>
+      <div class="tool-item">
+        <a-tooltip content="删除线" :mouse-enter-delay="0.5">
+          <a-button
+            size="mini"
+            :type="isStrikethrough ? 'primary' : 'text'"
+            @click="toggleStrikethrough"
+          >
+            <icon-strikethrough />
+          </a-button>
         </a-tooltip>
       </div>
     </template>
@@ -117,8 +116,8 @@
     <!-- Common Properties (Opacity & Layer) -->
     <div class="tool-section">
       <div class="tool-item">
-        <a-tooltip placement="top" title="不透明度" :mouseEnterDelay="0.3" content="透明度">
-          <span class="label" style="cursor: help; display: flex; align-items: center">
+        <a-tooltip placement="top" :mouseEnterDelay="0.3" content="不透明度">
+          <span class="label" style="cursor: default; display: flex; align-items: center">
             <svg
               class="icon"
               viewBox="0 0 1024 1024"
@@ -163,9 +162,9 @@
       </div>
       <div class="divider"></div>
       <div class="tool-item">
-        <a-popover trigger="click" position="bottom" content-class="layer-popover">
+        <a-popover trigger="click" position="right" content-class="layer-popover">
           <a-tooltip placement="top" content="图层顺序">
-            <a-button size="mini" type="text">
+            <a-button fontsize="24px" type="text">
               <icon-layers />
             </a-button>
           </a-tooltip>
@@ -212,13 +211,12 @@ import {
   BringToFrontOne as IconBringToFront,
   SentToBack as IconSendToBack,
   Layers as IconLayers, // 新增图标
-  Text as IconText, // 新增图标
+  // Text as IconText, // 新增图标
 } from '@icon-park/vue-next';
 import { ToolManager } from '@/core/ToolManager';
-
+import { IconFontColors, IconMenu } from '@arco-design/web-vue/es/icon';
 const store = useCanvasStore();
 const toolManagerRef = inject<Ref<ToolManager>>('toolManager');
-
 // 使用 useStyleSync 进行属性绑定
 const {
   activeNode,
@@ -294,7 +292,6 @@ const sendToBack = () => {
 
 // --- Shape Actions ---
 // fillColor, strokeColor, strokeWidth 已从 useStyleSync 导入
-
 // --- Text Actions ---
 // fontSize, textColor 已从 useStyleSync 导入
 // 1. 安全获取当前文本节点 (Computed)
@@ -307,12 +304,22 @@ const activeTextNode = computed(() => {
   return null;
 });
 
-const textColor = computed({
-  //NOTE: 关于调色板图标样式的响应还有待商榷 这个get响应逻辑是错的但先不改（可画不变）
-  get: () => activeTextNode.value?.props.color || '#000000',
-  set: (val) =>
-    activeTextNode.value && toolManagerRef?.value.handleColorChange(activeTextNode.value.id, val),
-});
+// const textColor = computed({
+//   //NOTE: 关于调色板图标样式的响应还有待商榷 这个get响应逻辑是错的但先不改（可画不变）
+//   get: () => activeTextNode.value?.props.color || '#000000',
+//   set: (val) =>
+//     activeTextNode.value && toolManagerRef?.value.handleColorChange(activeTextNode.value.id, val),
+// });
+
+const handleColorChange = (selectedColor: string) => {
+  // 1. 过滤无效值（和你之前修复的逻辑一致）
+  if (!selectedColor) return;
+
+  // 2. 触发原有修改颜色的逻辑
+  if (activeTextNode.value && toolManagerRef?.value) {
+    toolManagerRef.value.handleColorChange(activeTextNode.value.id, selectedColor);
+  }
+};
 
 // --- 样式开关 (Toggle) ---
 
@@ -559,5 +566,12 @@ const handleDelete = () => {
   display: flex;
   flex-direction: column; /* 按钮垂直排列 */
   gap: 4px; /* 按钮之间的间距 */
+}
+
+.arco-btn-size-mini {
+  height: 24px;
+  padding: 0 1px;
+  font-size: 16px;
+  border-radius: var(--border-radius-small);
 }
 </style>

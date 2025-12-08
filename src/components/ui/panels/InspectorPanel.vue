@@ -7,11 +7,6 @@
       </div>
       <div class="panel-section">
         <div class="panel-section">
-          <div class="section-title">网格</div>
-          <div class="prop-item">
-            <span class="label">显示网格</span>
-            <a-switch v-model:checked="store.viewport.isGridVisible" />
-          </div>
           <div class="prop-item">
             <span class="label">样式</span>
             <a-radio-group v-model="store.viewport.gridStyle" size="mini">
@@ -95,10 +90,6 @@
           </a-row>
           <a-row :gutter="8" class="prop-row">
             <a-col :span="24">
-              <a-input-number v-model="transformRotation" size="small">
-                <template #prefix>∠</template>
-                <template #suffix>°</template>
-              </a-input-number>
               <span class="section-title">旋转角度</span>
               <a-slider
                 v-model="transformRotation"
@@ -118,14 +109,14 @@
           <div class="label">外观</div>
           <!-- Fill -->
           <div class="prop-item" v-if="canEditShapeStyle && !isImage">
-            <span class="label">填充</span>
+            <span class="section-title">填充</span>
             <div class="flex-row">
               <a-color-picker v-model="fillColorTemp" size="small" @change="applyFillColor" />
             </div>
           </div>
           <!-- Stroke -->
           <div class="prop-item" v-if="canEditShapeStyle">
-            <span class="label">描边</span>
+            <span class="section-title">描边</span>
             <div class="flex-row">
               <a-color-picker
                 v-model="strokeColorTemp"
@@ -150,7 +141,7 @@
           </div>
           <template v-if="isRect">
             <div class="prop-item">
-              <span class="label">圆角 (%)</span>
+              <span class="section-title">圆角 (%)</span>
               <a-slider
                 v-model="cornerRadius"
                 :min="0"
@@ -165,10 +156,16 @@
         <a-divider style="margin: 12px 0" />
         <!-- Section 3: 特有属性 (Specific) -->
         <div class="panel-section" v-if="isText || isShape || isImage || isGroup">
-          <div class="section-title">属性</div>
+          <div class="label">属性</div>
           <div class="common">
-            <span class="label">z-Index</span>
-            <a-input-number v-model="zIndex" size="small" :min="1" mode="button" />
+            <span class="section-title">z-Index</span>
+            <a-input-number
+              v-model="zIndex"
+              size="small"
+              :min="1"
+              mode="button"
+              style="margin-top: 8px"
+            />
           </div>
           <br />
           <!-- Text Specific -->
@@ -190,7 +187,7 @@
             </div>
             <div class="prop-item">
               <div class="section-title">颜色</div>
-              <a-color-picker v-model="textColor" show-text size="small" />
+              <a-color-picker :value="textColor" show-text size="small" />
             </div>
           </template>
           <!-- Image Specific -->
@@ -259,7 +256,6 @@
             </div>
             <!-- 滤镜参数调节 -->
             <div class="prop-item">
-              <div class="section-title">滤镜参数</div>
               <!-- 灰度 -->
               <div class="filter-param-item">
                 <div class="filter-param-label">灰度</div>
@@ -1034,7 +1030,7 @@ const resetFilter = () => {
   font-size: 12px;
   font-weight: bold;
   color: var(--color-text-2);
-  margin-bottom: 4px;
+  margin-bottom: 8px;
 }
 
 .flex-row {

@@ -62,7 +62,7 @@
 
 // stores/canvasStore.ts
 import { defineStore } from 'pinia';
-import { ref, reactive, computed, watch } from 'vue';
+import { ref, reactive, computed, watch, readonly } from 'vue';
 import type { NodeState, ShapeState, TextState, ImageState, ViewportState } from '@/types/state';
 import { NodeType } from '@/types/state';
 import { DEFAULT_VIEWPORT } from '@/config/defaults';
@@ -155,6 +155,45 @@ export const useCanvasStore = defineStore('canvas', () => {
     redoStack.value = [];
   };
 
+  /**
+   * 批量操作时锁定历史记录，避免重复记录快照
+   * 使用方式：
+   * const unlock = lockHistory();
+   * // ... 批量操作
+   * unlock();
+   */
+  const lockHistory = () => {
+    const wasLocked = isHistoryLocked;
+    if (!wasLocked) {
+      pushSnapshot(); // 在锁定前记录一次快照
+      isHistoryLocked = true;
+    }
+    return () => {
+      if (!wasLocked) {
+        isHistoryLocked = false;
+      }
+    };
+  };
+
+  /**
+   * 锁定历史记录但不记录快照（用于自动操作，如调整组合边界）
+   * 使用方式：
+   * const unlock = lockHistoryWithoutSnapshot();
+   * // ... 自动操作
+   * unlock();
+   */
+  const lockHistoryWithoutSnapshot = () => {
+    const wasLocked = isHistoryLocked;
+    if (!wasLocked) {
+      isHistoryLocked = true;
+    }
+    return () => {
+      if (!wasLocked) {
+        isHistoryLocked = false;
+      }
+    };
+  };
+
   const restoreSnapshot = (snapshot: CanvasSnapshot) => {
     isRestoringSnapshot = true;
     nodes.value = cloneDeep(snapshot.nodes);
@@ -163,7 +202,11 @@ export const useCanvasStore = defineStore('canvas', () => {
     activeElementIds.value = new Set(snapshot.activeElementIds);
     editingGroupId.value = snapshot.editingGroupId;
     version.value++; // 标记一次变更，触发依赖更新
-    isRestoringSnapshot = false;
+    // 使用 queueMicrotask 延迟重置标志，确保所有响应式更新都完成后再重置
+    // 这样可以避免在恢复快照后触发的异步响应式更新（如 watch 监听器）调用 updateNode 时记录快照
+    queueMicrotask(() => {
+      isRestoringSnapshot = false;
+    });
   };
 
   const undo = () => {
@@ -208,7 +251,8 @@ export const useCanvasStore = defineStore('canvas', () => {
     if (!node) return;
 
     // 非交互态下，记录快照以支持撤销
-    if (!isInteracting.value) {
+    // 但如果正在恢复快照，则跳过（避免撤销时重复记录）
+    if (!isInteracting.value && !isRestoringSnapshot) {
       pushSnapshot();
     }
 
@@ -359,10 +403,23 @@ export const useCanvasStore = defineStore('canvas', () => {
 
   // 2. 添加节点
   function addNode(node: NodeState) {
-    pushSnapshot();
+    // 如果刚结束交互（isInteracting 刚变为 false），说明交互开始时的快照已经记录了
+    // 此时不应该再记录快照，避免重复记录
+    // 使用 lockHistoryWithoutSnapshot 来防止在添加节点后可能触发的 updateNode 记录快照
+    const unlockHistory = lockHistoryWithoutSnapshot();
+
+    // 只有在非交互状态下才记录快照
+    // 如果 isInteracting 为 true，说明交互开始时的 watch 已经记录了快照
+    if (!isInteracting.value) {
+      pushSnapshot();
+    }
+
     nodes.value[node.id] = node;
     nodeOrder.value.push(node.id);
     version.value++; // 触发更新
+
+    // 解锁历史记录
+    unlockHistory();
   }
 
   // 3. 删除节点（如果是组合，递归删除所有子节点）
@@ -403,7 +460,6 @@ export const useCanvasStore = defineStore('canvas', () => {
   // 注意：如果包含组合，会递归删除其子节点
   function deleteNodes(ids: string[]) {
     if (ids.length === 0) return;
-
     pushSnapshot();
     const idsToDelete = ids.filter((id) => nodes.value[id]);
     if (idsToDelete.length === 0) return;
@@ -922,8 +978,8 @@ export const useCanvasStore = defineStore('canvas', () => {
     canUndo,
     canRedo,
     // 仅供调试使用(undo/redo栈)
-    // historyStack,
-    // redoStack,
+    historyStack: readonly(historyStack),
+    redoStack: readonly(redoStack),
     // 复制/剪切/粘贴
     copySelected,
     cutSelected,
@@ -937,6 +993,9 @@ export const useCanvasStore = defineStore('canvas', () => {
     getAbsoluteTransform,
     // UI 状态请使用 uiStore 中的 activePanel 和 isPanelExpanded
     updateGlobalTextSelection,
+    // 批量操作支持
+    lockHistory,
+    lockHistoryWithoutSnapshot,
     // 创建工具相关
     creationTool,
     creationToolOptions,
