@@ -254,7 +254,9 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
-  toolManagerRef?.value?.destroy(); // 调用 ToolManager 销毁文本编辑器资源
+  // 只清理当前组件的 editor 引用
+  delete editorRefs.value[props.node.id];
+  toolManagerRef?.value?.removeTextEditor(props.node.id);
 });
 
 // 核心：禁用拖拽复制/虚影，保留选中文本
