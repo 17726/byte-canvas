@@ -1,207 +1,229 @@
 <template>
-  <div v-if="isVisible" class="context-toolbar" :style="positionStyle" @mousedown.stop>
-    <!-- Shape Controls -->
-    <template v-if="isShape || isText">
-      <div class="tool-item">
-        <a-tooltip content="填充颜色" :mouse-enter-delay="0.5">
-          <a-color-picker
-            position="left"
-            popup-offset="30"
-            :popup-translate="[0, 50]"
+  <!-- 核心修改：使用 Teleport 将工具栏挂载到 body 上，避开画布的 Scale 和事件干扰 -->
+  <Teleport to="body">
+    <div
+      v-if="isVisible"
+      class="context-toolbar"
+      :style="positionStyle"
+      @mousedown.stop
+      @wheel.stop
+    >
+      <!-- Shape Controls -->
+      <template v-if="isShape || isText">
+        <div class="tool-item">
+          <a-tooltip content="填充颜色" :mouse-enter-delay="0.5">
+            <a-color-picker
+              position="left"
+              popup-offset="30"
+              :popup-translate="[0, 50]"
+              size="mini"
+              v-model="fillColor"
+              trigger="hover"
+              disabled-alpha
+            />
+          </a-tooltip>
+        </div>
+        <div class="divider"></div>
+        <div class="tool-item">
+          <a-popover trigger="click" position="top" content-class="toolbar-popover-content">
+            <a-button size="mini" type="text" padding="0">
+              <icon-menu style="font-size: 20px; width: 24px" />
+            </a-button>
+            <template #content>
+              <div class="popover-grid" style="display: flex; gap: 10px; align-items: center">
+                <a-tooltip content="边框颜色" :mouse-enter-delay="0.5">
+                  <a-color-picker
+                    position="left"
+                    popup-offset="30"
+                    size="mini"
+                    v-model="strokeColor"
+                    trigger="hover"
+                  />
+                </a-tooltip>
+                <a-tooltip content="边框大小" :mouse-enter-delay="0.5">
+                  <a-input-number
+                    size="mini"
+                    v-model="strokeWidth"
+                    style="width: 50px"
+                    class="input-demo"
+                    :min="0"
+                    :max="100"
+                  />
+                </a-tooltip>
+              </div>
+            </template>
+          </a-popover>
+        </div>
+      </template>
+
+      <!-- Text Controls -->
+      <template v-if="isText">
+        <div class="tool-item" style="width: 100px">
+          <a-input-number
             size="mini"
-            v-model="fillColor"
-            trigger="hover"
-            disabled-alpha
+            v-model="fontSize"
+            style="width: 90px; margin-left: 2px"
+            class="input-demo"
+            :min="12"
+            :max="100"
+            mode="button"
           />
-        </a-tooltip>
-      </div>
-      <div class="divider"></div>
-      <div class="tool-item">
-        <a-popover trigger="click" position="top" content-class="toolbar-popover-content">
-          <a-button size="mini" type="text" padding="0">
-            <icon-menu style="font-size: 20px; width: 24px" />
-          </a-button>
-          <template #content>
-            <div class="popover-grid" style="display: flex; gap: 10px; align-items: center">
-              <a-tooltip content="边框颜色" :mouse-enter-delay="0.5">
-                <a-color-picker
-                  position="left"
-                  popup-offset="30"
-                  size="mini"
-                  v-model="strokeColor"
-                  trigger="hover"
-                />
-              </a-tooltip>
-              <a-tooltip content="边框大小" :mouse-enter-delay="0.5">
-                <a-input-number
-                  size="mini"
-                  v-model="strokeWidth"
-                  style="width: 50px"
-                  class="input-demo"
-                  :min="0"
-                  :max="100"
-                />
-              </a-tooltip>
-            </div>
-          </template>
-        </a-popover>
-      </div>
-    </template>
-
-    <!-- Text Controls -->
-    <template v-if="isText">
-      <div class="tool-item" style="width: 100px">
-        <a-input-number
-          size="mini"
-          v-model="fontSize"
-          style="width: 90px; margin-left: 2px"
-          class="input-demo"
-          :min="12"
-          :max="100"
-          mode="button"
-        />
-      </div>
-      <div class="divider"></div>
-      <div class="tool-item">
-        <a-tooltip content="文本颜色" :mouse-enter-delay="0.5">
-          <a-color-picker
-            :popup-offset="-150"
-            :popup-translate="[-100, -160]"
-            size="mini"
-            @change="handleColorChange"
-            trigger="hover"
-          >
-          </a-color-picker>
-        </a-tooltip>
-      </div>
-      <div class="tool-item">
-        <a-tooltip content="加粗" :mouse-enter-delay="0.5">
-          <a-button size="mini" :type="isBold ? 'primary' : 'text'" @click="toggleBold">
-            <icon-text-bold />
-          </a-button>
-        </a-tooltip>
-      </div>
-      <div class="tool-item">
-        <a-tooltip content="倾斜" :mouse-enter-delay="0.5">
-          <a-button size="mini" :type="isItalic ? 'primary' : 'text'" @click="toggleItalic">
-            <icon-text-italic />
-          </a-button>
-        </a-tooltip>
-      </div>
-      <div class="tool-item">
-        <a-tooltip content="下划线" :mouse-enter-delay="0.5">
-          <a-button size="mini" :type="isUnderline ? 'primary' : 'text'" @click="toggleUnderline">
-            <icon-text-underline />
-          </a-button>
-        </a-tooltip>
-      </div>
-      <div class="tool-item">
-        <a-tooltip content="删除线" :mouse-enter-delay="0.5">
-          <a-button
-            size="mini"
-            :type="isStrikethrough ? 'primary' : 'text'"
-            @click="toggleStrikethrough"
-          >
-            <icon-strikethrough />
-          </a-button>
-        </a-tooltip>
-      </div>
-    </template>
-
-    <!-- Image Controls -->
-    <template v-if="isImage">
-      <!-- 预留图片滤镜区域，后续恢复时直接取消注释即可 -->
-    </template>
-    <div class="divider" v-if="isShape || isText"></div>
-    <!-- Common Properties (Opacity & Layer) -->
-    <div class="tool-section">
-      <div class="tool-item">
-        <a-tooltip placement="top" :mouseEnterDelay="0.3" content="不透明度">
-          <span class="label" style="cursor: default; display: flex; align-items: center">
-            <svg
-              class="icon"
-              viewBox="0 0 1024 1024"
-              version="1.1"
-              xmlns="http://www.w3.org/2000/svg"
-              width="20"
-              height="20"
-              aria-hidden="true"
+        </div>
+        <div class="divider"></div>
+        <div class="tool-item">
+          <a-tooltip content="文本颜色" :mouse-enter-delay="0.5">
+            <a-color-picker
+              :popup-offset="-150"
+              :popup-translate="[-100, -160]"
+              size="mini"
+              @change="handleColorChange"
+              trigger="hover"
             >
-              <path
-                d="M102.4 716.8v-204.8h204.8v204.8z m0-409.6V102.4h204.8v204.8z"
-                opacity=".8"
-                fill="#1296db"
-              ></path>
-              <path
-                d="M307.2 921.6v-204.8h204.8v204.8z m0-409.6V307.2h204.8v204.8z"
-                opacity=".6"
-                fill="#1296db"
-              ></path>
-              <path
-                d="M512 716.8v-204.8h204.8v204.8z m0-409.6V102.4h204.8v204.8z"
-                opacity=".4"
-                fill="#1296db"
-              ></path>
-              <path
-                d="M716.8 921.6v-204.8h204.8v204.8z m0-409.6V307.2h204.8v204.8z"
-                opacity=".2"
-                fill="#1296db"
-              ></path>
-            </svg>
-          </span>
-        </a-tooltip>
-        <a-slider
-          v-model="opacity"
-          :min="0"
-          :max="1"
-          :step="0.01"
-          style="width: 60px; margin-left: 4px"
-          size="mini"
-          :tooltip-visible="false"
-        />
-      </div>
-      <div class="divider"></div>
-      <div class="tool-item">
-        <a-popover trigger="click" position="right" content-class="layer-popover">
-          <a-tooltip placement="top" content="图层顺序">
-            <a-button fontsize="24px" type="text">
-              <icon-layers />
+            </a-color-picker>
+          </a-tooltip>
+        </div>
+        <div class="tool-item">
+          <!-- 字体选择下拉菜单 -->
+          <a-select
+            style="width: 180px; margin-bottom: 10px"
+            placeholder="选择字体"
+            @change="handleFontFamilyChange"
+          >
+            <a-option v-for="font in fontList" :key="font.value" :value="font.value">
+              {{ font.label }}
+            </a-option>
+          </a-select>
+        </div>
+        <div class="tool-item">
+          <a-tooltip content="加粗" :mouse-enter-delay="0.5">
+            <a-button size="mini" :type="isBold ? 'primary' : 'text'" @click="toggleBold">
+              <icon-text-bold />
             </a-button>
           </a-tooltip>
-          <!-- 展开的内容（添加提示文字） -->
-          <template #content>
-            <div class="popover-row">
-              <a-button size="mini" type="text" @click="bringToFront" long>
-                <template #icon><icon-bring-to-front /></template>
-                置于顶层
+        </div>
+        <div class="tool-item">
+          <a-tooltip content="倾斜" :mouse-enter-delay="0.5">
+            <a-button size="mini" :type="isItalic ? 'primary' : 'text'" @click="toggleItalic">
+              <icon-text-italic />
+            </a-button>
+          </a-tooltip>
+        </div>
+        <div class="tool-item">
+          <a-tooltip content="下划线" :mouse-enter-delay="0.5">
+            <a-button size="mini" :type="isUnderline ? 'primary' : 'text'" @click="toggleUnderline">
+              <icon-text-underline />
+            </a-button>
+          </a-tooltip>
+        </div>
+        <div class="tool-item">
+          <a-tooltip content="删除线" :mouse-enter-delay="0.5">
+            <a-button
+              size="mini"
+              :type="isStrikethrough ? 'primary' : 'text'"
+              @click="toggleStrikethrough"
+            >
+              <icon-strikethrough />
+            </a-button>
+          </a-tooltip>
+        </div>
+      </template>
+
+      <!-- Image Controls -->
+      <template v-if="isImage">
+        <!-- 预留图片滤镜区域 -->
+      </template>
+      <div class="divider" v-if="isShape || isText"></div>
+
+      <!-- Common Properties (Opacity & Layer) -->
+      <div class="tool-section">
+        <div class="tool-item">
+          <a-tooltip placement="top" :mouseEnterDelay="0.3" content="不透明度">
+            <span class="label" style="cursor: default; display: flex; align-items: center">
+              <svg
+                class="icon"
+                viewBox="0 0 1024 1024"
+                version="1.1"
+                xmlns="http://www.w3.org/2000/svg"
+                width="20"
+                height="20"
+                aria-hidden="true"
+              >
+                <path
+                  d="M102.4 716.8v-204.8h204.8v204.8z m0-409.6V102.4h204.8v204.8z"
+                  opacity=".8"
+                  fill="#1296db"
+                ></path>
+                <path
+                  d="M307.2 921.6v-204.8h204.8v204.8z m0-409.6V307.2h204.8v204.8z"
+                  opacity=".6"
+                  fill="#1296db"
+                ></path>
+                <path
+                  d="M512 716.8v-204.8h204.8v204.8z m0-409.6V102.4h204.8v204.8z"
+                  opacity=".4"
+                  fill="#1296db"
+                ></path>
+                <path
+                  d="M716.8 921.6v-204.8h204.8v204.8z m0-409.6V307.2h204.8v204.8z"
+                  opacity=".2"
+                  fill="#1296db"
+                ></path>
+              </svg>
+            </span>
+          </a-tooltip>
+
+          <!-- 滑动条组件 -->
+          <a-slider
+            v-model="opacity"
+            :min="0"
+            :max="1"
+            :step="0.01"
+            style="width: 60px; margin-left: 4px"
+            size="mini"
+            :tooltip-visible="false"
+          />
+        </div>
+        <div class="divider"></div>
+        <div class="tool-item">
+          <a-popover trigger="click" position="right" content-class="layer-popover">
+            <a-tooltip placement="top" content="图层顺序">
+              <a-button fontsize="24px" type="text">
+                <icon-layers />
               </a-button>
-              <a-button size="mini" type="text" @click="sendToBack" long>
-                <template #icon><icon-send-to-back /></template>
-                置于底层
-              </a-button>
-            </div>
-          </template>
-        </a-popover>
+            </a-tooltip>
+            <template #content>
+              <div class="popover-row">
+                <a-button size="mini" type="text" @click="bringToFront" long>
+                  <template #icon><icon-bring-to-front /></template>
+                  置于顶层
+                </a-button>
+                <a-button size="mini" type="text" @click="sendToBack" long>
+                  <template #icon><icon-send-to-back /></template>
+                  置于底层
+                </a-button>
+              </div>
+            </template>
+          </a-popover>
+        </div>
+      </div>
+      <div class="divider"></div>
+      <div class="tool-item">
+        <a-tooltip placement="top" content="删除">
+          <a-button size="mini" status="danger" type="text" @click="handleDelete">
+            <icon-delete />
+          </a-button>
+        </a-tooltip>
       </div>
     </div>
-    <div class="divider"></div>
-    <div class="tool-item">
-      <a-tooltip placement="top" content="删除">
-        <a-button size="mini" status="danger" type="text" @click="handleDelete">
-          <icon-delete />
-        </a-button>
-      </a-tooltip>
-    </div>
-  </div>
+  </Teleport>
 </template>
 
 <script setup lang="ts">
-import { computed, inject, type Ref } from 'vue';
+import { computed, inject, type Ref, type CSSProperties } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
 import { useStyleSync } from '@/composables/useStyleSync';
 import { NodeType, type TextDecorationValue, type TextState } from '@/types/state';
 import { worldToClient } from '@/core/utils/geometry';
-// import { DEFAULT_IMAGE_FILTERS, DEFAULT_IMAGE_URL } from '@/config/defaults';
 import {
   Delete as IconDelete,
   TextBold as IconTextBold,
@@ -210,14 +232,13 @@ import {
   Strikethrough as IconStrikethrough,
   BringToFrontOne as IconBringToFront,
   SentToBack as IconSendToBack,
-  Layers as IconLayers, // 新增图标
-  // Text as IconText, // 新增图标
+  Layers as IconLayers,
 } from '@icon-park/vue-next';
 import { ToolManager } from '@/core/ToolManager';
-import { IconFontColors, IconMenu } from '@arco-design/web-vue/es/icon';
+import { IconMenu } from '@arco-design/web-vue/es/icon';
 const store = useCanvasStore();
 const toolManagerRef = inject<Ref<ToolManager>>('toolManager');
-// 使用 useStyleSync 进行属性绑定
+
 const {
   activeNode,
   isShape,
@@ -231,39 +252,51 @@ const {
   fontSize,
 } = useStyleSync();
 
-// 显示条件：有且仅有一个选中节点，并且不在其他交互中（如拖拽）
-const isVisible = computed(() => !!activeNode.value && !store.isInteracting && !isGroup.value);
-
+// 定义字体列表（包含常用中文字体和西文字体）
+const fontList = [
+  { label: '微软雅黑', value: 'Microsoft YaHei' },
+  { label: '宋体', value: 'SimSun' },
+  { label: '黑体', value: 'SimHei' },
+  { label: '楷体', value: 'KaiTi' },
+  { label: 'Arial', value: 'Arial' },
+  { label: 'Times New Roman', value: 'Times New Roman' },
+  { label: 'Courier New', value: 'Courier New' },
+];
 // 计算属性工具栏在屏幕中的位置，用 worldToClient 将世界坐标转换为 DOM 客户端坐标
 // 说明：由于 ContextToolbar 本身放在视口外层 (不受 viewport transform)，因此需要将节点的世界坐标映射到 client 坐标
 // 计算工具栏在页面中的绝对位置：以节点的中心为锚点向上偏移
-const positionStyle = computed(() => {
-  if (!activeNode.value) return {};
+// 显示条件：有且仅有一个选中节点，并且不在其他交互中（如拖拽）
+const isVisible = computed(() => !!activeNode.value && !store.isInteracting && !isGroup.value);
 
+// 计算位置 - 修改为 fixed 定位以配合 Teleport
+const positionStyle = computed<CSSProperties>(() => {
+  if (!activeNode.value) return {};
   // 使用绝对坐标，保证组合编辑模式下子元素位置正确
   const absTransform =
     store.getAbsoluteTransform(activeNode.value.id) || activeNode.value.transform;
   const { x, y, width } = absTransform;
-
   // 计算节点在屏幕上的位置（相对于 CanvasStage 容器）
   const worldCenter = {
     x: x + width / 2,
     y: y,
   };
 
+  // worldToClient 得到的通常是相对于视口的坐标
   const clientPos = worldToClient(store.viewport, worldCenter.x, worldCenter.y);
 
   return {
-    top: `${clientPos.y - 12}px`,
+    // 关键修改：强制使用 fixed 定位，因为 Teleport 到了 body
+    position: 'fixed',
+    top: `${clientPos.y + 50}px`,
     left: `${clientPos.x}px`,
-    transform: 'translate(-50%, -100%)', // 居中并向上偏移
+    transform: 'translate(-50%, -100%)',
+    zIndex: 1002, // 确保层级最高
   };
 });
 
 // 类型判断和基础属性已从 useStyleSync 导入
 
 // --- Common Actions (对选中节点的操作，例如置于最前 / 置于最底 / 删除) ---
-
 const bringToFront = () => {
   if (!activeNode.value) return;
   const id = activeNode.value.id;
@@ -289,7 +322,6 @@ const sendToBack = () => {
     store.version++;
   }
 };
-
 // --- Shape Actions ---
 // fillColor, strokeColor, strokeWidth 已从 useStyleSync 导入
 // --- Text Actions ---
@@ -303,7 +335,6 @@ const activeTextNode = computed(() => {
   }
   return null;
 });
-
 // const textColor = computed({
 //   //NOTE: 关于调色板图标样式的响应还有待商榷 这个get响应逻辑是错的但先不改（可画不变）
 //   get: () => activeTextNode.value?.props.color || '#000000',
@@ -314,13 +345,18 @@ const activeTextNode = computed(() => {
 const handleColorChange = (selectedColor: string) => {
   // 1. 过滤无效值（和你之前修复的逻辑一致）
   if (!selectedColor) return;
-
   // 2. 触发原有修改颜色的逻辑
   if (activeTextNode.value && toolManagerRef?.value) {
     toolManagerRef.value.handleColorChange(activeTextNode.value.id, selectedColor);
   }
 };
+const handleFontFamilyChange = (fontFamily: string) => {
+  if (!fontFamily) return;
 
+  if (activeTextNode.value && toolManagerRef?.value) {
+    toolManagerRef.value.handleFontFamilyChange(activeTextNode.value.id, fontFamily);
+  }
+};
 // --- 样式开关 (Toggle) ---
 
 //粗体
@@ -356,9 +392,7 @@ const isBold = computed(() => {
 const toggleBold = () => {
   const activeId = Array.from(store.activeElementIds)[0];
   if (activeId) {
-    console.log('设置粗体');
     toolManagerRef?.value.handleToggleBold(activeId);
-    console.log('设置粗体完毕');
   }
 };
 
@@ -426,6 +460,7 @@ const isUnderline = computed(() => {
 
   return isGlobalUnderline && !hasInlineOverride;
 });
+
 const toggleUnderline = () => {
   const activeId = Array.from(store.activeElementIds)[0];
   if (activeId) {
@@ -465,6 +500,7 @@ const isStrikethrough = computed(() => {
 
   return isGlobalStrikethrough && !hasInlineOverride;
 });
+
 const toggleStrikethrough = () => {
   const activeId = Array.from(store.activeElementIds)[0];
   if (activeId) {
@@ -480,17 +516,21 @@ const handleDelete = () => {
 </script>
 
 <style scoped>
+/* 注意：由于使用了 Teleport，scoped 样式依然生效，但结构上 .context-toolbar 直接位于 body 下 */
+/* merged */
 .context-toolbar {
-  position: absolute;
-  z-index: 1000;
   display: flex;
   align-items: center;
   padding: 6px 12px;
-  background-color: var(--color-bg-2); /* 白色背景 */
-  border-radius: 8px; /* 圆角矩形 */
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1); /* 柔和阴影 */
+  background-color: var(--color-bg-2);
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
   gap: 8px;
+
+  /* 关键：确保鼠标事件有效，并防止文本选择 */
   pointer-events: auto;
+  user-select: none;
+  -webkit-user-select: none;
   border: 1px solid var(--color-border-2);
 }
 
@@ -517,6 +557,7 @@ const handleDelete = () => {
   background-color: var(--color-border-2);
 }
 
+/* ... 其他样式保持不变 ... */
 .filter-options {
   display: flex;
   gap: 10px;
@@ -550,7 +591,6 @@ const handleDelete = () => {
   padding: 8px !important; /* 调整内边距 */
   min-width: 120px; /* 固定最小宽度，避免文字挤压 */
 }
-
 /* 提示文字样式 */
 .popover-tip {
   text-align: center; /* 文字居中 */
@@ -560,7 +600,6 @@ const handleDelete = () => {
   border-bottom: 1px solid #f0f0f0; /* 加分割线，视觉更清晰 */
   margin-bottom: 6px;
 }
-
 /* 按钮行样式优化 */
 .popover-row {
   display: flex;
