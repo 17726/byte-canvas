@@ -517,6 +517,7 @@ const handleDelete = () => {
 
 <style scoped>
 /* 注意：由于使用了 Teleport，scoped 样式依然生效，但结构上 .context-toolbar 直接位于 body 下 */
+/* merged */
 .context-toolbar {
   display: flex;
   align-items: center;
