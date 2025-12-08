@@ -19,6 +19,8 @@
  * - sendToBack: 图层置底
  * - selectAll: 全选
  * - clearSelection: 取消选择
+ * - clearCanvas: 清空画布
+ * - isClipboardAvailable: 剪贴板可用性检测
  *
  * 包含计算属性：
  * - hasSelection: 是否有选中节点
@@ -26,7 +28,7 @@
  * - canUngroup: 是否可以取消组合
  */
 
-import { computed } from 'vue';
+import { computed, nextTick } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
 import { GroupService } from '@/core/services/GroupService';
 import { Notification } from '@arco-design/web-vue';
@@ -377,6 +379,27 @@ export function useNodeActions() {
     return true;
   }
 
+  /**
+   * 清空画布
+   */
+  async function clearCanvas(): Promise<void> {
+    // 需要添加 async
+    for (let i = store.nodeOrder.length - 1; i >= 0; --i) {
+      const nodeId = store.nodeOrder[i];
+      const node = store.nodes[nodeId!];
+      if (node && !node.isLocked) store.deleteNode(nodeId!);
+    }
+
+    //等 DOM 重绘
+    await nextTick(); // 需要添加 await
+
+    Notification.success({
+      content: '已清空画布',
+      closable: true,
+      duration: 2000,
+    });
+  }
+
   // ==================== 导出 ====================
 
   return {
@@ -396,5 +419,6 @@ export function useNodeActions() {
     sendToBack,
     selectAll,
     clearSelection,
+    clearCanvas,
   };
 }

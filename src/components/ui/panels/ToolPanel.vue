@@ -40,10 +40,20 @@
       <!-- Canvas Settings moved to top-right header -->
     </a-menu>
   </div>
+
+  <!-- 确认删除弹窗 -->
+  <a-modal
+    v-model:visible="delModalVisible"
+    @ok="onDeleteConfirm"
+    @cancel="delModalVisible = false"
+  >
+    <template #title>确认删除</template>
+    <div>确定要删除选中的元素吗？</div>
+  </a-modal>
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { ref, computed } from 'vue';
 import { IconPlus, IconEdit, IconDelete } from '@arco-design/web-vue/es/icon';
 //TODO：UI开发完成后优化icon-park库的导入，针对按需导入减小打包体积
 import { Square, Round } from '@icon-park/vue-next';
@@ -53,12 +63,14 @@ import ImageMenu from '../common/ImageMenu.vue';
 
 const { hasSelection, deleteSelected } = useNodeActions();
 
+//状态
+const delModalVisible = ref(false);
+
 //NOTE：按钮返回值需提前在MenuKey进行注册
 enum MenuKey {
   AddRect = 'addRect',
   AddCircle = 'addCircle',
   AddText = 'addText',
-  AddImage = 'addImage',
   Delete = 'deleteSelected',
 }
 
@@ -92,19 +104,20 @@ function onMenuItemClick(key: string) {
       console.log('文本工具被激活');
       store.setCreationTool('text');
       break;
-    //NOTE: 菜单项不支持预览图 故创建图片独立出去处理(ImageMenu.vue)
-    // case MenuKey.AddImage:
-    //   console.log('图片被点击');
-    //   toolManager.createImage(imageUrl);
-    //   selectedKeys.value = [key];
-    //   break;
     case MenuKey.Delete:
-      deleteSelected();
+      if (!hasSelection.value) return;
+      delModalVisible.value = true;
       break;
     default:
       console.warn(`未处理的菜单项: ${key}`);
       break;
   }
+}
+
+/* ---------- 删除确认 ---------- */
+function onDeleteConfirm() {
+  deleteSelected();
+  delModalVisible.value = false;
 }
 </script>
 
