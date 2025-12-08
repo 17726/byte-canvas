@@ -700,6 +700,23 @@ export class ToolManager {
     this.textSelectionHandler.updatePartialInlineStyle(id, this.store, 'color', newColor, false);
   }
 
+  handleFontFamilyChange(id: string, newFontFamily: string) {
+    this.textSelectionHandler.updateGlobalStyles(
+      id,
+      this.store,
+      'fontFamily',
+      newFontFamily,
+      false
+    );
+    this.textSelectionHandler.updatePartialInlineStyle(
+      id,
+      this.store,
+      'fontFamily',
+      newFontFamily,
+      false
+    );
+  }
+
   //这里没用了
   // handleFontSizeChange(id: string, newFontSize: number) {
   //   this.textSelectionHandler.updateGlobalStyles(id, this.store, { fontSize: newFontSize });

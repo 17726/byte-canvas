@@ -75,6 +75,18 @@
         </a-tooltip>
       </div>
       <div class="tool-item">
+        <!-- 字体选择下拉菜单 -->
+        <a-select
+          style="width: 180px; margin-bottom: 10px"
+          placeholder="选择字体"
+          @change="handleFontFamilyChange"
+        >
+          <a-option v-for="font in fontList" :key="font.value" :value="font.value">
+            {{ font.label }}
+          </a-option>
+        </a-select>
+      </div>
+      <div class="tool-item">
         <a-tooltip content="加粗" :mouse-enter-delay="0.5">
           <a-button size="mini" :type="isBold ? 'primary' : 'text'" @click="toggleBold">
             <icon-text-bold />
@@ -231,6 +243,17 @@ const {
   fontSize,
 } = useStyleSync();
 
+// 定义字体列表（包含常用中文字体和西文字体）
+const fontList = [
+  { label: '微软雅黑', value: 'Microsoft YaHei' },
+  { label: '宋体', value: 'SimSun' },
+  { label: '黑体', value: 'SimHei' },
+  { label: '楷体', value: 'KaiTi' },
+  { label: 'Arial', value: 'Arial' },
+  { label: 'Times New Roman', value: 'Times New Roman' },
+  { label: 'Courier New', value: 'Courier New' },
+];
+
 // 显示条件：有且仅有一个选中节点，并且不在其他交互中（如拖拽）
 const isVisible = computed(() => !!activeNode.value && !store.isInteracting && !isGroup.value);
 
@@ -318,6 +341,14 @@ const handleColorChange = (selectedColor: string) => {
   // 2. 触发原有修改颜色的逻辑
   if (activeTextNode.value && toolManagerRef?.value) {
     toolManagerRef.value.handleColorChange(activeTextNode.value.id, selectedColor);
+  }
+};
+
+const handleFontFamilyChange = (fontFamily: string) => {
+  if (!fontFamily) return;
+
+  if (activeNode.value && toolManagerRef?.value) {
+    toolManagerRef.value.handleFontFamilyChange(activeNode.value.id, fontFamily);
   }
 };
 
