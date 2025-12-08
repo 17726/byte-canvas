@@ -136,7 +136,14 @@
           </div>
           <div class="prop-item">
             <div class="section-title">不透明度</div>
-            <a-slider v-model="opacity" :min="0" :max="1" :step="0.01" show-input size="small" />
+            <a-slider
+              v-model="panelOpacity"
+              :min="0"
+              :max="1"
+              :step="0.01"
+              show-input
+              size="small"
+            />
           </div>
           <template v-if="isRect">
             <div class="prop-item">
@@ -450,8 +457,11 @@ const displayNode = computed(() => {
 // 重写 activeNode 供内部逻辑使用
 const activeNode = displayNode;
 
-// 重写 isGroup：如果是原生的 Group 或者是多选模式（视为临时 Group）
-const isGroup = computed(() => syncIsGroup.value || isMultiSelect.value);
+// 编辑组模式检测（双击组进入编辑模式时为 true）
+const isEditingGroup = computed(() => !!store.editingGroupId);
+
+// 重写 isGroup：如果是原生的 Group 或者是多选模式（视为临时 Group）或处于组合编辑模式
+const isGroup = computed(() => syncIsGroup.value || isMultiSelect.value || isEditingGroup.value);
 
 // --- 显示用的变换属性 ---
 // 如果是单选，双向绑定到 useStyleSync 的 ref
@@ -594,13 +604,23 @@ function collectGroupDescendants(group: GroupState): NodeState[] {
 }
 
 const groupDescendants = computed(() => {
-  if (!isGroup.value || !activeNode.value) return [];
-  // 如果是多选造成的虚拟 group，其 children 已经在构造 activeNode 时填充了 ID 列表
-  // 但对于真实的 GroupState 结构，需要类型断言
-  const node = activeNode.value as GroupState;
-  // 安全检查：如果 children 不存在（例如虚拟节点构建不完全），返回空
-  if (!node.children) return store.activeElements; // 多选模式直接返回 activeElements
+  // 支持两种 group 情形：1) 正在编辑的真实组合（editingGroupId） 2) 通过 activeNode 表示的组合（或虚拟多选 group）
+  if (!isGroup.value) return [];
 
+  // 优先处理编辑模式下的真实组合
+  if (isEditingGroup.value) {
+    const gid = store.editingGroupId;
+    if (!gid) return [];
+    const groupNode = store.nodes[gid] as GroupState | undefined;
+    if (!groupNode) return [];
+    if (!groupNode.children) return [];
+    return collectGroupDescendants(groupNode);
+  }
+
+  // 其他情况：使用 activeNode（可能是虚拟的临时 group）
+  if (!activeNode.value) return [];
+  const node = activeNode.value as GroupState;
+  if (!node.children) return store.activeElements; // 多选模式直接返回 activeElements
   return collectGroupDescendants(node);
 });
 
@@ -769,7 +789,10 @@ const syncShapeStyleTemps = () => {
   // 如果没有最后选中的子节点，则读取第一个形状子节点的 style
   // 这样可以避免在退出编辑模式时触发样式同步
   if (isGroup.value) {
-    const groupNode = activeNode.value as GroupState;
+    // 如果是在组合编辑模式，优先使用 store.editingGroupId 对应的真实组节点
+    const groupNode = isEditingGroup.value
+      ? (store.nodes[store.editingGroupId as string] as GroupState)
+      : (activeNode.value as GroupState);
     // 优先使用最后选中的子节点
     let targetChild: NodeState | null = null;
     if (lastSelectedChildId.value) {
@@ -777,6 +800,8 @@ const syncShapeStyleTemps = () => {
       if (
         child &&
         (child.type === NodeType.RECT || child.type === NodeType.CIRCLE) &&
+        groupNode &&
+        Array.isArray(groupNode.children) &&
         groupNode.children.includes(child.id)
       ) {
         targetChild = child;
@@ -784,12 +809,16 @@ const syncShapeStyleTemps = () => {
     }
     // 如果没有最后选中的子节点，或者最后选中的子节点不是形状节点，则使用第一个形状子节点
     if (!targetChild) {
-      targetChild =
-        groupNode.children
-          .map((id) => store.nodes[id])
-          .find(
-            (child) => child && (child.type === NodeType.RECT || child.type === NodeType.CIRCLE)
-          ) || null;
+      if (groupNode && Array.isArray(groupNode.children)) {
+        targetChild =
+          groupNode.children
+            .map((id) => store.nodes[id])
+            .find(
+              (child) => child && (child.type === NodeType.RECT || child.type === NodeType.CIRCLE)
+            ) || null;
+      } else {
+        targetChild = null;
+      }
     }
 
     if (targetChild) {
@@ -842,6 +871,10 @@ watch(
     borderColor: activeNode.value?.style.borderColor,
     borderWidth: activeNode.value?.style.borderWidth,
     canEdit: canEditShapeStyle.value,
+    isMultiSelect: isMultiSelect.value,
+    isEditingGroup: isEditingGroup.value,
+    lastSelectedChild: lastSelectedChildId.value,
+    descendants: groupDescendants.value.length,
   }),
   () => {
     syncShapeStyleTemps();
@@ -851,9 +884,9 @@ watch(
 
 // 如果是多选模式，应用颜色到所有选中的形状
 const applyFillColor = (newColor?: unknown) => {
-  // 修改逻辑：支持多选
+  // 修改逻辑：支持多选与组合编辑
   if (!canEditShapeStyle.value) return;
-  if (!activeNode.value && !isMultiSelect.value) return;
+  if (!activeNode.value && !isMultiSelect.value && !isEditingGroup.value) return;
 
   if (newColor !== undefined && ignoreFillChange.value) {
     ignoreFillChange.value = false;
@@ -863,11 +896,39 @@ const applyFillColor = (newColor?: unknown) => {
   const color = extractColorValue(newColor, fillColorTemp.value);
   fillColorTemp.value = color;
 
-  // 多选处理：更新所有选中的形状
+  // 组合编辑模式：优先修改最后选中的子元素，否则修改组中所有形状子元素
+  if (isEditingGroup.value) {
+    if (lastSelectedChildId.value) {
+      const child = store.nodes[lastSelectedChildId.value];
+      if (child && (child.type === NodeType.RECT || child.type === NodeType.CIRCLE)) {
+        if (child.style.backgroundColor !== color) {
+          store.updateNode(child.id, { style: { ...child.style, backgroundColor: color } });
+        }
+      }
+      return;
+    }
+
+    // 无指定子节点，批量更新组内所有形状
+    groupDescendants.value.forEach((node) => {
+      if (!node) return;
+      if (node.type === NodeType.RECT || node.type === NodeType.CIRCLE) {
+        if (node.style.backgroundColor !== color) {
+          store.updateNode(node.id, { style: { ...node.style, backgroundColor: color } });
+        }
+      }
+    });
+    return;
+  }
+
+  // 多选处理：更新所有选中的形状和组合
   if (isMultiSelect.value) {
     store.activeElements.forEach((node) => {
       if (!node) return;
-      if (node.type === NodeType.RECT || node.type === NodeType.CIRCLE) {
+      if (
+        node.type === NodeType.RECT ||
+        node.type === NodeType.CIRCLE ||
+        node.type === NodeType.GROUP
+      ) {
         if (node.style.backgroundColor !== color) {
           store.updateNode(node.id, { style: { ...node.style, backgroundColor: color } });
         }
@@ -886,7 +947,7 @@ const applyFillColor = (newColor?: unknown) => {
 
 const applyStrokeStyle = (options?: { color?: unknown; width?: number }) => {
   if (!canEditShapeStyle.value) return;
-  if (!activeNode.value && !isMultiSelect.value) return;
+  if (!activeNode.value && !isMultiSelect.value && !isEditingGroup.value) return;
 
   if (options?.color !== undefined) {
     if (ignoreStrokeColorChange.value) {
@@ -905,11 +966,46 @@ const applyStrokeStyle = (options?: { color?: unknown; width?: number }) => {
   const nextColor = strokeColorTemp.value;
   const nextWidth = strokeWidthTemp.value;
 
-  // 多选处理
+  // 组合编辑模式：优先修改最后选中的子元素，否则修改组中所有形状子元素
+  if (isEditingGroup.value) {
+    if (lastSelectedChildId.value) {
+      const child = store.nodes[lastSelectedChildId.value];
+      if (child && (child.type === NodeType.RECT || child.type === NodeType.CIRCLE)) {
+        const colorChanged = child.style.borderColor !== nextColor;
+        const widthChanged = child.style.borderWidth !== nextWidth;
+        if (colorChanged || widthChanged) {
+          store.updateNode(child.id, {
+            style: { ...child.style, borderColor: nextColor, borderWidth: nextWidth },
+          });
+        }
+      }
+      return;
+    }
+
+    groupDescendants.value.forEach((node) => {
+      if (!node) return;
+      if (node.type === NodeType.RECT || node.type === NodeType.CIRCLE) {
+        const colorChanged = node.style.borderColor !== nextColor;
+        const widthChanged = node.style.borderWidth !== nextWidth;
+        if (colorChanged || widthChanged) {
+          store.updateNode(node.id, {
+            style: { ...node.style, borderColor: nextColor, borderWidth: nextWidth },
+          });
+        }
+      }
+    });
+    return;
+  }
+
+  // 多选处理：更新所有选中的形状和组合
   if (isMultiSelect.value) {
     store.activeElements.forEach((node) => {
       if (!node) return;
-      if (node.type === NodeType.RECT || node.type === NodeType.CIRCLE) {
+      if (
+        node.type === NodeType.RECT ||
+        node.type === NodeType.CIRCLE ||
+        node.type === NodeType.GROUP
+      ) {
         const colorChanged = node.style.borderColor !== nextColor;
         const widthChanged = node.style.borderWidth !== nextWidth;
         if (colorChanged || widthChanged) {
@@ -946,6 +1042,52 @@ const handleStrokeWidthChange = (value: unknown) => {
   const width = extractNumericValue(value, strokeWidthTemp.value);
   applyStrokeStyle({ width });
 };
+
+// 面板专用的不透明度绑定：支持组合编辑、多选、单选
+const panelOpacity = computed<number>({
+  get: () => {
+    // 组合编辑模式：如果有 lastSelectedChildId，取该子元素的 opacity
+    if (isEditingGroup.value && lastSelectedChildId.value) {
+      const child = store.nodes[lastSelectedChildId.value];
+      if (child) return child.style.opacity ?? 1;
+    }
+
+    // 多选模式：取所有选中元素的平均 opacity，或第一个元素的值作为回显
+    if (isMultiSelect.value) {
+      const first = store.activeElements.find((n) => !!n);
+      return first ? (first!.style.opacity ?? 1) : 1;
+    }
+
+    // 单选 / 默认：使用 useStyleSync 提供的绑定
+    return opacity.value ?? 1;
+  },
+  set: (val: number) => {
+    const clampedVal = Math.max(0, Math.min(1, val)); // 约束到 [0, 1]
+
+    // 组合编辑模式：如果存在 lastSelectedChildId，则仅更新该子元素
+    if (isEditingGroup.value && lastSelectedChildId.value) {
+      const childId = lastSelectedChildId.value;
+      const node = store.nodes[childId];
+      if (node) {
+        store.updateNode(childId, { style: { ...node.style, opacity: clampedVal } });
+      }
+      return;
+    }
+
+    // 多选时：对所有选中元素统一设置 opacity
+    if (isMultiSelect.value) {
+      store.activeElements.forEach((n) => {
+        if (!n) return;
+        store.updateNode(n.id, { style: { ...n.style, opacity: clampedVal } });
+      });
+      return;
+    }
+
+    // 单选：委托给 useStyleSync 的 binding
+    opacity.value = clampedVal;
+  },
+});
+
 // opacity 已从 useStyleSync 导入
 
 // 修改 zIndex 计算属性以支持多选显示 (取最大值)
