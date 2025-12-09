@@ -241,11 +241,11 @@ export class TextSelectionHandler {
 
     const startNodeContent = range.startContainer.textContent;
     const startNodeParent = range.startContainer.parentElement;
-    if (!startNodeContent || !startNodeParent) return;
+    if (startNodeContent === null || !startNodeParent) return;
 
     const endNodeContent = range.endContainer.textContent;
     const endNodeParent = range.endContainer.parentElement;
-    if (!endNodeContent || !endNodeParent) return;
+    if (endNodeContent === null || !endNodeParent) return;
 
     // 计算选区的「绝对起始索引」（totalStart）
     //const startNode = range.startContainer; // 选区开始的节点（比如某个文本节点）
