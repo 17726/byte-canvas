@@ -756,21 +756,25 @@ export const useCanvasStore = defineStore('canvas', () => {
     /**
      * 深拷贝组合及其所有子节点，生成全新的 ID 和 parentId 关系
      * 关键：避免两个组合共享同一批子节点，导致缩放/移动互相影响
+     *
+     * 修复：从剪贴板节点映射中读取，而不是从当前画布状态读取
      */
-    const cloneGroupWithChildren = (sourceGroupId: string, rootOffset: number): string | null => {
-      const sourceGroup = nodes.value[sourceGroupId] as
-        | import('@/types/state').GroupState
-        | undefined;
-      if (!sourceGroup) return null;
+    // 先构建剪贴板节点的 ID 映射，方便查找
+    const clipboardNodeMap = new Map<string, NodeState>();
+    clipboardData.nodes.forEach((n) => {
+      clipboardNodeMap.set(n.id, n);
+    });
+
+    const cloneGroupWithChildren = (sourceNode: NodeState, rootOffset: number): string | null => {
+      if (sourceNode.type !== NodeType.GROUP) return null;
 
       const idMap = new Map<string, string>();
 
-      const cloneNodeRecursive = (originalId: string, parentNewId: string | null) => {
-        const original = nodes.value[originalId];
+      const cloneNodeRecursive = (original: NodeState, parentNewId: string | null) => {
         if (!original) return;
 
         const newId = uuidv4();
-        idMap.set(originalId, newId);
+        idMap.set(original.id, newId);
 
         const isGroup = original.type === NodeType.GROUP;
 
@@ -800,16 +804,20 @@ export const useCanvasStore = defineStore('canvas', () => {
           const origGroup = original as import('@/types/state').GroupState;
           const newChildren: string[] = [];
           origGroup.children.forEach((childOrigId) => {
-            cloneNodeRecursive(childOrigId, newId);
-            const mappedId = idMap.get(childOrigId);
-            if (mappedId) newChildren.push(mappedId);
+            // 从剪贴板映射中查找子节点
+            const childNode = clipboardNodeMap.get(childOrigId);
+            if (childNode) {
+              cloneNodeRecursive(childNode, newId);
+              const mappedId = idMap.get(childOrigId);
+              if (mappedId) newChildren.push(mappedId);
+            }
           });
           (nodes.value[newId] as import('@/types/state').GroupState).children = newChildren;
         }
       };
 
-      cloneNodeRecursive(sourceGroupId, null);
-      return idMap.get(sourceGroupId) ?? null;
+      cloneNodeRecursive(sourceNode, null);
+      return idMap.get(sourceNode.id) ?? null;
     };
 
     clipboardData.nodes.forEach((node) => {
@@ -832,7 +840,7 @@ export const useCanvasStore = defineStore('canvas', () => {
       }
 
       // 情况2：组合节点 —— 深拷贝整棵子树，避免共享子节点
-      const rootNewId = cloneGroupWithChildren(node.id, offset);
+      const rootNewId = cloneGroupWithChildren(node, offset);
       if (rootNewId) {
         newIds.push(rootNewId);
       }
@@ -860,9 +868,9 @@ export const useCanvasStore = defineStore('canvas', () => {
   // 新增：更新全局选区（供文本组件调用）
   function updateGlobalTextSelection(selection: { start: number; end: number } | null) {
     // 响应式 ref 需通过 .value 赋值
-    //console.log('触发updateGlobalTextSelection', selection);
+    console.log('触发updateGlobalTextSelection', selection);
     globalTextSelection.value = selection;
-    //console.log('Pinia 全局选区更新：', selection); // 调试日志（可选）
+    console.log('Pinia 全局选区更新：', selection); // 调试日志（可选）
   }
   // ==================== 组合相关状态（只读计算属性）====================
 

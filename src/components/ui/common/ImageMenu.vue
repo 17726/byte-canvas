@@ -165,7 +165,7 @@ const loadLazyImage = (index: number) => {
 
 // 图片网格点击事件 - 事件委托 通过单个事件监听器处理多个子元素的点击事件，而不是为每个子元素单独绑定事件
 const handleImageGridClick = (event: Event) => {
-  console.log('图片被点击');
+  //console.log('图片被点击');
   // 1. 找到实际被点击的 .image-item 元素
   const imageItem = (event.target as HTMLElement).closest('.image-item');
   // 2. 如果点击的不是图片项，直接返回(点击了空白区域)
@@ -174,7 +174,7 @@ const handleImageGridClick = (event: Event) => {
   const imageUrl = (imageItem as HTMLElement).dataset.imageUrl;
   // 4. 如果有URL，激活图片创建工具（进入创建模式）
   const url = imageUrl || DEFAULT_IMAGE_URL;
-  console.log('激活图片创建工具, URL:', url);
+  //console.log('激活图片创建工具, URL:', url);
 
   // 使用新的创建模式：设置工具为 image，传入图片URL
   store.setCreationTool('image', { imageUrl: url });
