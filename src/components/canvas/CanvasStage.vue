@@ -91,7 +91,8 @@ const store = useCanvasStore();
 const stageRef = ref<HTMLElement | null>(null);
 
 // 使用 useNodeActions 提供的操作方法（带 UI 反馈）
-const { deleteSelected, copy, cut, paste, groupSelected, ungroupSelected } = useNodeActions();
+const { deleteSelected, copy, cut, paste, groupSelected, ungroupSelected, selectAll } =
+  useNodeActions();
 
 // 空格键状态（迁移自ToolManager，统一在组件内维护）
 const isSpacePressed = ref(false);
@@ -380,26 +381,10 @@ const handleKeyDown = (e: KeyboardEvent) => {
     deleteSelected();
     return;
   }
-  // Ctrl/Cmd + A: 选中所有元素
+  // Ctrl/Cmd + A: 全选（复用 useNodeActions，保持与右键菜单一致）
   if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
     e.preventDefault();
-    // 根据当前模式选中不同的元素
-    if (store.editingGroupId) {
-      // 组合编辑模式：选中当前组合的所有未锁定子元素
-      const groupNode = store.nodes[store.editingGroupId];
-      if (groupNode && 'children' in groupNode) {
-        const unlockedChildren = (groupNode.children as string[]).filter(
-          id => store.nodes[id] && !store.nodes[id].isLocked
-        );
-        store.setActive(unlockedChildren);
-      }
-    } else {
-      // 普通模式：选中所有未锁定顶层元素
-      const toplevelIds = Object.entries(store.nodes)
-        .filter(([, node]) => node && node.parentId === null && !node.isLocked)
-        .map(([id]) => id);
-      store.setActive(toplevelIds);
-    }
+    selectAll();
     return;
   }
 };
