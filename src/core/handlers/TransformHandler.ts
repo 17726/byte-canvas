@@ -43,8 +43,10 @@
 
 import { useCanvasStore } from '@/store/canvasStore';
 import type { BaseNodeState } from '@/types/state';
+import { NodeType } from '@/types/state';
 import type { ResizeHandle } from '@/types/editor';
 import { eventToWorld } from '@/core/utils/geometry';
+import { GroupService } from '@/core/services/GroupService';
 
 /** 拖拽类型 */
 type DragType = 'node' | 'area';
@@ -649,15 +651,25 @@ export class TransformHandler {
       Math.abs(newWidth - node.transform.width) < 1e-3 &&
       Math.abs(newHeight - node.transform.height) < 1e-3;
     if (!isSame) {
-      this.store.updateNode(nodeId, {
-        transform: {
-          ...node.transform,
+      // 判断是否为 Group 节点，使用对应的更新方法
+      if (node.type === NodeType.GROUP) {
+        GroupService.updateGroupTransform(this.store, nodeId, {
           x: finalX,
           y: finalY,
           width: newWidth,
           height: newHeight,
-        },
-      });
+        });
+      } else {
+        this.store.updateNode(nodeId, {
+          transform: {
+            ...node.transform,
+            x: finalX,
+            y: finalY,
+            width: newWidth,
+            height: newHeight,
+          },
+        });
+      }
     }
   }
 
@@ -973,15 +985,24 @@ export class TransformHandler {
           Math.abs(newNodeHeight - node.transform.height) < 1e-3;
 
         if (!isSame) {
-          this.store.updateNode(id, {
-            transform: {
-              ...node.transform,
+          if (node.type === NodeType.GROUP) {
+            GroupService.updateGroupTransform(this.store, id, {
               x: centerAdjustedX,
               y: centerAdjustedY,
               width: Math.abs(newNodeWidth),
               height: Math.abs(newNodeHeight),
-            },
-          });
+            });
+          } else {
+            this.store.updateNode(id, {
+              transform: {
+                ...node.transform,
+                x: centerAdjustedX,
+                y: centerAdjustedY,
+                width: Math.abs(newNodeWidth),
+                height: Math.abs(newNodeHeight),
+              },
+            });
+          }
         }
       } else {
         // 普通缩放：直接使用像素偏移
@@ -992,15 +1013,24 @@ export class TransformHandler {
           Math.abs(newNodeHeight - node.transform.height) < 1e-3;
 
         if (!isSame) {
-          this.store.updateNode(id, {
-            transform: {
-              ...node.transform,
+          if (node.type === NodeType.GROUP) {
+            GroupService.updateGroupTransform(this.store, id, {
               x: newNodeX,
               y: newNodeY,
               width: Math.abs(newNodeWidth),
               height: Math.abs(newNodeHeight),
-            },
-          });
+            });
+          } else {
+            this.store.updateNode(id, {
+              transform: {
+                ...node.transform,
+                x: newNodeX,
+                y: newNodeY,
+                width: Math.abs(newNodeWidth),
+                height: Math.abs(newNodeHeight),
+              },
+            });
+          }
         }
       }
     });
