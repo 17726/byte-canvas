@@ -191,7 +191,274 @@ watch(
 // 2. 所有事件处理：只调用 ToolManager 方法，不直接接触 Handler
 const handleContentChange = (e: Event, id: string) => {
   if (isComposing.value) return; // 组合态时跳过处理
+
+  // 在 TextService 处理之前，先保存光标位置（使用事件发生时的文本内容）
+  const editorEl = editorRefs.value[id];
+  let savedCursorOffset = -1;
+  if (editorEl) {
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      const targetEl = e.target as HTMLElement;
+
+      try {
+        // 使用更准确的方法计算光标位置：遍历所有节点（包括文本节点和BR节点）
+        const walker = document.createTreeWalker(
+          targetEl,
+          NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
+          {
+            acceptNode: (node) => {
+              // 接受文本节点和BR元素节点
+              if (node.nodeType === Node.TEXT_NODE) {
+                return NodeFilter.FILTER_ACCEPT;
+              }
+              if (node.nodeType === Node.ELEMENT_NODE && (node as Element).tagName === 'BR') {
+                return NodeFilter.FILTER_ACCEPT;
+              }
+              return NodeFilter.FILTER_SKIP;
+            },
+          }
+        );
+
+        let currentNode: Node | null = null;
+        let offset = 0;
+        let found = false;
+
+        while ((currentNode = walker.nextNode())) {
+          // 先检查光标是否在BR节点之后（range.endContainer 是BR的父元素，且 endOffset 指向BR之后）
+          if (
+            currentNode.nodeType === Node.ELEMENT_NODE &&
+            (currentNode as Element).tagName === 'BR'
+          ) {
+            const parent = currentNode.parentNode;
+            if (parent === range.endContainer && range.endOffset > 0) {
+              // 检查BR节点在父元素中的位置
+              const brIndex = Array.from(parent.childNodes).indexOf(currentNode);
+              if (brIndex >= 0 && range.endOffset === brIndex + 1) {
+                // 光标在这个BR节点之后
+                savedCursorOffset = offset + 1;
+                found = true;
+                break;
+              }
+            }
+          }
+
+          // 检查光标是否在当前节点
+          if (currentNode === range.endContainer) {
+            // 如果是文本节点，使用 endOffset
+            if (currentNode.nodeType === Node.TEXT_NODE) {
+              savedCursorOffset = offset + range.endOffset;
+              found = true;
+              break;
+            } else if (
+              currentNode.nodeType === Node.ELEMENT_NODE &&
+              (currentNode as Element).tagName === 'BR'
+            ) {
+              // 如果是BR节点，光标在BR之后
+              savedCursorOffset = offset + 1;
+              found = true;
+              break;
+            }
+          }
+
+          // 计算当前节点的长度（在检查之后计算，因为如果光标在当前节点内，我们已经处理了）
+          if (currentNode.nodeType === Node.TEXT_NODE) {
+            offset += currentNode.textContent?.length || 0;
+          } else if (
+            currentNode.nodeType === Node.ELEMENT_NODE &&
+            (currentNode as Element).tagName === 'BR'
+          ) {
+            // BR节点算作1个字符（换行符）
+            offset += 1;
+          }
+        }
+
+        // 如果没找到匹配的节点，使用 innerText 长度（包含换行）
+        if (!found) {
+          const innerText = targetEl.innerText || '';
+          savedCursorOffset = innerText.length;
+        }
+      } catch (err) {
+        // 如果计算失败，使用 innerText 长度作为后备
+        const innerText = (e.target as HTMLElement).innerText || '';
+        savedCursorOffset = innerText.length;
+      }
+    }
+  }
+
   toolManagerRef?.value?.handleTextInput(e, id); // 调用 ToolManager 文本输入处理
+
+  // 延迟调整文本框高度，确保 TextService 的光标恢复已完成
+  nextTick(() => {
+    nextTick(() => {
+      const editorEl = editorRefs.value[id];
+      if (!editorEl) return;
+
+      const node = store.nodes[id] as TextState | undefined;
+      if (!node) return;
+
+      const fontSize = node.props.fontSize || 16;
+      const lineHeight = node.props.lineHeight || 1.6;
+      const minHeight = fontSize * lineHeight;
+      const currentHeight = node.transform.height;
+
+      // 临时设置高度为 auto，获取准确的内容高度
+      const originalHeight = editorEl.style.height;
+      const originalOverflow = editorEl.style.overflow;
+      editorEl.style.height = 'auto';
+      editorEl.style.overflow = 'hidden';
+
+      // 获取实际内容高度
+      const scrollHeight = editorEl.scrollHeight;
+
+      // 恢复原始样式
+      editorEl.style.height = originalHeight;
+      editorEl.style.overflow = originalOverflow;
+
+      const newHeight = Math.max(scrollHeight, minHeight);
+
+      // 恢复光标位置的函数（在 TextService 恢复之后执行）
+      const restoreCursor = () => {
+        if (savedCursorOffset >= 0) {
+          // 再等一个 tick，确保 TextService 的光标恢复已完成
+          nextTick(() => {
+            nextTick(() => {
+              const selection = window.getSelection();
+              if (!selection) return;
+
+              const innerText = editorEl.innerText || '';
+              const safeOffset = Math.min(savedCursorOffset, innerText.length);
+
+              // 确保偏移量有效（不能小于0）
+              if (safeOffset < 0) return;
+
+              // 使用更准确的方法恢复光标位置：遍历所有节点（包括文本节点和BR节点）
+              const walker = document.createTreeWalker(
+                editorEl,
+                NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
+                {
+                  acceptNode: (node) => {
+                    // 接受文本节点和BR元素节点
+                    if (node.nodeType === Node.TEXT_NODE) {
+                      return NodeFilter.FILTER_ACCEPT;
+                    }
+                    if (node.nodeType === Node.ELEMENT_NODE && (node as Element).tagName === 'BR') {
+                      return NodeFilter.FILTER_ACCEPT;
+                    }
+                    return NodeFilter.FILTER_SKIP;
+                  },
+                }
+              );
+
+              let currentNode: Node | null = null;
+              let currentOffset = 0;
+
+              while ((currentNode = walker.nextNode())) {
+                let nodeLength = 0;
+                if (currentNode.nodeType === Node.TEXT_NODE) {
+                  nodeLength = currentNode.textContent?.length || 0;
+                } else if (
+                  currentNode.nodeType === Node.ELEMENT_NODE &&
+                  (currentNode as Element).tagName === 'BR'
+                ) {
+                  // BR节点算作1个字符（换行符）
+                  nodeLength = 1;
+                }
+
+                if (currentOffset + nodeLength >= safeOffset) {
+                  const offsetInNode = safeOffset - currentOffset;
+                  const range = document.createRange();
+
+                  if (currentNode.nodeType === Node.TEXT_NODE) {
+                    // 文本节点：设置到文本内的偏移位置
+                    const textOffset = Math.min(offsetInNode, nodeLength);
+                    range.setStart(currentNode, textOffset);
+                    range.collapse(true);
+                  } else if (
+                    currentNode.nodeType === Node.ELEMENT_NODE &&
+                    (currentNode as Element).tagName === 'BR'
+                  ) {
+                    // BR节点：光标在BR之后
+                    if (offsetInNode >= 1) {
+                      // 光标在BR之后
+                      range.setStartAfter(currentNode);
+                    } else {
+                      // 光标在BR之前（不应该发生，但为了安全）
+                      range.setStartBefore(currentNode);
+                    }
+                    range.collapse(true);
+                  }
+
+                  selection.removeAllRanges();
+                  selection.addRange(range);
+                  return;
+                }
+
+                currentOffset += nodeLength;
+              }
+
+              // 如果没找到匹配的节点，尝试在末尾设置光标
+              if (innerText.length > 0) {
+                // 找到最后一个文本节点或BR节点
+                const allNodes: Node[] = [];
+                const walker2 = document.createTreeWalker(
+                  editorEl,
+                  NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
+                  {
+                    acceptNode: (node) => {
+                      if (node.nodeType === Node.TEXT_NODE) {
+                        return NodeFilter.FILTER_ACCEPT;
+                      }
+                      if (
+                        node.nodeType === Node.ELEMENT_NODE &&
+                        (node as Element).tagName === 'BR'
+                      ) {
+                        return NodeFilter.FILTER_ACCEPT;
+                      }
+                      return NodeFilter.FILTER_SKIP;
+                    },
+                  }
+                );
+                let node: Node | null = null;
+                while ((node = walker2.nextNode())) {
+                  allNodes.push(node);
+                }
+
+                if (allNodes.length > 0) {
+                  const lastNode = allNodes[allNodes.length - 1];
+                  const range = document.createRange();
+
+                  if (lastNode.nodeType === Node.TEXT_NODE) {
+                    range.setStart(lastNode, lastNode.textContent?.length || 0);
+                  } else {
+                    range.setStartAfter(lastNode);
+                  }
+
+                  range.collapse(true);
+                  selection.removeAllRanges();
+                  selection.addRange(range);
+                }
+              }
+            });
+          });
+        }
+      };
+
+      // 只有当新高度大于当前高度时才更新（避免高度缩小）
+      // 允许1px的误差，避免因为计算精度问题导致的频繁更新
+      if (newHeight > currentHeight + 1) {
+        store.updateNode(id, {
+          transform: { ...node.transform, height: newHeight },
+        });
+
+        // 高度更新后恢复光标位置
+        restoreCursor();
+      } else {
+        // 即使高度不需要更新，也要确保光标位置正确（TextService 的恢复可能失败）
+        restoreCursor();
+      }
+    });
+  });
 };
 
 const handleSelectionChange = (id: string) => {
@@ -252,6 +519,19 @@ onMounted(() => {
   if (!currentEditor) return;
   // 调用修改后的initTextEditor，传入节点ID和editor
   toolManagerRef?.value?.initTextEditor(props.node.id, currentEditor);
+
+  // 初始化高度为字体高度
+  nextTick(() => {
+    const fontSize = props.node.props.fontSize || 16;
+    const lineHeight = props.node.props.lineHeight || 1.6;
+    const minHeight = fontSize * lineHeight;
+
+    if (props.node.transform.height < minHeight) {
+      store.updateNode(props.node.id, {
+        transform: { ...props.node.transform, height: minHeight },
+      });
+    }
+  });
 });
 
 onUnmounted(() => {
@@ -282,6 +562,8 @@ const handleDragStart = (e: DragEvent) => {
   outline: none !important;
   box-shadow: none !important;
   padding: 2px 4px;
+  white-space: pre-wrap;
+  word-wrap: break-word;
 }
 
 .textBox.is-editing {
