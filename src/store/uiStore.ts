@@ -58,6 +58,8 @@ export const useUIStore = defineStore('ui', () => {
 
   /**
    * 控制性能测试面板显示/隐藏
+   *
+   * @param visible - true 表示显示，false 表示隐藏
    */
   function setPerformancePanelVisible(visible: boolean) {
     showPerformancePanel.value = visible;
