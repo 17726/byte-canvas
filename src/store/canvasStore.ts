@@ -249,6 +249,10 @@ export const useCanvasStore = defineStore('canvas', () => {
    * - 只触发一次 version 更新
    * - 支持 props 深度合并
    *
+   * 注意：
+   * - transform/style 等嵌套对象不会自动合并，调用方需要预先合并
+   * - 示例：updates[id] = { style: { ...node.style, opacity: 0.5 } }
+   *
    * @param updates - 节点更新映射 { nodeId: patch }
    */
   function batchUpdateNodes(updates: Record<string, Partial<NodeState>>): void {
