@@ -148,6 +148,7 @@ const create100Elements = async () => {
   try {
     // 清空现有元素
     if (store.nodeOrder.length > 0) {
+      if (isAnimating.value) stopAutoAnimation();
       store.deleteNodes([...store.nodeOrder]);
     }
 
