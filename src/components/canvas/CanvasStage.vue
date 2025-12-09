@@ -385,15 +385,18 @@ const handleKeyDown = (e: KeyboardEvent) => {
     e.preventDefault();
     // 根据当前模式选中不同的元素
     if (store.editingGroupId) {
-      // 组合编辑模式：选中当前组合的所有子元素
+      // 组合编辑模式：选中当前组合的所有未锁定子元素
       const groupNode = store.nodes[store.editingGroupId];
       if (groupNode && 'children' in groupNode) {
-        store.setActive((groupNode.children as string[]) || []);
+        const unlockedChildren = (groupNode.children as string[]).filter(
+          id => store.nodes[id] && !store.nodes[id].isLocked
+        );
+        store.setActive(unlockedChildren);
       }
     } else {
-      // 普通模式：选中所有顶层元素
+      // 普通模式：选中所有未锁定顶层元素
       const toplevelIds = Object.entries(store.nodes)
-        .filter(([, node]) => node && node.parentId === null)
+        .filter(([, node]) => node && node.parentId === null && !node.isLocked)
         .map(([id]) => id);
       store.setActive(toplevelIds);
     }
