@@ -486,8 +486,12 @@ const activeNode = displayNode;
 // 编辑组模式检测（双击组进入编辑模式时为 true）
 const isEditingGroup = computed(() => !!store.editingGroupId);
 
-// 重写 isGroup：如果是原生的 Group 或者是多选模式（视为临时 Group）或处于组合编辑模式
-const isGroup = computed(() => syncIsGroup.value || isMultiSelect.value || isEditingGroup.value);
+// 分别定义三种“组”状态
+const isRealGroup = computed(() => syncIsGroup.value); // 真实组节点
+const isVirtualGroup = computed(() => isMultiSelect.value); // 多选虚拟组
+const isInGroupEditMode = computed(() => isEditingGroup.value); // 编辑组模式
+// 可选：如果需要统一判断“组相关”场景
+const isGroupLike = computed(() => isRealGroup.value || isVirtualGroup.value || isInGroupEditMode.value);
 
 // --- 显示用的变换属性 ---
 // 如果是单选，双向绑定到 useStyleSync 的 ref
