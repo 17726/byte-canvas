@@ -74,7 +74,7 @@ import { useHistoryStore } from './historyStore';
  * 管理整个编辑器的核心状态，包括节点、渲染顺序、视口、交互状态等
  */
 export const useCanvasStore = defineStore('canvas', () => {
-  const selectionStore = useSelectionStore();
+  const getSelectionStore = () => useSelectionStore();
   // 1. 核心数据
   // 使用 Record 存储，对应调研报告中的 "State/Node分离" 思想
   // 节点字典：key 为节点 ID，value 为 NodeState
@@ -224,12 +224,14 @@ export const useCanvasStore = defineStore('canvas', () => {
 
     const unlockHistory = history.lockHistoryWithoutSnapshot();
 
-    nodes.value[node.id] = node;
-    nodeOrder.value.push(node.id);
-    version.value++; // 触发更新
-
-    // 解锁历史记录
-    unlockHistory();
+    try {
+      nodes.value[node.id] = node;
+      nodeOrder.value.push(node.id);
+      version.value++; // 触发更新
+    } finally {
+      // 解锁历史记录，避免后续更新重复记录快照
+      unlockHistory();
+    }
   }
 
   // 3. 删除节点（如果是组合，递归删除所有子节点）
@@ -239,33 +241,39 @@ export const useCanvasStore = defineStore('canvas', () => {
 
     const history = useHistoryStore();
     const unlockHistory = history.lockHistory();
+    const selectionStore = getSelectionStore();
+    const idsToDelete = new Set<string>();
 
-    const deleteRecursive = (targetId: string) => {
+    const collectIds = (targetId: string) => {
       const current = nodes.value[targetId];
       if (!current) return;
+      idsToDelete.add(targetId);
 
       // 如果是组合节点，先递归删除所有子节点
       if (current.type === NodeType.GROUP) {
         const groupNode = current as import('@/types/state').GroupState;
         groupNode.children.forEach((childId) => {
-          deleteRecursive(childId);
+          collectIds(childId);
         });
-      }
-
-      delete nodes.value[targetId];
-      nodeOrder.value = nodeOrder.value.filter((nId) => nId !== targetId);
-      // 清除选中态
-      selectionStore.setActive(
-        Array.from(selectionStore.activeElementIds).filter((selectedId) => selectedId !== targetId)
-      );
-
-      // 如果正在编辑这个组合，退出编辑模式
-      if (selectionStore.editingGroupId === targetId) {
-        selectionStore.setEditingGroup(null);
       }
     };
 
-    deleteRecursive(id);
+    collectIds(id);
+
+    idsToDelete.forEach((targetId) => {
+      delete nodes.value[targetId];
+    });
+
+    nodeOrder.value = nodeOrder.value.filter((nId) => !idsToDelete.has(nId));
+
+    const nextActiveIds = Array.from(selectionStore.activeElementIds).filter(
+      (selectedId) => !idsToDelete.has(selectedId)
+    );
+    selectionStore.setActive(nextActiveIds);
+
+    if (selectionStore.editingGroupId && idsToDelete.has(selectionStore.editingGroupId)) {
+      selectionStore.setEditingGroup(null);
+    }
 
     version.value++; // 触发更新
     unlockHistory();
@@ -280,6 +288,7 @@ export const useCanvasStore = defineStore('canvas', () => {
 
     const history = useHistoryStore();
     const unlockHistory = history.lockHistory();
+    const selectionStore = getSelectionStore();
 
     // 收集所有需要删除的节点（包括组合的子节点）
     const allIdsToDelete = new Set<string>();
@@ -301,18 +310,19 @@ export const useCanvasStore = defineStore('canvas', () => {
     // 批量删除节点
     allIdsToDelete.forEach((id) => {
       delete nodes.value[id];
-      selectionStore.setActive(
-        Array.from(selectionStore.activeElementIds).filter((selectedId) => selectedId !== id)
-      );
-
-      // 如果正在编辑这个组合，退出编辑模式
-      if (selectionStore.editingGroupId === id) {
-        selectionStore.setEditingGroup(null);
-      }
     });
 
     // 一次性过滤 nodeOrder
     nodeOrder.value = nodeOrder.value.filter((nId) => !allIdsToDelete.has(nId));
+
+    const nextActiveIds = Array.from(selectionStore.activeElementIds).filter(
+      (selectedId) => !allIdsToDelete.has(selectedId)
+    );
+    selectionStore.setActive(nextActiveIds);
+
+    if (selectionStore.editingGroupId && allIdsToDelete.has(selectionStore.editingGroupId)) {
+      selectionStore.setEditingGroup(null);
+    }
 
     // 仅触发一次版本更新
     version.value++;
@@ -400,6 +410,7 @@ export const useCanvasStore = defineStore('canvas', () => {
    * 清除 localStorage 中的状态并重置画布
    */
   function clearStorage() {
+    const selectionStore = getSelectionStore();
     clearLocalStorage();
     nodes.value = {};
     nodeOrder.value = [];
@@ -470,6 +481,7 @@ export const useCanvasStore = defineStore('canvas', () => {
    * 复制选中的元素
    */
   function copySelected(): boolean {
+    const selectionStore = getSelectionStore();
     const selectedIds = Array.from(selectionStore.activeElementIds);
     if (selectedIds.length === 0) {
       console.log('[Clipboard] 没有选中的元素');
@@ -497,6 +509,7 @@ export const useCanvasStore = defineStore('canvas', () => {
    * 剪切选中的元素
    */
   function cutSelected(): boolean {
+    const selectionStore = getSelectionStore();
     const selectedIds = Array.from(selectionStore.activeElementIds);
     if (selectedIds.length === 0) {
       console.log('[Clipboard] 没有选中的元素');
@@ -527,6 +540,7 @@ export const useCanvasStore = defineStore('canvas', () => {
    * 粘贴元素
    */
   function paste(): boolean {
+    const selectionStore = getSelectionStore();
     const clipboardData = loadClipboard();
     if (!clipboardData || clipboardData.nodes.length === 0) {
       console.log('[Clipboard] 剪贴板为空');

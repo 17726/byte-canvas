@@ -199,10 +199,10 @@ export class TransformHandler {
   constructor(
     store: ReturnType<typeof useCanvasStore>,
     stageEl: HTMLElement | null = null,
-    selectionStore: ReturnType<typeof useSelectionStore> = useSelectionStore()
+    selectionStore?: ReturnType<typeof useSelectionStore>
   ) {
     this.store = store;
-    this.selectionStore = selectionStore;
+    this.selectionStore = selectionStore || useSelectionStore();
     this.stageEl = stageEl; // 【修复】保存 stageEl
   }
 

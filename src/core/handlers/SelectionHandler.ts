@@ -61,10 +61,10 @@ export class SelectionHandler {
   constructor(
     store: CanvasStore,
     stageEl: HTMLElement | null,
-    selectionStore: ReturnType<typeof useSelectionStore> = useSelectionStore()
+    selectionStore?: ReturnType<typeof useSelectionStore>
   ) {
     this.store = store;
-    this.selectionStore = selectionStore;
+    this.selectionStore = selectionStore || useSelectionStore();
     this.stageEl = stageEl;
   }
 

@@ -255,7 +255,7 @@ export class GroupService {
   /**
    * 退出组合编辑模式
    *
-   * 退出后会自动选中当前编辑的组合节点。
+   * 退出后会自动选中当前编辑的组合节点并清理编辑状态。
    */
   static exitGroupEdit(): void {
     const selectionStore = getSelectionStore();

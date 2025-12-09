@@ -1,3 +1,23 @@
+/**
+ * @file historyStore.ts
+ * @description History store：管理画布的快照、撤销/重做与历史锁
+ *
+ * 职责：
+ * - 维护撤销/重做栈，提供快照的创建与恢复
+ * - 提供历史锁以聚合批量操作（避免重复快照）
+ * - 与 canvas/selection store 协同保存节点、视口与选中态
+ *
+ * State:
+ * - historyStack: 撤销栈（最新状态在栈顶）
+ * - redoStack: 重做栈
+ * - isRestoring: 是否处于快照恢复中（防止循环记录）
+ * - isLocked: 是否锁定快照记录（批量更新时使用）
+ *
+ * Actions:
+ * - pushSnapshot/undo/redo: 快照的记录与恢复
+ * - lockHistory/lockHistoryWithoutSnapshot: 锁定历史，避免批量操作产生多次快照
+ * - clearHistory: 清空历史栈并解锁
+ */
 import { defineStore } from 'pinia';
 import { computed, ref } from 'vue';
 import { cloneDeep } from 'lodash-es';

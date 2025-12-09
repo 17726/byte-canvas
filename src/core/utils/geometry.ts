@@ -143,10 +143,13 @@ export function computeAbsoluteTransform(
   let rotationSum = 0;
 
   chain.forEach((segment) => {
-    const { x, y, rotation } = segment.transform;
+    const { x, y, width = 0, height = 0, rotation } = segment.transform;
     matrix = applyTranslate(matrix, x, y);
-    if (rotation) {
+    if (rotation != null && rotation !== 0) {
+      // 绕节点中心旋转：先平移到中心，再旋转，最后平移回左上角
+      matrix = applyTranslate(matrix, width / 2, height / 2);
       matrix = applyRotate(matrix, (rotation * Math.PI) / 180);
+      matrix = applyTranslate(matrix, -width / 2, -height / 2);
       rotationSum += rotation;
     }
   });

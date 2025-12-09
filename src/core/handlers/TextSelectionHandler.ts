@@ -57,11 +57,11 @@ export class TextSelectionHandler {
     store: CanvasStore,
     transformHandler: TransformHandler,
     viewportHandler: ViewportHandler,
-    selectionStore: ReturnType<typeof useSelectionStore> = useSelectionStore()
+    selectionStore?: ReturnType<typeof useSelectionStore>
   ) {
     // 赋值依赖到私有属性（供内部方法使用）
     this.store = store;
-    this.selectionStore = selectionStore;
+    this.selectionStore = selectionStore || useSelectionStore();
     this.transformHandler = transformHandler;
     this.viewportHandler = viewportHandler;
 
