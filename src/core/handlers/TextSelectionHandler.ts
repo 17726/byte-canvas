@@ -508,11 +508,6 @@ export class TextSelectionHandler {
   }
 
   /**
-   * 新增：恢复完整的选区 Range（支持选区+光标）
-   * @param savedRange 保存的克隆 Range 对象
-   * @param id 文本节点 ID（指定要恢复的编辑器）
-   */
-  /**
    * 重写：基于静态序列化信息恢复选区/光标（彻底解决 Range 失效问题）
    * @param savedData 保存的静态序列化信息
    * @param id 文本节点ID
