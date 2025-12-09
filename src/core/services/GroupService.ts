@@ -413,9 +413,92 @@ export class GroupService {
   }
 
   /**
-   * 更新组合样式并同步到所有子节点
+   * 更新 Group 节点的 transform，并级联更新所有子节点
    *
-   * 目前仅同步 opacity 属性到子节点。
+   * 核心逻辑：
+   * 1. 计算 transform 变更导致的缩放比例
+   * 2. 递归更新所有子节点的位置和尺寸
+   * 3. 使用 batchUpdateNodes 一次性提交所有更新
+   *
+   * @param store - Canvas Store 实例
+   * @param groupId - 组合 ID
+   * @param transformPatch - 要更新的 transform 属性
+   */
+  static updateGroupTransform(
+    store: CanvasStore,
+    groupId: string,
+    transformPatch: Partial<GroupState['transform']>
+  ): void {
+    const groupNode = store.nodes[groupId] as GroupState;
+    if (!groupNode || groupNode.type !== NodeType.GROUP) return;
+
+    // 如果处于编辑模式，不触发级联更新
+    if (store.editingGroupId === groupId) {
+      store.updateNode(groupId, {
+        transform: { ...groupNode.transform, ...transformPatch },
+      });
+      return;
+    }
+
+    const oldTransform = groupNode.transform;
+    const newTransform = { ...oldTransform, ...transformPatch };
+
+    // 计算缩放比例
+    const scaleX = oldTransform.width > 0 ? newTransform.width / oldTransform.width : 1;
+    const scaleY = oldTransform.height > 0 ? newTransform.height / oldTransform.height : 1;
+
+    // 收集所有需要更新的节点
+    const updates: Record<string, Partial<NodeState>> = {};
+
+    // 更新 Group 自身
+    updates[groupId] = { transform: newTransform };
+
+    // 只有当尺寸发生变化时才需要更新子节点
+    if (scaleX !== 1 || scaleY !== 1) {
+      // 递归更新所有后代节点
+      const updateDescendants = (childIds: string[]) => {
+        childIds.forEach((childId) => {
+          const child = store.nodes[childId];
+          if (!child) return;
+
+          // 等比例缩放子节点的位置和尺寸
+          const childNewX = child.transform.x * scaleX;
+          const childNewY = child.transform.y * scaleY;
+          const childNewWidth = Math.max(1, child.transform.width * scaleX);
+          const childNewHeight = Math.max(1, child.transform.height * scaleY);
+
+          updates[childId] = {
+            transform: {
+              ...child.transform,
+              x: childNewX,
+              y: childNewY,
+              width: childNewWidth,
+              height: childNewHeight,
+            },
+          };
+
+          // 如果子节点也是组合，递归处理其子节点
+          if (child.type === NodeType.GROUP) {
+            const childGroup = child as GroupState;
+            updateDescendants(childGroup.children);
+          }
+        });
+      };
+
+      updateDescendants(groupNode.children);
+    }
+
+    // 批量提交更新
+    store.batchUpdateNodes(updates);
+  }
+
+  /**
+   * 更新 Group 节点的 style，并级联更新所有子节点
+   *
+   * 核心逻辑：
+   * 1. 检查哪些样式属性发生了变更
+   * 2. 递归收集所有子节点的样式更新
+   * 3. 使用 batchUpdateNodes 一次性提交所有更新
    *
    * @param store - Canvas Store 实例
    * @param groupId - 组合 ID
@@ -426,23 +509,80 @@ export class GroupService {
     groupId: string,
     stylePatch: Partial<GroupState['style']>
   ): void {
-    const group = store.nodes[groupId] as GroupState;
-    if (!group || group.type !== NodeType.GROUP) return;
+    const groupNode = store.nodes[groupId] as GroupState;
+    if (!groupNode || groupNode.type !== NodeType.GROUP) return;
 
-    // 更新组合自身的样式
-    group.style = { ...group.style, ...stylePatch };
-
-    // 如果更新了opacity，同步到所有子节点
-    if ('opacity' in stylePatch && stylePatch.opacity !== undefined) {
-      const opacityValue = stylePatch.opacity;
-      group.children.forEach((childId: string) => {
-        const child = store.nodes[childId];
-        if (child) {
-          child.style = { ...child.style, opacity: opacityValue };
-        }
+    // 如果处于编辑模式，不触发级联更新
+    if (store.editingGroupId === groupId) {
+      store.updateNode(groupId, {
+        style: { ...groupNode.style, ...stylePatch },
       });
+      return;
     }
 
-    store.version++;
+    const currentStyle = groupNode.style;
+
+    // 检查哪些样式属性发生了变更
+    const opacityChanged =
+      stylePatch.opacity !== undefined && stylePatch.opacity !== currentStyle.opacity;
+    const backgroundChanged =
+      stylePatch.backgroundColor !== undefined &&
+      stylePatch.backgroundColor !== currentStyle.backgroundColor;
+    const borderColorChanged =
+      stylePatch.borderColor !== undefined && stylePatch.borderColor !== currentStyle.borderColor;
+    const borderWidthChanged =
+      stylePatch.borderWidth !== undefined && stylePatch.borderWidth !== currentStyle.borderWidth;
+
+    const shouldSyncChildren =
+      opacityChanged || backgroundChanged || borderColorChanged || borderWidthChanged;
+
+    // 收集所有需要更新的节点
+    const updates: Record<string, Partial<NodeState>> = {};
+
+    // 更新 Group 自身
+    updates[groupId] = { style: { ...currentStyle, ...stylePatch } };
+
+    // 只有在样式值真正发生变化时才同步到子节点
+    if (shouldSyncChildren) {
+      const updateChildrenStyle = (childIds: string[]) => {
+        childIds.forEach((childId) => {
+          const child = store.nodes[childId];
+          if (!child) return;
+
+          const childStylePatch: Record<string, unknown> = {};
+          const isShapeNode = child.type === NodeType.RECT || child.type === NodeType.CIRCLE;
+
+          if (opacityChanged) {
+            childStylePatch.opacity = stylePatch.opacity;
+          }
+
+          if (backgroundChanged && isShapeNode) {
+            childStylePatch.backgroundColor = stylePatch.backgroundColor;
+          }
+
+          if (borderColorChanged && isShapeNode) {
+            childStylePatch.borderColor = stylePatch.borderColor;
+          }
+
+          if (borderWidthChanged && isShapeNode) {
+            childStylePatch.borderWidth = stylePatch.borderWidth;
+          }
+
+          if (Object.keys(childStylePatch).length > 0) {
+            updates[childId] = { style: { ...child.style, ...childStylePatch } };
+          }
+
+          if (child.type === NodeType.GROUP) {
+            const childGroup = child as GroupState;
+            updateChildrenStyle(childGroup.children);
+          }
+        });
+      };
+
+      updateChildrenStyle(groupNode.children);
+    }
+
+    // 批量提交更新
+    store.batchUpdateNodes(updates);
   }
 }

@@ -240,6 +240,54 @@ export const useCanvasStore = defineStore('canvas', () => {
   });
 
   // Actions - 操作函数
+
+  /**
+   * 批量更新多个节点（原子化操作）
+   *
+   * 特点：
+   * - 只记录一次历史快照
+   * - 只触发一次 version 更新
+   * - 支持 props 深度合并
+   *
+   * @param updates - 节点更新映射 { nodeId: patch }
+   */
+  function batchUpdateNodes(updates: Record<string, Partial<NodeState>>): void {
+    if (Object.keys(updates).length === 0) return;
+
+    // 非交互态下，记录快照以支持撤销（只记录一次）
+    if (!isInteracting.value && !isRestoringSnapshot && !isHistoryLocked) {
+      pushSnapshot();
+    }
+
+    // 遍历所有更新
+    Object.entries(updates).forEach(([id, patch]) => {
+      const node = nodes.value[id];
+      if (!node) return;
+
+      // 处理 props 的深度合并（复用 updateNode 的逻辑）
+      if ('props' in patch && patch.props) {
+        const currentNode = node as NodeState & { props?: Record<string, unknown> };
+        const patchProps = patch.props as Record<string, unknown>;
+
+        currentNode.props = {
+          ...(currentNode.props as Record<string, unknown>),
+          ...patchProps,
+        };
+
+        // 合并除 props 外的其他属性
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const { props, ...rest } = patch as Partial<ShapeState | TextState | ImageState>;
+        Object.assign(node, rest);
+      } else {
+        // 普通更新
+        Object.assign(node, patch);
+      }
+    });
+
+    // 批量更新完成后，只触发一次版本更新
+    version.value++;
+  }
+
   // 1. 更新节点
   /**
    * 更新节点：强制合并 props（浅合并）以避免覆盖未传入的值
@@ -251,127 +299,10 @@ export const useCanvasStore = defineStore('canvas', () => {
     if (!node) return;
 
     // 非交互态下，记录快照以支持撤销
-    // 但如果正在恢复快照，则跳过（避免撤销时重复记录）
-    if (!isInteracting.value && !isRestoringSnapshot) {
+    // 但如果正在恢复快照或历史锁定，则跳过（避免撤销时重复记录）
+    if (!isInteracting.value && !isRestoringSnapshot && !isHistoryLocked) {
       pushSnapshot();
     }
-
-    // ==================== 组合节点特殊处理 ====================
-    // 注意：只有在非编辑模式下才触发子节点同步更新
-    // 编辑模式下，用户直接操作子节点，组合边框由 expandGroupToFitChildren 单独处理
-    if (node.type === NodeType.GROUP && editingGroupId.value !== id) {
-      const groupNode = node as import('@/types/state').GroupState;
-
-      // 处理组合的 transform 变更：同步更新子节点
-      // 注意：子节点坐标是相对于组合的，所以：
-      // - 组合移动时：子节点不需要更新（相对位置不变）
-      // - 组合缩放时：子节点的位置和尺寸需要等比例缩放
-      if ('transform' in patch && patch.transform) {
-        const oldTransform = node.transform;
-        const newTransform = { ...oldTransform, ...patch.transform };
-
-        // 计算缩放比例
-        const scaleX = oldTransform.width > 0 ? newTransform.width / oldTransform.width : 1;
-        const scaleY = oldTransform.height > 0 ? newTransform.height / oldTransform.height : 1;
-
-        // 只有当尺寸发生变化时才需要更新子节点
-        if (scaleX !== 1 || scaleY !== 1) {
-          // 递归更新所有后代节点
-          const updateDescendants = (childIds: string[]) => {
-            childIds.forEach((childId) => {
-              const child = nodes.value[childId];
-              if (!child) return;
-
-              // 等比例缩放子节点的位置和尺寸
-              const childNewX = child.transform.x * scaleX;
-              const childNewY = child.transform.y * scaleY;
-              const childNewWidth = Math.max(1, child.transform.width * scaleX);
-              const childNewHeight = Math.max(1, child.transform.height * scaleY);
-
-              child.transform = {
-                ...child.transform,
-                x: childNewX,
-                y: childNewY,
-                width: childNewWidth,
-                height: childNewHeight,
-              };
-
-              // 如果子节点也是组合，递归处理其子节点
-              if (child.type === NodeType.GROUP) {
-                const childGroup = child as import('@/types/state').GroupState;
-                updateDescendants(childGroup.children);
-              }
-            });
-          };
-
-          updateDescendants(groupNode.children);
-        }
-      }
-
-      // 处理组合的 style 变更：同步更新子节点的相应样式
-      // 注意：只有在非编辑模式下，且样式值真正发生变化时，才同步到子节点。
-      // 编辑模式下，用户直接修改子节点，组合的样式同步由 expandGroupToFitChildren 单独处理（见第75行的注释）。
-      if ('style' in patch && patch.style) {
-        const stylePatch = patch.style;
-        const currentStyle = node.style;
-
-        const opacityChanged =
-          stylePatch.opacity !== undefined && stylePatch.opacity !== currentStyle.opacity;
-        const backgroundChanged =
-          stylePatch.backgroundColor !== undefined &&
-          stylePatch.backgroundColor !== currentStyle.backgroundColor;
-        const borderColorChanged =
-          stylePatch.borderColor !== undefined &&
-          stylePatch.borderColor !== currentStyle.borderColor;
-        const borderWidthChanged =
-          stylePatch.borderWidth !== undefined &&
-          stylePatch.borderWidth !== currentStyle.borderWidth;
-
-        const shouldSyncChildren =
-          opacityChanged || backgroundChanged || borderColorChanged || borderWidthChanged;
-
-        // 只有在样式值真正发生变化时才同步，避免在退出编辑模式时触发不必要的同步
-        if (shouldSyncChildren) {
-          const updateChildrenStyle = (childIds: string[]) => {
-            childIds.forEach((childId) => {
-              const child = nodes.value[childId];
-              if (!child) return;
-
-              const childStylePatch: Record<string, unknown> = {};
-              const isShapeNode = child.type === NodeType.RECT || child.type === NodeType.CIRCLE;
-
-              if (opacityChanged) {
-                childStylePatch.opacity = stylePatch.opacity;
-              }
-
-              if (backgroundChanged && isShapeNode) {
-                childStylePatch.backgroundColor = stylePatch.backgroundColor;
-              }
-
-              if (borderColorChanged && isShapeNode) {
-                childStylePatch.borderColor = stylePatch.borderColor;
-              }
-
-              if (borderWidthChanged && isShapeNode) {
-                childStylePatch.borderWidth = stylePatch.borderWidth;
-              }
-
-              if (Object.keys(childStylePatch).length > 0) {
-                child.style = { ...child.style, ...childStylePatch };
-              }
-
-              if (child.type === NodeType.GROUP) {
-                const childGroup = child as import('@/types/state').GroupState;
-                updateChildrenStyle(childGroup.children);
-              }
-            });
-          };
-
-          updateChildrenStyle(groupNode.children);
-        }
-      }
-    }
-    // ==================== 组合节点特殊处理结束 ====================
 
     // 核心优化：处理 props 的深度合并 (Deep Merge for props)
     // 防止 updateNode(id, { props: { fontSize: 20 } }) 导致 content 等其他属性丢失
@@ -971,6 +902,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     globalTextSelection,
     // 节点操作
     updateNode,
+    batchUpdateNodes,
     addNode,
     deleteNode,
     deleteNodes,
