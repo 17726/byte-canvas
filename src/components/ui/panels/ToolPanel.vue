@@ -43,7 +43,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { ref, computed } from 'vue';
 import { IconPlus, IconEdit, IconDelete } from '@arco-design/web-vue/es/icon';
 //TODO：UI开发完成后优化icon-park库的导入，针对按需导入减小打包体积
 import { Square, Round } from '@icon-park/vue-next';
@@ -58,7 +58,6 @@ enum MenuKey {
   AddRect = 'addRect',
   AddCircle = 'addCircle',
   AddText = 'addText',
-  AddImage = 'addImage',
   Delete = 'deleteSelected',
 }
 
@@ -92,12 +91,6 @@ function onMenuItemClick(key: string) {
       console.log('文本工具被激活');
       store.setCreationTool('text');
       break;
-    //NOTE: 菜单项不支持预览图 故创建图片独立出去处理(ImageMenu.vue)
-    // case MenuKey.AddImage:
-    //   console.log('图片被点击');
-    //   toolManager.createImage(imageUrl);
-    //   selectedKeys.value = [key];
-    //   break;
     case MenuKey.Delete:
       deleteSelected();
       break;
