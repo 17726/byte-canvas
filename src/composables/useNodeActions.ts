@@ -382,7 +382,6 @@ export function useNodeActions() {
    * 清空画布
    */
   async function clearCanvas(): Promise<void> {
-    // 需要添加 async
     for (let i = store.nodeOrder.length - 1; i >= 0; --i) {
       const nodeId = store.nodeOrder[i];
       const node = store.nodes[nodeId!];
