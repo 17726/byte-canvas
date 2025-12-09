@@ -469,7 +469,7 @@ const displayNode = computed(() => {
       width: selectionBounds.value.width,
       height: selectionBounds.value.height,
       rotation: 0,
-      children: store.activeElements.map((e) => e!.id),
+      children: store.activeElements.filter((e): e is NodeState => !!e).map((e) => e.id),
       style: {
         zIndex: Math.max(...store.activeElements.map((e) => e!.style.zIndex || 1)),
         opacity: 1, // 默认不透明度
