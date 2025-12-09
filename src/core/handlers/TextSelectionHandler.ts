@@ -571,7 +571,7 @@ export class TextSelectionHandler {
     // 第一步：找到起始位置的文本节点和偏移
     let startNode: Node | null = null;
     let startNodeOffset = 0;
-    while ((currentNode = walker.nextNode()) && !startNode) {
+    while ((currentNode = walker.nextNode())) {
       const nodeText = currentNode.textContent || '';
       const nodeLength = nodeText.length;
       // 起始索引落在当前节点内
