@@ -1,5 +1,6 @@
 <template>
   <div class="property-panel">
+    <!-- Canvas Settings Mode -->
     <div v-if="isCanvas" class="panel-content">
       <div class="panel-header">
         <span class="node-type">画布设置</span>
@@ -50,6 +51,7 @@
         </div>
       </div>
     </div>
+    <!-- Node Properties Mode -->
     <div v-else>
       <div v-if="!displayNode" class="empty-state">
         <a-empty description="未选中元素" />
@@ -107,14 +109,17 @@
           </a-row>
         </div>
         <a-divider style="margin: 12px 0" />
+        <!-- Section 2: 外观 (Appearance) -->
         <div class="panel-section">
           <div class="label">外观</div>
+          <!-- Fill -->
           <div class="prop-item" v-if="canEditShapeStyle && !isImage">
             <span class="section-title">填充</span>
             <div class="flex-row">
               <a-color-picker v-model="fillColorTemp" size="small" @change="applyFillColor" />
             </div>
           </div>
+          <!-- Stroke -->
           <div class="prop-item" v-if="canEditShapeStyle">
             <span class="section-title">描边</span>
             <div class="flex-row">
@@ -134,6 +139,7 @@
               </a-input-number>
             </div>
           </div>
+          <!-- Opacity -->
           <div class="prop-item">
             <div class="section-title">不透明度</div>
             <a-slider
@@ -160,6 +166,7 @@
           </template>
         </div>
         <a-divider style="margin: 12px 0" />
+        <!-- Section 3: 特有属性 (Specific) -->
         <div class="panel-section" v-if="isText || isShape || isImage || isGroup">
           <div class="label">属性</div>
           <div class="common">
@@ -173,6 +180,7 @@
             />
           </div>
           <br />
+          <!-- Text Specific -->
           <template v-if="canEditText">
             <div class="prop-item">
               <div class="section-title">内容</div>
@@ -194,9 +202,11 @@
               <a-color-picker :value="textColor" show-text size="small" />
             </div>
           </template>
+          <!-- Image Specific -->
           <template v-if="isImage">
             <div class="prop-item">
               <span class="label">滤镜</span>
+              <!-- 黑白滤镜 -->
               <div class="filter-options">
                 <div class="filter-item" @click="selectFilter('grayscale')">
                   <div class="filter-preview" :class="{ active: selectedFilter === 'grayscale' }">
@@ -210,8 +220,10 @@
                   </div>
                   <span class="filter-name">黑白</span>
                 </div>
+                <!-- 模糊滤镜 -->
                 <div class="filter-item" @click="selectFilter('blur')">
                   <div class="filter-preview" :class="{ active: selectedFilter === 'blur' }">
+                    <!-- 新增内部层：仅承载背景图和滤镜 -->
                     <div
                       class="filter-preview-inner"
                       :style="{
@@ -222,6 +234,7 @@
                   </div>
                   <span class="filter-name">模糊</span>
                 </div>
+                <!-- 复古滤镜 -->
                 <div class="filter-item" @click="selectFilter('vintage')">
                   <div class="filter-preview" :class="{ active: selectedFilter === 'vintage' }">
                     <div
@@ -235,8 +248,10 @@
                   </div>
                   <span class="filter-name">复古</span>
                 </div>
+                <!-- 重置滤镜 -->
                 <div class="filter-item" @click="selectFilter('reset')">
                   <div class="filter-preview" :class="{ active: selectedFilter === 'reset' }">
+                    <!-- 新增内部层：仅承载背景图和滤镜 -->
                     <div
                       class="filter-preview-inner"
                       :style="{
@@ -249,7 +264,9 @@
                 </div>
               </div>
             </div>
+            <!-- 滤镜参数调节 -->
             <div class="prop-item">
+              <!-- 灰度 -->
               <div class="filter-param-item">
                 <div class="filter-param-label">灰度</div>
                 <a-slider
@@ -263,6 +280,7 @@
                 />
               </div>
 
+              <!-- 模糊 -->
               <div class="filter-param-item">
                 <div class="filter-param-label">模糊</div>
                 <a-slider
@@ -276,6 +294,7 @@
                 />
               </div>
 
+              <!-- 亮度 -->
               <div class="filter-param-item">
                 <div class="filter-param-label">亮度</div>
                 <a-slider
@@ -289,6 +308,7 @@
                 />
               </div>
 
+              <!-- 对比度 -->
               <div class="filter-param-item">
                 <div class="filter-param-label">对比度</div>
                 <a-slider
@@ -302,6 +322,7 @@
                 />
               </div>
 
+              <!-- 饱和度 -->
               <div class="filter-param-item">
                 <div class="filter-param-label">饱和度</div>
                 <a-slider
@@ -315,6 +336,7 @@
                 />
               </div>
 
+              <!-- 色相旋转 -->
               <div class="filter-param-item">
                 <div class="filter-param-label">色相旋转</div>
                 <a-slider
@@ -328,6 +350,7 @@
                 />
               </div>
 
+              <!-- 滤镜透明度 -->
               <div class="filter-param-item">
                 <div class="filter-param-label">滤镜透明度</div>
                 <a-slider
@@ -341,6 +364,7 @@
                 />
               </div>
 
+              <!-- 反转 -->
               <div class="filter-param-item">
                 <div class="filter-param-label">反转</div>
                 <a-slider
@@ -354,6 +378,7 @@
                 />
               </div>
 
+              <!-- 棕褐色 -->
               <div class="filter-param-item">
                 <div class="filter-param-label">棕褐色</div>
                 <a-slider
