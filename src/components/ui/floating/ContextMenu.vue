@@ -20,7 +20,7 @@
             全选
             <span class="label">Ctrl+A</span>
           </a-menu-item>
-          <a-menu-item key="clearSelection" @click="clearModalVisible = true">
+          <a-menu-item key="clearCanvas" @click="clearModalVisible = true">
             <template #icon><IconDelete /></template>
             清空画布
           </a-menu-item>
