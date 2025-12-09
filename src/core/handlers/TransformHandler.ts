@@ -564,26 +564,55 @@ export class TransformHandler {
 
       if (isCorner) {
         // 角点中心缩放：总位移应用到宽度/高度，并对称修正fixed/movable
+        // 新增：处理 Shift+Alt 组合键 - 中心等比缩放
+        if (e.shiftKey) {
+          const startRatio = startWidth / Math.max(startHeight, 1e-6); // 初始宽高比
+          // 计算鼠标位移对应的单边缩放增量
+          let deltaW = 0;
+          let deltaH = 0;
 
-        // 1. 计算宽度/高度的变化量（这里是半边变化量）
-        let deltaW = 0;
-        let deltaH = 0;
+          // 根据 handle 确定 x/y 轴位移的正负
+          if (handle.includes('e')) deltaW = unrotatedDx;
+          if (handle.includes('w')) deltaW = -unrotatedDx;
+          if (handle.includes('s')) deltaH = unrotatedDy;
+          if (handle.includes('n')) deltaH = -unrotatedDy;
 
-        // 根据 handle 确定 x/y 轴位移的正负（dx/dy 代表鼠标在未旋转坐标系下的位移）
-        if (handle.includes('e')) deltaW = unrotatedDx;
-        if (handle.includes('w')) deltaW = -unrotatedDx;
-        if (handle.includes('s')) deltaH = unrotatedDy;
-        if (handle.includes('n')) deltaH = -unrotatedDy;
+          // 计算等比缩放比例（取x/y轴中绝对值更大的增量）
+          const scaleX = (startWidth + deltaW * 2) / startWidth;
+          const scaleY = (startHeight + deltaH * 2) / startHeight;
+          const scale = Math.abs(scaleX) > Math.abs(scaleY) ? scaleX : scaleY;
 
-        // 计算新尺寸并应用最小限制
-        const newW = Math.max(startWidth + deltaW * 2, MIN_SIZE);
-        const newH = Math.max(startHeight + deltaH * 2, MIN_SIZE);
+          // 计算等比目标尺寸（最小尺寸保护）
+          const targetWidth = Math.max(Math.abs(scale) * startWidth, MIN_SIZE);
+          const targetHeight = Math.max(targetWidth / startRatio, MIN_SIZE);
 
-        // 2. 重新计算 fixed/movable，使其关于 startCenter 对称
-        fixedX = centerX - newW / 2;
-        movableX = centerX + newW / 2;
-        fixedY = centerY - newH / 2;
-        movableY = centerY + newH / 2;
+          // 基于中心对称计算 fixed/movable
+          fixedX = centerX - targetWidth / 2;
+          movableX = centerX + targetWidth / 2;
+          fixedY = centerY - targetHeight / 2;
+          movableY = centerY + targetHeight / 2;
+        } else {
+          // 原有 Alt 单独中心缩放逻辑
+          // 1. 计算宽度/高度的变化量（这里是半边变化量）
+          let deltaW = 0;
+          let deltaH = 0;
+
+          // 根据 handle 确定 x/y 轴位移的正负（dx/dy 代表鼠标在未旋转坐标系下的位移）
+          if (handle.includes('e')) deltaW = unrotatedDx;
+          if (handle.includes('w')) deltaW = -unrotatedDx;
+          if (handle.includes('s')) deltaH = unrotatedDy;
+          if (handle.includes('n')) deltaH = -unrotatedDy;
+
+          // 计算新尺寸并应用最小限制
+          const newW = Math.max(startWidth + deltaW * 2, MIN_SIZE);
+          const newH = Math.max(startHeight + deltaH * 2, MIN_SIZE);
+
+          // 2. 重新计算 fixed/movable，使其关于 startCenter 对称
+          fixedX = centerX - newW / 2;
+          movableX = centerX + newW / 2;
+          fixedY = centerY - newH / 2;
+          movableY = centerY + newH / 2;
+        }
       } else if (isEdge) {
         // 边中心缩放：仅单轴变化，该轴对称，另一轴保持不变
         switch (handle) {
