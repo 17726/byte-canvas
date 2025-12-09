@@ -172,7 +172,7 @@ const {
 function handleShowContextMenu(e: CustomEvent) {
   const { x, y } = e.detail;
   openAt(x, y);
-  //检测粘贴板可用性
+  // 检测粘贴板可用性
   checkClipboardAvailability();
 }
 
