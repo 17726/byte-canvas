@@ -10,9 +10,13 @@ export class DomTextRenderer implements INodeRenderer<string> {
     if (inlineStyles.length === 0) {
       // 全局样式 → CSS 转换（关键步骤）
       const globalStyleStr = this.convertStylesToCss(globalStyles);
+
+      // 处理换行符，将 \n 转换为 <br>
+      const escapedContent = this.escapeHtml(content).replace(/\n/g, '<br>');
+
       return globalStyleStr
-        ? `<span style="${globalStyleStr}">${this.escapeHtml(content)}</span>`
-        : this.escapeHtml(content);
+        ? `<span style="${globalStyleStr}">${escapedContent}</span>`
+        : escapedContent;
     }
 
     // 有行内样式：先分组行内样式
@@ -30,13 +34,26 @@ export class DomTextRenderer implements INodeRenderer<string> {
       const end = sortedSplitPoints[i + 1];
       if (start! >= end!) continue;
 
-      const textFragment = this.escapeHtml(content.slice(start, end));
+      // 获取当前片段的文本内容
+      const textFragment = content.slice(start, end);
+
+      // 检查是否包含换行符
+      if (textFragment === '\n') {
+        html += '<br>'; // 将换行符渲染为 <br>
+        continue;
+      }
+
+      // 转义 HTML 内容
+      const escapedFragment = this.escapeHtml(textFragment);
+
+      // 获取匹配的行内样式
       const matchedStyles = groupedStyles.filter((style) => {
         return style.start! <= start! && style.end! >= end!;
       });
 
       // 步骤1：以全局样式为基础（JS对象）
       const baseStyle = { ...globalStyles };
+
       // 步骤2：合并行内样式（行内覆盖全局）
       const finalStyleObj = matchedStyles.reduce((acc, cur) => {
         return { ...acc, ...cur.combinedStyles };
@@ -46,7 +63,7 @@ export class DomTextRenderer implements INodeRenderer<string> {
       const finalStyleStr = this.convertStylesToCss(finalStyleObj);
 
       // 步骤4：拼接带CSS样式的span
-      html += `<span style="${finalStyleStr}">${textFragment}</span>`;
+      html += `<span style="${finalStyleStr}">${escapedFragment}</span>`;
     }
 
     return html;

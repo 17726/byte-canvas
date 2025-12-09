@@ -78,7 +78,7 @@ export class TextSelectionHandler {
 
   // 公共方法，更新全局选区
   updateGlobalSelection(selection: { start: number; end: number } | null) {
-    console.log('updateGlobalSelection:', selection);
+    //console.log('updateGlobalSelection:', selection);
     this.store.updateGlobalTextSelection(selection);
   }
 
@@ -113,7 +113,7 @@ export class TextSelectionHandler {
         range.selectNodeContents(editor); // 选中编辑器内所有内容
         selection?.removeAllRanges();
         selection?.addRange(range);
-        console.log('双击全选');
+        //console.log('双击全选');
 
         // 2. 更新 currentSelection 为「全部文本范围」
         const content = node.props.content || ''; // 获取文本内容
@@ -129,7 +129,7 @@ export class TextSelectionHandler {
           start: 0, // 全选从索引 0 开始
           end: contentLength, // 全选到文本长度结束（符合你的 inlineStyles 规则：end 排除）
         });
-        console.log(this.currentSelection);
+        //console.log(this.currentSelection);
       }
     });
   }
@@ -219,26 +219,26 @@ export class TextSelectionHandler {
     const startOffset = range.startOffset; // 相对startNode的偏移量（比如在startNode第2个字符后）
     const baseOffset = this.getTextOffset(startNodeContent, startNodeParent, editor);
     const totalStart = baseOffset + startOffset;
-    console.log('baseOffset=', baseOffset);
-    console.log('startOffset=', startOffset);
-    console.log('totalStart=', totalStart);
+    // console.log('baseOffset=', baseOffset);
+    // console.log('startOffset=', startOffset);
+    // console.log('totalStart=', totalStart);
 
     //const endNode = range.endContainer;
     const endOffset = range.endOffset;
     const endBaseOffset = this.getTextOffset(endNodeContent, endNodeParent, editor); // endNode的绝对偏移
     const totalEnd = endBaseOffset + endOffset; // 最终：选区在整个文本中的绝对结束索引
-    console.log('endBaseOffset=', endBaseOffset);
-    console.log('endOffset=', endOffset);
-    console.log('totalEnd=', totalEnd);
+    // console.log('endBaseOffset=', endBaseOffset);
+    // console.log('endOffset=', endOffset);
+    // console.log('totalEnd=', totalEnd);
 
     // 统一选区方向：确保 start ≤ end（用户可能从后往前选，比如从第8个字符选到第2个）
     const start = Math.min(totalStart, totalEnd); // 取较小值为真正的起始
     const end = Math.max(totalStart, totalEnd); // 取较大值为真正的结束
-    console.log('保存选区前currentSelection：', this.currentSelection);
+    //console.log('保存选区前currentSelection：', this.currentSelection);
     // 保存有效选区：只有「真正选中文字」（start < end）才保存
     if (start < end) {
       this.currentSelection = { start, end }; // 比如 { start:2, end:8 } 表示选中第2-8个字符
-      console.log('保存选区后currentSelection：', this.currentSelection);
+      //console.log('保存选区后currentSelection：', this.currentSelection);
     } else {
       this.currentSelection = null; // 无有效选中（比如选中长度为0）
     }
@@ -246,7 +246,7 @@ export class TextSelectionHandler {
     // 同步选区到全局状态：让其他功能（比如设置字体样式）能获取当前选区
     const isActive = this.store.activeElements[0]?.id === id || this.isEditing;
     if (isActive && this.currentSelection) {
-      console.log('handler中updateGlobalSelection：', this.currentSelection);
+      //console.log('handler中updateGlobalSelection：', this.currentSelection);
       this.updateGlobalSelection(this.currentSelection);
     } else {
       this.updateGlobalSelection(null);
@@ -267,16 +267,16 @@ export class TextSelectionHandler {
 
     // 遍历编辑器内所有文本节点，累加前面节点的文本长度
     while ((currentNode = walker.nextNode())) {
-      console.log('currentNode.textContent:', currentNode.textContent);
-      console.log('targetText:', targetText);
+      // console.log('currentNode.textContent:', currentNode.textContent);
+      // console.log('targetText:', targetText);
 
       // 匹配条件：文本内容相同 + 父节点相同（避免多个相同内容的文本节点混淆）
       const isMatch =
         currentNode.textContent === targetText && currentNode.parentElement === targetParent;
-      console.log('isMatch', isMatch);
+      // console.log('isMatch', isMatch);
       if (isMatch) break;
 
-      console.log('currentNode.textContent?.length:', currentNode.textContent?.length);
+      // console.log('currentNode.textContent?.length:', currentNode.textContent?.length);
       offset += currentNode.textContent?.length || 0;
     }
     return offset;
@@ -541,13 +541,13 @@ export class TextSelectionHandler {
           }
           selection.removeAllRanges();
           selection.addRange(newRange);
-          console.log('选区恢复成功:', newRange);
+          //console.log('选区恢复成功:', newRange);
         } else {
           // 降级：定位到文本末尾
           this.fallbackToTextEnd(editor, selection);
         }
       } catch (e) {
-        console.log('恢复选区失败，降级到文本末尾', e);
+        //console.log('恢复选区失败，降级到文本末尾', e);
         this.fallbackToTextEnd(editor, selection);
       }
     });
@@ -1031,7 +1031,7 @@ export class TextSelectionHandler {
   ) {
     // ========== 新增：第一步：修改前保存完整选区 ==========
     const savedData = this.saveFullSelection(id);
-    console.log('全局保存后savedRange:', savedData);
+    //console.log('全局保存后savedRange:', savedData);
     // ===================== 1. 基础安全校验 =====================
     const node = store.nodes[id] as TextState | undefined;
     if (!node || node.type !== NodeType.TEXT) {
@@ -1058,7 +1058,7 @@ export class TextSelectionHandler {
     }
     // 有有效选中范围时，不修改全局样式
     if (hasValidSelection) {
-      console.log(`updateGlobalStyles: 节点${id}存在有效选中范围，跳过更新`);
+      //console.log(`updateGlobalStyles: 节点${id}存在有效选中范围，跳过更新`);
       return;
     }
 

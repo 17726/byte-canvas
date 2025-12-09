@@ -35,8 +35,18 @@ export class TextService {
     const target = e.target as HTMLElement;
     // 保存当前光标位置
     const savedCursorPos = saveCursorPosition();
-
-    const newContent = target.textContent || ''; // 兜底空字符串，避免 null
+    console.log('子节点内容:', target.childNodes);
+    const newContent = Array.from(target.childNodes)
+      .map((node) => {
+        if (node.nodeName === 'DIV') {
+          return '\n' + node.textContent; // 将 <div> 转换为换行符
+        } else if (node.nodeName === 'BR') {
+          return '\n'; // 将 <br> 转换为换行符
+        }
+        return node.textContent; // 其他节点直接取文本内容
+      })
+      .join(''); // 合并所有文本节点
+    console.log('新内容:', JSON.stringify(newContent));
     // 通过 ID 更新节点内容
     store.updateNode(id, {
       props: { ...node.props, content: newContent },
