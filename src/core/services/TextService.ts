@@ -21,12 +21,20 @@ export class TextService {
     e: Event,
     id: string,
     store: CanvasStore,
-    saveCursorPosition: () => { parent: Node | null; offset: number; textContent: string },
-    restoreCursorPosition: (savedPos: {
-      parent: Node | null;
-      offset: number;
-      textContent: string;
-    }) => void
+    saveCursorPosition: (id: string) => {
+      isCollapsed: boolean; // 是否是光标（折叠选区）
+      startOffset: number; // 选区起始的「文本逻辑索引」（整个文本的第n个字符）
+      endOffset: number; // 选区结束的「文本逻辑索引」
+      nodeText: string; // 光标/选区所在文本节点的内容（用于匹配新DOM）
+    } | null,
+    restoreCursorPosition: (
+      savedData: {
+        isCollapsed: boolean; // 是否是光标（折叠选区）
+        startOffset: number; // 选区起始的「文本逻辑索引」（整个文本的第n个字符）
+        endOffset: number; // 选区结束的「文本逻辑索引」
+        nodeText: string; // 光标/选区所在文本节点的内容（用于匹配新DOM）
+      } | null
+    ) => void
   ) {
     //通过 ID 获取节点，加非空+类型校验
     const node = store.nodes[id] as TextState | undefined;
@@ -34,7 +42,7 @@ export class TextService {
 
     const target = e.target as HTMLElement;
     // 保存当前光标位置
-    const savedCursorPos = saveCursorPosition();
+    const savedCursorPos = saveCursorPosition(id);
     console.log('子节点内容:', target.childNodes);
     const newContent = Array.from(target.childNodes)
       .map((node) => {
@@ -47,6 +55,7 @@ export class TextService {
       })
       .join(''); // 合并所有文本节点
     console.log('新内容:', JSON.stringify(newContent));
+    const oldContent = node.props.content || '';
     // 通过 ID 更新节点内容
     store.updateNode(id, {
       props: { ...node.props, content: newContent },
@@ -54,9 +63,9 @@ export class TextService {
 
     // DOM 重新渲染后，恢复光标位置
     restoreCursorPosition(savedCursorPos);
-
+    console.log('恢复光标位置:', savedCursorPos);
+    console.log('新存储的内容:', node.props.content);
     // 同步调整内联样式（传递 id 给内部方法）
-    const oldContent = node.props.content || '';
     if (oldContent && newContent) {
       this.updateInlineStylesOnContentChange(oldContent, newContent, id, store);
     }

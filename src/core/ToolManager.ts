@@ -588,8 +588,8 @@ export class ToolManager {
       e,
       id, // 传递节点 ID
       this.store, // Pinia 实例
-      () => this.textSelectionHandler.saveCursorPosition(),
-      (pos) => this.textSelectionHandler.restoreCursorPosition(pos)
+      () => this.textSelectionHandler.saveFullSelection(id),
+      (pos) => this.textSelectionHandler.restoreFullSelection(pos, id)
     );
   }
 

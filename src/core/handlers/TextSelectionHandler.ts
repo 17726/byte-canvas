@@ -393,79 +393,6 @@ export class TextSelectionHandler {
   };
 
   /**
-   * NOTE: 以下为一组【选区范围】保存/恢复函数和一组【光标】保存/恢复函数
-   * 选区范围保存/恢复：
-      适用于用户选中一段文本的场景。
-      保存的信息更复杂，因为需要处理选区的起点和终点，以及选区是否跨多个文本节点。
-
-    光标保存/恢复：
-      适用于用户未选中文本、仅有光标的场景。
-      保存的信息较简单，只需记录光标位置。
-   */
-
-  /**
-   * 保存当前光标位置（修复：保存真实光标节点和结束偏移）
-   * 用户未选中文本时的插入点
-   * @returns 保存的位置信息（文本节点+偏移量）
-   */
-  saveCursorPosition(): {
-    parent: Node | null;
-    offset: number;
-    textContent: string; // 新增：保存节点文本内容，用于恢复时匹配
-  } {
-    const selection = window.getSelection();
-    if (!selection || selection.rangeCount === 0) {
-      return { parent: null, offset: 0, textContent: '' };
-    }
-
-    const range = selection.getRangeAt(0);
-    // ✅ 关键1：保存光标所在的「最小文本节点」（startContainer）
-    // ✅ 关键2：保存 endOffset（输入后光标在末尾，更符合预期）
-    // ✅ 关键3：保存节点文本内容，用于恢复时精准匹配
-    return {
-      parent: range.startContainer,
-      offset: range.endOffset,
-      textContent: range.startContainer.textContent || '',
-    };
-  }
-
-  /**
-   * 恢复光标位置（修复：精准匹配新DOM节点+边界校验）
-   * @param savedPos 保存的位置信息
-   */
-  restoreCursorPosition(savedPos: { parent: Node | null; offset: number; textContent: string }) {
-    const id = Array.from(this.store.activeElementIds)[0];
-    if (!id) return;
-    const editor = this.editors[id];
-    if (!editor || !savedPos.parent || !this.isEditing || !savedPos.textContent) {
-      return;
-    }
-
-    const selection = window.getSelection();
-    if (!selection) return;
-
-    // 确保DOM完全更新（用nextTick确保渲染完成，避免早了找不到节点）
-    nextTick(() => {
-      // 在新DOM树中找到「和保存时文本内容一致」的文本节点
-      const targetNode = this.findTextNodeByContent(editor, savedPos.textContent);
-      if (!targetNode) return;
-
-      //偏移量边界校验（避免超出文本长度）
-      const textLength = targetNode.textContent?.length || 0;
-      const safeOffset = Math.min(savedPos.offset, textLength); // 最大不超过文本长度
-      const finalOffset = Math.max(0, safeOffset); // 最小不小于0
-
-      //恢复光标
-      const range = document.createRange();
-      range.setStart(targetNode, finalOffset); // 新DOM节点 + 安全偏移
-      range.collapse(true); // 光标折叠（只显示光标，不选中文字）
-
-      selection.removeAllRanges();
-      selection.addRange(range);
-    });
-  }
-
-  /**
    * 新增：保存完整的选区 Range（支持选中一段文本 + 光标）
    * 区别于仅保存光标，此方法保存完整的选区范围，恢复后能保留文本选中的视觉效果
    */
@@ -533,7 +460,7 @@ export class TextSelectionHandler {
           savedData.startOffset,
           savedData.endOffset
         );
-
+        console.log('到这里了newRange:', newRange);
         if (newRange) {
           // 恢复选区/光标（折叠则是光标，非折叠则是选中）
           if (savedData.isCollapsed) {
@@ -541,13 +468,13 @@ export class TextSelectionHandler {
           }
           selection.removeAllRanges();
           selection.addRange(newRange);
-          //console.log('选区恢复成功:', newRange);
+          console.log('选区恢复成功:', newRange);
         } else {
           // 降级：定位到文本末尾
           this.fallbackToTextEnd(editor, selection);
         }
       } catch (e) {
-        //console.log('恢复选区失败，降级到文本末尾', e);
+        console.log('恢复选区失败，降级到文本末尾', e);
         this.fallbackToTextEnd(editor, selection);
       }
     });
