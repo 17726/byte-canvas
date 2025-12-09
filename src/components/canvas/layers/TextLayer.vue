@@ -199,12 +199,12 @@ const handleContentChange = (e: Event, id: string) => {
     const selection = window.getSelection();
     if (selection && selection.rangeCount > 0) {
       const range = selection.getRangeAt(0);
-      const targetEl = e.target as HTMLElement;
+      const walkRoot = editorEl;
 
       try {
-        // 使用更准确的方法计算光标位置：遍历所有节点（包括文本节点和BR节点）
+        // 使用更准确的方法计算光标位置：遍历整个编辑器内的所有节点（包括文本节点和BR节点）
         const walker = document.createTreeWalker(
-          targetEl,
+          walkRoot,
           NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
           {
             acceptNode: (node) => {
@@ -275,12 +275,12 @@ const handleContentChange = (e: Event, id: string) => {
 
         // 如果没找到匹配的节点，使用 innerText 长度（包含换行）
         if (!found) {
-          const innerText = targetEl.innerText || '';
+          const innerText = walkRoot.innerText || '';
           savedCursorOffset = innerText.length;
         }
       } catch (err) {
         // 如果计算失败，使用 innerText 长度作为后备
-        const innerText = (e.target as HTMLElement).innerText || '';
+        const innerText = walkRoot.innerText || '';
         savedCursorOffset = innerText.length;
       }
     }
