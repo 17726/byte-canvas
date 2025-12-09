@@ -1,5 +1,6 @@
 // src/core/handlers/RotationHandler.ts
 import { useCanvasStore } from '@/store/canvasStore';
+import { useSelectionStore } from '@/store/selectionStore';
 import type { BaseNodeState } from '@/types/state';
 import { eventToWorld } from '../utils/geometry';
 
@@ -24,6 +25,7 @@ interface RotationState {
  */
 export class RotationHandler {
   private store = useCanvasStore();
+  private selectionStore = useSelectionStore();
   private stageEl: HTMLElement | null;
 
   private rotationState: RotationState = {
@@ -46,7 +48,7 @@ export class RotationHandler {
    * @param e 鼠标事件
    */
   startRotate(e: MouseEvent): void {
-    const selectedNodeIds = Array.from(this.store.activeElementIds);
+    const selectedNodeIds = Array.from(this.selectionStore.activeElementIds);
     if (selectedNodeIds.length === 0) return;
 
     // 记录每个选中节点的初始旋转角度（确保多节点独立旋转）

@@ -29,28 +29,30 @@
 
 import { computed, nextTick } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
+import { useSelectionStore } from '@/store/selectionStore';
 import { GroupService } from '@/core/services/GroupService';
 import { Notification } from '@arco-design/web-vue';
 
 export function useNodeActions() {
   const store = useCanvasStore();
+  const selectionStore = useSelectionStore();
 
   // ==================== 计算属性 ====================
 
   /**
    * 是否有选中节点
    */
-  const hasSelection = computed(() => store.activeElementIds.size > 0);
+  const hasSelection = computed(() => selectionStore.activeElementIds.size > 0);
 
   /**
    * 是否可以组合（至少选中 2 个节点）
    */
-  const canGroup = computed(() => store.canGroup);
+  const canGroup = computed(() => GroupService.canGroup(store));
 
   /**
    * 是否可以取消组合（选中的节点中包含组合）
    */
-  const canUngroup = computed(() => store.canUngroup);
+  const canUngroup = computed(() => GroupService.canUngroup(store));
 
   // ==================== 节点操作方法 ====================
 
@@ -67,7 +69,7 @@ export function useNodeActions() {
       return false;
     }
 
-    const selectedIds = Array.from(store.activeElementIds);
+    const selectedIds = Array.from(selectionStore.activeElementIds);
     selectedIds.forEach((id) => store.deleteNode(id));
 
     Notification.success({
@@ -167,7 +169,7 @@ export function useNodeActions() {
       return false;
     }
 
-    if (store.activeElementIds.size < 2) {
+    if (selectionStore.activeElementIds.size < 2) {
       Notification.warning({
         content: '至少需要选择两个元素才能进行组合',
         closable: true,
@@ -249,7 +251,7 @@ export function useNodeActions() {
       return false;
     }
 
-    const selectedIds = Array.from(store.activeElementIds);
+    const selectedIds = Array.from(selectionStore.activeElementIds);
 
     // 过滤掉不在 nodeOrder 中的 ID（可能是子节点）。
     // 也可能是新添加但未加入 nodeOrder 的节点。更明确地检查 parent 属性。
@@ -300,7 +302,7 @@ export function useNodeActions() {
       return false;
     }
 
-    const selectedIds = Array.from(store.activeElementIds);
+    const selectedIds = Array.from(selectionStore.activeElementIds);
 
     // 过滤掉不在 nodeOrder 中的 ID（可能是子节点）
     const validIds = selectedIds.filter((id) => store.nodeOrder.includes(id));
@@ -348,7 +350,7 @@ export function useNodeActions() {
       return false;
     }
 
-    store.setActive(allNodeIds);
+    selectionStore.setActive(allNodeIds);
 
     Notification.success({
       content: '已全选',
@@ -367,7 +369,7 @@ export function useNodeActions() {
       return false;
     }
 
-    store.setActive([]);
+    selectionStore.clearSelection();
 
     Notification.success({
       content: '已取消选择',

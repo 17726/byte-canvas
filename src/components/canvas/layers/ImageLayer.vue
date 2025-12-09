@@ -6,7 +6,7 @@
 
 <script setup lang="ts">
 import { getDomStyle } from '@/core/renderers/dom';
-import { useCanvasStore } from '@/store/canvasStore';
+import { useSelectionStore } from '@/store/selectionStore';
 import type { ImageState } from '@/types/state';
 import { computed, type CSSProperties } from 'vue';
 
@@ -14,13 +14,13 @@ const props = defineProps<{
   node: ImageState;
 }>();
 
-const store = useCanvasStore();
+const selectionStore = useSelectionStore();
 
 // 获取样式 (使用策略模式分离的渲染器)
 const style = computed(() => getDomStyle(props.node) as CSSProperties);
 
 // 选中状态
-const isSelected = computed(() => store.activeElementIds.has(props.node.id));
+const isSelected = computed(() => selectionStore.activeElementIds.has(props.node.id));
 
 // 图片URL
 const imageUrl = computed(

@@ -5,10 +5,9 @@
  * 职责：
  * 1. 管理所有节点数据（nodes）和渲染顺序（nodeOrder）
  * 2. 管理视口状态（zoom, offsetX, offsetY）
- * 3. 管理选中状态（activeElementIds）和组合编辑状态（editingGroupId）
- * 4. 提供节点的增删改查操作
- * 5. 处理复制/剪切/粘贴操作
- * 6. 管理本地存储的持久化
+ * 3. 提供节点的增删改查操作
+ * 4. 处理复制/剪切/粘贴操作
+ * 5. 管理本地存储的持久化
  *
  * 特点：
  * - 使用 Pinia 进行状态管理
@@ -23,9 +22,7 @@
  * - nodeOrder: 渲染顺序数组
  * - version: 脏标记计数器
  * - viewport: 视口状态（zoom, offset, canvasSize）
- * - activeElementIds: 选中元素集合（Set）
  * - isInteracting: 交互锁（防止交互时触发自动保存）
- * - editingGroupId: 当前编辑的组合 ID
  *
  * 包含方法列表：
  * 节点操作：
@@ -33,10 +30,6 @@
  * - addNode: 添加节点到画布
  * - deleteNode: 删除单个节点
  * - deleteNodes: 批量删除节点
- *
- * 选中操作：
- * - setActive: 设置选中状态
- * - toggleSelection: 切换节点选中状态
  *
  * 持久化操作：
  * - initFromStorage: 从 LocalStorage 加载
@@ -54,15 +47,12 @@
  *
  * 计算属性：
  * - renderList: 按顺序的可渲染节点列表
- * - activeElements: 选中的节点列表
  * - visibleRenderList: 可见的节点列表（过滤不可见节点）
- * - canGroup: 是否可以组合选中节点
- * - canUngroup: 是否可以解散选中节点
  */
 
 // stores/canvasStore.ts
 import { defineStore } from 'pinia';
-import { ref, reactive, computed, watch, readonly } from 'vue';
+import { ref, reactive, computed, watch } from 'vue';
 import type { NodeState, ShapeState, TextState, ImageState, ViewportState } from '@/types/state';
 import { NodeType } from '@/types/state';
 import { DEFAULT_VIEWPORT } from '@/config/defaults';
@@ -78,6 +68,7 @@ import {
 } from './persistence';
 import { v4 as uuidv4 } from 'uuid';
 import { cloneDeep } from 'lodash-es';
+import { useSelectionStore } from './selectionStore';
 
 /**
  * Canvas Store
@@ -85,6 +76,7 @@ import { cloneDeep } from 'lodash-es';
  * 管理整个编辑器的核心状态，包括节点、渲染顺序、视口、交互状态等
  */
 export const useCanvasStore = defineStore('canvas', () => {
+  const selectionStore = useSelectionStore();
   // 1. 核心数据
   // 使用 Record 存储，对应调研报告中的 "State/Node分离" 思想
   // 节点字典：key 为节点 ID，value 为 NodeState
@@ -101,17 +93,11 @@ export const useCanvasStore = defineStore('canvas', () => {
 
   // 3. 交互状态
   // 优化：使用 Set 提高查找性能
-  // 选中元素集合（Set 便于添加/删除/查重）
-  const activeElementIds = ref<Set<string>>(new Set());
-
   // 优化：交互锁，防止拖拽过程中触发昂贵操作(如自动保存)
   const isInteracting = ref(false);
   // 注意：activePanel 与 isPanelExpanded 为 UI 控制字段，已迁移至 uiStore
 
   // ==================== 组合编辑状态 ====================
-  // 当前正在编辑的组合 ID（双击组合进入编辑模式）
-  const editingGroupId = ref<string | null>(null);
-
   // ==================== 创建工具状态 ====================
   // 当前激活的创建工具（类似 Figma 的工具选择）
   const creationTool = ref<import('@/types/editor').CanvasToolType>('select');
@@ -142,8 +128,8 @@ export const useCanvasStore = defineStore('canvas', () => {
     nodes: cloneDeep(nodes.value),
     nodeOrder: [...nodeOrder.value],
     viewport: { ...(viewport as ViewportState) },
-    activeElementIds: Array.from(activeElementIds.value),
-    editingGroupId: editingGroupId.value,
+    activeElementIds: Array.from(selectionStore.activeElementIds),
+    editingGroupId: selectionStore.editingGroupId,
   });
 
   const pushSnapshot = () => {
@@ -199,8 +185,8 @@ export const useCanvasStore = defineStore('canvas', () => {
     nodes.value = cloneDeep(snapshot.nodes);
     nodeOrder.value = [...snapshot.nodeOrder];
     Object.assign(viewport, snapshot.viewport);
-    activeElementIds.value = new Set(snapshot.activeElementIds);
-    editingGroupId.value = snapshot.editingGroupId;
+    selectionStore.activeElementIds = new Set(snapshot.activeElementIds);
+    selectionStore.editingGroupId = snapshot.editingGroupId;
     version.value++; // 标记一次变更，触发依赖更新
     // 使用 queueMicrotask 延迟重置标志，确保所有响应式更新都完成后再重置
     // 这样可以避免在恢复快照后触发的异步响应式更新（如 watch 监听器）调用 updateNode 时记录快照
@@ -231,12 +217,6 @@ export const useCanvasStore = defineStore('canvas', () => {
   // 获取排序后的渲染列表，供 v-for 使用
   const renderList = computed(() => {
     return nodeOrder.value.map((id) => nodes.value[id]).filter(Boolean);
-  });
-
-  const activeElements = computed(() => {
-    return Array.from(activeElementIds.value)
-      .map((id) => nodes.value[id])
-      .filter(Boolean);
   });
 
   // Actions - 操作函数
@@ -377,11 +357,14 @@ export const useCanvasStore = defineStore('canvas', () => {
 
     delete nodes.value[id];
     nodeOrder.value = nodeOrder.value.filter((nId) => nId !== id);
-    activeElementIds.value.delete(id); // 清除选中态
+    // 清除选中态
+    selectionStore.setActive(
+      Array.from(selectionStore.activeElementIds).filter((selectedId) => selectedId !== id)
+    );
 
     // 如果正在编辑这个组合，退出编辑模式
-    if (editingGroupId.value === id) {
-      editingGroupId.value = null;
+    if (selectionStore.editingGroupId === id) {
+      selectionStore.setEditingGroup(null);
     }
 
     version.value++; // 触发更新
@@ -419,11 +402,13 @@ export const useCanvasStore = defineStore('canvas', () => {
     // 批量删除节点
     allIdsToDelete.forEach((id) => {
       delete nodes.value[id];
-      activeElementIds.value.delete(id);
+      selectionStore.setActive(
+        Array.from(selectionStore.activeElementIds).filter((selectedId) => selectedId !== id)
+      );
 
       // 如果正在编辑这个组合，退出编辑模式
-      if (editingGroupId.value === id) {
-        editingGroupId.value = null;
+      if (selectionStore.editingGroupId === id) {
+        selectionStore.setEditingGroup(null);
       }
     });
 
@@ -432,34 +417,6 @@ export const useCanvasStore = defineStore('canvas', () => {
 
     // 仅触发一次版本更新
     version.value++;
-  }
-
-  function setActive(ids: string[]) {
-    // activeElementIds：获取当前选中的 Set（避免重复创建）
-    const currentActiveSet = activeElementIds.value;
-    //预处理新 ids：去重 + 验证有效性（复用 nodes 字典，过滤无效节点 ID）
-    const validNewIds = [...new Set(ids)].filter((id) => nodes.value[id]); // 只保留存在的节点 ID
-
-    // 核心：对比新/旧 Set 内容是否一致（复用 currentActiveSet，无需额外创建）
-    const isContentSame =
-      validNewIds.length === currentActiveSet.size &&
-      validNewIds.every((id) => currentActiveSet.has(id));
-
-    // 只有内容不同 + 非交互锁时，才执行更新（避免无意义的响应式触发）
-    if (!isContentSame && !isInteracting.value) {
-      //直接替换为新 Set（保持原有 Set 性能优化）
-      activeElementIds.value = new Set(validNewIds);
-      //Node 改动时更新脏标记（符合现有设计逻辑）
-      version.value++;
-    }
-  }
-
-  function toggleSelection(id: string) {
-    if (activeElementIds.value.has(id)) {
-      activeElementIds.value.delete(id);
-    } else {
-      activeElementIds.value.add(id);
-    }
   }
 
   // ==================== 创建工具操作 ====================
@@ -546,7 +503,8 @@ export const useCanvasStore = defineStore('canvas', () => {
     clearLocalStorage();
     nodes.value = {};
     nodeOrder.value = [];
-    activeElementIds.value = new Set();
+    selectionStore.clearSelection();
+    selectionStore.setEditingGroup(null);
     Object.assign(viewport, DEFAULT_VIEWPORT);
     version.value = 0;
     historyStack.value = [];
@@ -611,7 +569,7 @@ export const useCanvasStore = defineStore('canvas', () => {
    * 复制选中的元素
    */
   function copySelected(): boolean {
-    const selectedIds = Array.from(activeElementIds.value);
+    const selectedIds = Array.from(selectionStore.activeElementIds);
     if (selectedIds.length === 0) {
       console.log('[Clipboard] 没有选中的元素');
       return false;
@@ -638,7 +596,7 @@ export const useCanvasStore = defineStore('canvas', () => {
    * 剪切选中的元素
    */
   function cutSelected(): boolean {
-    const selectedIds = Array.from(activeElementIds.value);
+    const selectedIds = Array.from(selectionStore.activeElementIds);
     if (selectedIds.length === 0) {
       console.log('[Clipboard] 没有选中的元素');
       return false;
@@ -782,7 +740,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     });
 
     // 选中新粘贴的元素
-    setActive(newIds);
+    selectionStore.setActive(newIds);
 
     // 如果是剪切操作，粘贴后清除剪贴板（只能粘贴一次）
     if (clipboardData.type === 'cut') {
@@ -818,26 +776,6 @@ export const useCanvasStore = defineStore('canvas', () => {
     return nodeOrder.value
       .map((id) => nodes.value[id])
       .filter((node) => node && node.parentId === null);
-  });
-
-  /**
-   * 检查选中的元素是否可以组合（UI状态）
-   */
-  const canGroup = computed(() => {
-    const ids = Array.from(activeElementIds.value);
-    if (ids.length < 2) return false;
-    return ids.every((id) => nodes.value[id]);
-  });
-
-  /**
-   * 检查选中的元素是否可以解组合（UI状态）
-   */
-  const canUngroup = computed(() => {
-    const ids = Array.from(activeElementIds.value);
-    return ids.some((id) => {
-      const node = nodes.value[id];
-      return node && node.type === NodeType.GROUP;
-    });
   });
 
   /**
@@ -899,10 +837,8 @@ export const useCanvasStore = defineStore('canvas', () => {
     nodeOrder,
     version,
     viewport,
-    activeElementIds,
     isInteracting,
     renderList,
-    activeElements,
     globalTextSelection,
     // 节点操作
     updateNode,
@@ -910,8 +846,6 @@ export const useCanvasStore = defineStore('canvas', () => {
     addNode,
     deleteNode,
     deleteNodes,
-    setActive,
-    toggleSelection,
     // 持久化相关
     initFromStorage,
     saveToStorage,
@@ -922,17 +856,14 @@ export const useCanvasStore = defineStore('canvas', () => {
     canUndo,
     canRedo,
     // 仅供调试使用(undo/redo栈)
-    historyStack: readonly(historyStack),
-    redoStack: readonly(redoStack),
+    // historyStack,
+    // redoStack,
     // 复制/剪切/粘贴
     copySelected,
     cutSelected,
     paste,
     // 组合相关状态（只读）
-    editingGroupId,
     visibleRenderList,
-    canGroup,
-    canUngroup,
     getSelectionBounds,
     getAbsoluteTransform,
     // UI 状态请使用 uiStore 中的 activePanel 和 isPanelExpanded

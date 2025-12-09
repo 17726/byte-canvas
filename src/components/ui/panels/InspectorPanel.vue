@@ -399,6 +399,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
+import { useSelectionStore } from '@/store/selectionStore';
 import { useUIStore } from '@/store/uiStore';
 import { useStyleSync } from '@/composables/useStyleSync';
 import {
@@ -412,6 +413,7 @@ import { DEFAULT_CANVAS_THEMES, DEFAULT_IMAGE_FILTERS, DEFAULT_IMAGE_URL } from 
 import { GroupService } from '@/core/services/GroupService';
 
 const store = useCanvasStore();
+const selectionStore = useSelectionStore();
 const ui = useUIStore();
 
 // 使用 useStyleSync 进行属性绑定（基础变换和通用属性）
@@ -940,7 +942,7 @@ const selectFilter = (filterType: string) => {
 };
 
 const grayscaleFilter = () => {
-  store.activeElements.forEach((element) => {
+  selectionStore.activeElements.forEach((element) => {
     if (element && element.id && element.type === 'image') {
       store.updateNode(element.id, {
         props: {
@@ -957,7 +959,7 @@ const grayscaleFilter = () => {
 };
 
 const blurFilter = () => {
-  store.activeElements.forEach((element) => {
+  selectionStore.activeElements.forEach((element) => {
     if (element && element.id && element.type === 'image') {
       store.updateNode(element.id, {
         props: {
@@ -974,7 +976,7 @@ const blurFilter = () => {
 };
 
 const vintageFilter = () => {
-  store.activeElements.forEach((element) => {
+  selectionStore.activeElements.forEach((element) => {
     if (element && element.id && element.type === 'image') {
       store.updateNode(element.id, {
         props: {
@@ -993,7 +995,7 @@ const vintageFilter = () => {
 };
 
 const resetFilter = () => {
-  store.activeElements.forEach((element) => {
+  selectionStore.activeElements.forEach((element) => {
     if (element && element.id && element.type === 'image') {
       store.updateNode(element.id, {
         props: {

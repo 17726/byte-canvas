@@ -221,6 +221,7 @@
 <script setup lang="ts">
 import { computed, inject, type Ref, type CSSProperties } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
+import { useSelectionStore } from '@/store/selectionStore';
 import { useStyleSync } from '@/composables/useStyleSync';
 import { NodeType, type TextDecorationValue, type TextState } from '@/types/state';
 import { worldToClient } from '@/core/utils/geometry';
@@ -237,6 +238,7 @@ import {
 import { ToolManager } from '@/core/ToolManager';
 import { IconFontColors, IconSort } from '@arco-design/web-vue/es/icon';
 const store = useCanvasStore();
+const selectionStore = useSelectionStore();
 const toolManagerRef = inject<Ref<ToolManager>>('toolManager');
 
 const {
@@ -329,7 +331,7 @@ const sendToBack = () => {
 // 1. 安全获取当前文本节点 (Computed)
 // 这样后面就不用每次都写 (activeNode.value as TextState) 了
 const activeTextNode = computed(() => {
-  const node = store.activeElements[0];
+  const node = selectionStore.activeElements[0];
   if (node?.type === NodeType.TEXT) {
     return node as TextState;
   }
@@ -390,7 +392,7 @@ const isBold = computed(() => {
 });
 
 const toggleBold = () => {
-  const activeId = Array.from(store.activeElementIds)[0];
+  const activeId = Array.from(selectionStore.activeElementIds)[0];
   if (activeId) {
     toolManagerRef?.value.handleToggleBold(activeId);
   }
@@ -422,7 +424,7 @@ const isItalic = computed(() => {
 });
 
 const toggleItalic = () => {
-  const activeId = Array.from(store.activeElementIds)[0];
+  const activeId = Array.from(selectionStore.activeElementIds)[0];
   if (activeId) {
     toolManagerRef?.value.handleToggleItalic(activeId);
   }
@@ -462,7 +464,7 @@ const isUnderline = computed(() => {
 });
 
 const toggleUnderline = () => {
-  const activeId = Array.from(store.activeElementIds)[0];
+  const activeId = Array.from(selectionStore.activeElementIds)[0];
   if (activeId) {
     toolManagerRef?.value.handleToggleUnderline(activeId);
   }
@@ -502,7 +504,7 @@ const isStrikethrough = computed(() => {
 });
 
 const toggleStrikethrough = () => {
-  const activeId = Array.from(store.activeElementIds)[0];
+  const activeId = Array.from(selectionStore.activeElementIds)[0];
   if (activeId) {
     toolManagerRef?.value.handleToggleStrikethrough(activeId);
   }

@@ -78,6 +78,7 @@ import {
 import { GroupService } from '@/core/services/GroupService';
 import { ToolManager } from '@/core/ToolManager';
 import { useCanvasStore } from '@/store/canvasStore';
+import { useSelectionStore } from '@/store/selectionStore';
 import { useUIStore } from '@/store/uiStore';
 import { useNodeActions } from '@/composables/useNodeActions';
 import { NodeType } from '@/types/state';
@@ -93,6 +94,7 @@ import SelectionOverlay from './SelectionOverlay.vue';
 import PerformanceTestPanel from '../performance/PerformanceTestPanel.vue';
 
 const store = useCanvasStore();
+const selectionStore = useSelectionStore();
 const ui = useUIStore();
 const stageRef = ref<HTMLElement | null>(null);
 
@@ -267,8 +269,8 @@ const handleContextMenu = (e: MouseEvent) => {
 
   // 如果没有选中任何节点，则取消选中
   const nodeLayer = (e.target as Element).closest('.node-layer');
-  if (!nodeLayer || !store.activeElementIds.has(nodeLayer.id)) {
-    store.setActive([]);
+  if (!nodeLayer || !selectionStore.activeElementIds.has(nodeLayer.id)) {
+    selectionStore.clearSelection();
   }
 
   // 转发到ToolManager处理
@@ -283,8 +285,8 @@ const handleNodeContextMenu = (e: MouseEvent, id: string) => {
   e.stopPropagation(); // 阻止事件冒泡到画布
 
   // 如果节点未被选中，将其设为唯一选中项
-  if (!store.activeElementIds.has(id)) {
-    store.setActive([id]);
+  if (!selectionStore.activeElementIds.has(id)) {
+    selectionStore.setActive([id]);
   }
 
   // 转发到ToolManager处理
@@ -320,7 +322,7 @@ const handleKeyDown = (e: KeyboardEvent) => {
       return;
     }
     // 其次处理组合编辑模式
-    if (store.editingGroupId) {
+    if (selectionStore.editingGroupId) {
       GroupService.exitGroupEdit(store);
       return;
     }

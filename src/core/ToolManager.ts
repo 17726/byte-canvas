@@ -55,6 +55,7 @@
  * GroupService.groupSelected(store)
  */
 import { useCanvasStore } from '@/store/canvasStore';
+import { useSelectionStore } from '@/store/selectionStore';
 import { useUIStore } from '@/store/uiStore';
 import type { ResizeHandle } from '@/types/editor';
 import { NodeType, type BaseNodeState } from '@/types/state';
@@ -75,6 +76,7 @@ import { TextService } from './services/TextService';
  */
 export class ToolManager {
   private store: ReturnType<typeof useCanvasStore>;
+  private selectionStore: ReturnType<typeof useSelectionStore>;
   private ui: ReturnType<typeof useUIStore>;
   private stageEl: HTMLElement | null; // 画布根元素
 
@@ -100,6 +102,7 @@ export class ToolManager {
    */
   constructor(stageEl: HTMLElement | null, getIsSpacePressed: () => boolean) {
     this.store = useCanvasStore();
+    this.selectionStore = useSelectionStore();
     this.ui = useUIStore();
     this.stageEl = stageEl;
     this.getIsSpacePressed = getIsSpacePressed;
@@ -221,8 +224,8 @@ export class ToolManager {
     if (e.button === 1) {
       this.viewportHandler.startPan(e);
       this.store.isInteracting = true; // 标记交互中
-      this.store.setActive([]);
-      if (this.store.editingGroupId) {
+      this.selectionStore.clearSelection();
+      if (this.selectionStore.editingGroupId) {
         GroupService.exitGroupEdit(this.store);
       }
       // 文本处理器：结束编辑态
@@ -232,11 +235,11 @@ export class ToolManager {
 
     // 原有业务逻辑：左键框选/多选拖拽
     if (e.button === 0 && !this.getIsSpacePressed()) {
-      const hasActiveNodes = this.store.activeElementIds.size > 0;
+      const hasActiveNodes = this.selectionStore.activeElementIds.size > 0;
       const isClickInArea = this.selectionHandler.isClickInSelectedArea(e);
 
       if (hasActiveNodes && isClickInArea) {
-        const activeIds = Array.from(this.store.activeElementIds).filter((id) => {
+        const activeIds = Array.from(this.selectionStore.activeElementIds).filter((id) => {
           const node = this.store.nodes[id];
           return node && !node.isLocked;
         });
@@ -253,7 +256,7 @@ export class ToolManager {
       }
 
       // 原有业务逻辑：退出组合编辑
-      if (this.store.editingGroupId) {
+      if (this.selectionStore.editingGroupId) {
         GroupService.exitGroupEdit(this.store);
       }
 
@@ -368,7 +371,7 @@ export class ToolManager {
     // 文本处理器：编辑态下同步选区到全局
     if (this.textSelectionHandler.isEditing) {
       // 获取当前激活的文本节点ID
-      const activeTextNodeId = Array.from(this.store.activeElementIds).find((id) => {
+      const activeTextNodeId = Array.from(this.selectionStore.activeElementIds).find((id) => {
         const node = this.store.nodes[id];
         return node?.type === NodeType.TEXT;
       });
@@ -378,7 +381,7 @@ export class ToolManager {
     }
 
     // 如果在组合编辑模式下有拖拽/缩放/旋转操作，检查并扩展组合边界
-    if (hadDragOrResize && this.store.editingGroupId) {
+    if (hadDragOrResize && this.selectionStore.editingGroupId) {
       GroupService.expandGroupToFitChildren(this.store);
     }
   }
@@ -413,10 +416,10 @@ export class ToolManager {
 
     // 原有业务逻辑：多选逻辑
     if (e.ctrlKey || e.shiftKey) {
-      this.store.toggleSelection(id);
+      this.selectionStore.toggleSelection(id);
     } else {
-      if (!this.store.activeElementIds.has(id)) {
-        this.store.setActive([id]);
+      if (!this.selectionStore.activeElementIds.has(id)) {
+        this.selectionStore.setActive([id]);
       }
     }
 
@@ -632,7 +635,7 @@ export class ToolManager {
       const parentId = node.parentId;
       if (parentId) {
         // 选中父节点
-        this.store.setActive([parentId]);
+        this.selectionStore.setActive([parentId]);
         return;
       }
     }
@@ -640,8 +643,8 @@ export class ToolManager {
     this.textSelectionHandler.handleTextBoxClick(e, id);
     //console.log('单击文本节点');
 
-    if (!this.store.activeElementIds.has(id)) {
-      this.store.setActive([id]);
+    if (!this.selectionStore.activeElementIds.has(id)) {
+      this.selectionStore.setActive([id]);
     }
   }
 
@@ -799,7 +802,7 @@ export class ToolManager {
       detail: {
         x,
         y,
-        hasSelection: this.store.activeElementIds.size > 0,
+        hasSelection: this.selectionStore.activeElementIds.size > 0,
       },
       bubbles: true,
       cancelable: true,

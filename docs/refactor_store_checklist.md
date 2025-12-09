@@ -14,7 +14,9 @@
 
 # 📝 阶段性任务清单 (Phased Checklist)
 
-## Phase 1: Viewport Store 独立 (Low Risk)
+## Phase 1: Viewport Store 独立 (Low Risk) — 已取消（暂不拆分）
+
+> 决策更新：视口拆分 ROI 低，暂时保留在 `canvasStore`，以下任务作为历史记录留存。
 
 - [ ] 创建 `src/store/viewportStore.ts`。
 - [ ] 迁移 `viewport`, `setZoom` 等状态和方法。
