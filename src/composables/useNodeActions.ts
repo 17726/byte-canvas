@@ -20,7 +20,6 @@
  * - selectAll: 全选
  * - clearSelection: 取消选择
  * - clearCanvas: 清空画布
- * - isClipboardAvailable: 剪贴板可用性检测
  *
  * 包含计算属性：
  * - hasSelection: 是否有选中节点
