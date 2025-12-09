@@ -97,7 +97,8 @@ const ui = useUIStore();
 const stageRef = ref<HTMLElement | null>(null);
 
 // 使用 useNodeActions 提供的操作方法（带 UI 反馈）
-const { deleteSelected, copy, cut, paste, groupSelected, ungroupSelected } = useNodeActions();
+const { deleteSelected, copy, cut, paste, groupSelected, ungroupSelected, selectAll } =
+  useNodeActions();
 
 // 空格键状态（迁移自ToolManager，统一在组件内维护）
 const isSpacePressed = ref(false);
@@ -384,6 +385,12 @@ const handleKeyDown = (e: KeyboardEvent) => {
   if (e.key === 'Delete' || e.key === 'Backspace') {
     e.preventDefault();
     deleteSelected();
+    return;
+  }
+  // Ctrl/Cmd + A: 全选（复用 useNodeActions，保持与右键菜单一致）
+  if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+    e.preventDefault();
+    selectAll();
     return;
   }
 };
