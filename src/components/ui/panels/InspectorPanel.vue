@@ -442,15 +442,51 @@ const isMultiSelect = computed(() => {
 });
 
 // 计算多选时的包围盒（虚拟节点的尺寸）
+// Helper: get the four corners of a rectangle after rotation
+function getRotatedCorners(transform: { x: number, y: number, width: number, height: number, rotation: number }) {
+  const { x, y, width, height, rotation } = transform;
+  const rad = (rotation || 0) * Math.PI / 180;
+  const cx = x + width / 2;
+  const cy = y + height / 2;
+  // Rectangle corners relative to center
+  const corners = [
+    { dx: -width / 2, dy: -height / 2 },
+    { dx: width / 2, dy: -height / 2 },
+    { dx: width / 2, dy: height / 2 },
+    { dx: -width / 2, dy: height / 2 },
+  ];
+  // Rotate and translate corners
+  return corners.map(({ dx, dy }) => {
+    const rx = dx * Math.cos(rad) - dy * Math.sin(rad);
+    const ry = dx * Math.sin(rad) + dy * Math.cos(rad);
+    return { x: cx + rx, y: cy + ry };
+  });
+}
+
 const selectionBounds = computed(() => {
   if (!isMultiSelect.value) return null;
   const elements = store.activeElements.filter(Boolean);
   if (elements.length === 0) return null;
 
-  const minX = Math.min(...elements.map((e) => e!.transform.x));
-  const minY = Math.min(...elements.map((e) => e!.transform.y));
-  const maxX = Math.max(...elements.map((e) => e!.transform.x + e!.transform.width));
-  const maxY = Math.max(...elements.map((e) => e!.transform.y + e!.transform.height));
+  // Collect all corners of all elements
+  const allCorners: { x: number, y: number }[] = [];
+  for (const e of elements) {
+    if (!e) continue;
+    const t = e.transform;
+    const corners = getRotatedCorners({
+      x: t.x,
+      y: t.y,
+      width: t.width,
+      height: t.height,
+      rotation: t.rotation || 0,
+    });
+    allCorners.push(...corners);
+  }
+  if (allCorners.length === 0) return null;
+  const minX = Math.min(...allCorners.map(c => c.x));
+  const minY = Math.min(...allCorners.map(c => c.y));
+  const maxX = Math.max(...allCorners.map(c => c.x));
+  const maxY = Math.max(...allCorners.map(c => c.y));
 
   return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
 });
