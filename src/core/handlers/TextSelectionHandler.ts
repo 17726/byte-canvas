@@ -174,7 +174,7 @@ export class TextSelectionHandler {
         this.handleSelectionChange(id);
       });
     }
-    console.log('处理文本节点的handleMouseUpAndSelection');
+    //console.log('处理文本节点的handleMouseUpAndSelection');
   }
 
   /**
@@ -206,39 +206,6 @@ export class TextSelectionHandler {
       return;
     }
 
-    /**
-     * 精准计算选中文本的 start 和 end
-     * 核心工具函数：计算「目标文本节点」在「整个编辑器文本」中的「绝对偏移量」
-     * 为什么需要？因为编辑器内的文本可能被多个标签包裹（比如 <span>文字1</span>文字2）
-     * 浏览器原生的 offset 是「相对当前节点」的，需要转换成「相对整个编辑器文本」的绝对索引
-     */
-    const getTextOffset = (
-      targetText: string,
-      targetParent: Element,
-      root: HTMLElement
-    ): number => {
-      let offset = 0; // 累计偏移量（目标节点前面有多少个字符）
-      // TreeWalker：浏览器提供的DOM遍历工具，这里只遍历「文本节点」（SHOW_TEXT）
-      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-      let currentNode: Node | null;
-
-      // 遍历编辑器内所有文本节点，累加前面节点的文本长度
-      while ((currentNode = walker.nextNode())) {
-        console.log('currentNode.textContent:', currentNode.textContent);
-        console.log('targetText:', targetText);
-
-        // 匹配条件：文本内容相同 + 父节点相同（避免多个相同内容的文本节点混淆）
-        const isMatch =
-          currentNode.textContent === targetText && currentNode.parentElement === targetParent;
-        console.log('isMatch', isMatch);
-        if (isMatch) break;
-
-        console.log('currentNode.textContent?.length:', currentNode.textContent?.length);
-        offset += currentNode.textContent?.length || 0;
-      }
-      return offset;
-    };
-
     const startNodeContent = range.startContainer.textContent;
     const startNodeParent = range.startContainer.parentElement;
     if (!startNodeContent || !startNodeParent) return;
@@ -250,7 +217,7 @@ export class TextSelectionHandler {
     // 计算选区的「绝对起始索引」（totalStart）
     //const startNode = range.startContainer; // 选区开始的节点（比如某个文本节点）
     const startOffset = range.startOffset; // 相对startNode的偏移量（比如在startNode第2个字符后）
-    const baseOffset = getTextOffset(startNodeContent, startNodeParent, editor);
+    const baseOffset = this.getTextOffset(startNodeContent, startNodeParent, editor);
     const totalStart = baseOffset + startOffset;
     console.log('baseOffset=', baseOffset);
     console.log('startOffset=', startOffset);
@@ -258,7 +225,7 @@ export class TextSelectionHandler {
 
     //const endNode = range.endContainer;
     const endOffset = range.endOffset;
-    const endBaseOffset = getTextOffset(endNodeContent, endNodeParent, editor); // endNode的绝对偏移
+    const endBaseOffset = this.getTextOffset(endNodeContent, endNodeParent, editor); // endNode的绝对偏移
     const totalEnd = endBaseOffset + endOffset; // 最终：选区在整个文本中的绝对结束索引
     console.log('endBaseOffset=', endBaseOffset);
     console.log('endOffset=', endOffset);
@@ -286,6 +253,34 @@ export class TextSelectionHandler {
     }
   }
 
+  /**
+   * 精准计算选中文本的 start 和 end
+   * 核心工具函数：计算「目标文本节点」在「整个编辑器文本」中的「绝对偏移量」
+   * 为什么需要？因为编辑器内的文本可能被多个标签包裹（比如 <span>文字1</span>文字2）
+   * 浏览器原生的 offset 是「相对当前节点」的，需要转换成「相对整个编辑器文本」的绝对索引
+   */
+  getTextOffset = (targetText: string, targetParent: Element, root: HTMLElement): number => {
+    let offset = 0; // 累计偏移量（目标节点前面有多少个字符）
+    // TreeWalker：浏览器提供的DOM遍历工具，这里只遍历「文本节点」（SHOW_TEXT）
+    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+    let currentNode: Node | null;
+
+    // 遍历编辑器内所有文本节点，累加前面节点的文本长度
+    while ((currentNode = walker.nextNode())) {
+      console.log('currentNode.textContent:', currentNode.textContent);
+      console.log('targetText:', targetText);
+
+      // 匹配条件：文本内容相同 + 父节点相同（避免多个相同内容的文本节点混淆）
+      const isMatch =
+        currentNode.textContent === targetText && currentNode.parentElement === targetParent;
+      console.log('isMatch', isMatch);
+      if (isMatch) break;
+
+      console.log('currentNode.textContent?.length:', currentNode.textContent?.length);
+      offset += currentNode.textContent?.length || 0;
+    }
+    return offset;
+  };
   /**
    * 处理文本框点击事件
    * @param e 鼠标事件
@@ -398,7 +393,19 @@ export class TextSelectionHandler {
   };
 
   /**
+   * NOTE: 以下为一组【选区范围】保存/恢复函数和一组【光标】保存/恢复函数
+   * 选区范围保存/恢复：
+      适用于用户选中一段文本的场景。
+      保存的信息更复杂，因为需要处理选区的起点和终点，以及选区是否跨多个文本节点。
+
+    光标保存/恢复：
+      适用于用户未选中文本、仅有光标的场景。
+      保存的信息较简单，只需记录光标位置。
+   */
+
+  /**
    * 保存当前光标位置（修复：保存真实光标节点和结束偏移）
+   * 用户未选中文本时的插入点
    * @returns 保存的位置信息（文本节点+偏移量）
    */
   saveCursorPosition(): {
@@ -481,22 +488,17 @@ export class TextSelectionHandler {
     if (!selection || selection.rangeCount === 0) return null;
 
     const range = selection.getRangeAt(0);
-    // 复用你已有的 getTextOffset 方法，计算「文本逻辑索引」（整个文本的绝对位置）
-    const getTextOffset = (node: Node, root: HTMLElement): number => {
-      let offset = 0;
-      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-      let currentNode: Node | null;
-      while ((currentNode = walker.nextNode())) {
-        if (currentNode === node) break;
-        offset += currentNode.textContent?.length || 0;
-      }
-      return offset;
-    };
+
+    const startNodeContent = range.startContainer.textContent;
+    const startNodeParent = range.startContainer.parentElement;
+
+    const endNodeContent = range.endContainer.textContent;
+    const endNodeParent = range.endContainer.parentElement;
 
     // 计算选区起始/结束的「文本逻辑索引」（核心：和DOM节点解耦）
-    const startBaseOffset = getTextOffset(range.startContainer, editor);
+    const startBaseOffset = this.getTextOffset(startNodeContent!, startNodeParent!, editor);
     const startTextOffset = startBaseOffset + range.startOffset; // 整个文本的第n个字符
-    const endBaseOffset = getTextOffset(range.endContainer, editor);
+    const endBaseOffset = this.getTextOffset(endNodeContent!, endNodeParent!, editor);
     const endTextOffset = endBaseOffset + range.endOffset;
 
     return {
@@ -550,7 +552,7 @@ export class TextSelectionHandler {
           this.fallbackToTextEnd(editor, selection);
         }
       } catch (e) {
-        console.warn('恢复选区失败，降级到文本末尾', e);
+        console.log('恢复选区失败，降级到文本末尾', e);
         this.fallbackToTextEnd(editor, selection);
       }
     });
