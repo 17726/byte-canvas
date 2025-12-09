@@ -443,9 +443,15 @@ const isMultiSelect = computed(() => {
 
 // 计算多选时的包围盒（虚拟节点的尺寸）
 // Helper: get the four corners of a rectangle after rotation
-function getRotatedCorners(transform: { x: number, y: number, width: number, height: number, rotation: number }) {
+function getRotatedCorners(transform: {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+}) {
   const { x, y, width, height, rotation } = transform;
-  const rad = (rotation || 0) * Math.PI / 180;
+  const rad = ((rotation || 0) * Math.PI) / 180;
   const cx = x + width / 2;
   const cy = y + height / 2;
   // Rectangle corners relative to center
@@ -469,7 +475,7 @@ const selectionBounds = computed(() => {
   if (elements.length === 0) return null;
 
   // Collect all corners of all elements
-  const allCorners: { x: number, y: number }[] = [];
+  const allCorners: { x: number; y: number }[] = [];
   for (const e of elements) {
     if (!e) continue;
     const t = e.transform;
@@ -483,10 +489,10 @@ const selectionBounds = computed(() => {
     allCorners.push(...corners);
   }
   if (allCorners.length === 0) return null;
-  const minX = Math.min(...allCorners.map(c => c.x));
-  const minY = Math.min(...allCorners.map(c => c.y));
-  const maxX = Math.max(...allCorners.map(c => c.x));
-  const maxY = Math.max(...allCorners.map(c => c.y));
+  const minX = Math.min(...allCorners.map((c) => c.x));
+  const minY = Math.min(...allCorners.map((c) => c.y));
+  const maxX = Math.max(...allCorners.map((c) => c.x));
+  const maxY = Math.max(...allCorners.map((c) => c.y));
 
   return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
 });
@@ -526,8 +532,10 @@ const isEditingGroup = computed(() => !!store.editingGroupId);
 const isRealGroup = computed(() => syncIsGroup.value); // 真实组节点
 const isVirtualGroup = computed(() => isMultiSelect.value); // 多选虚拟组
 const isInGroupEditMode = computed(() => isEditingGroup.value); // 编辑组模式
-// 可选：如果需要统一判断“组相关”场景
-const isGroupLike = computed(() => isRealGroup.value || isVirtualGroup.value || isInGroupEditMode.value);
+// 统一“组”判定，兼容真实组合、虚拟多选组合与编辑模式
+const isGroup = computed(
+  () => isRealGroup.value || isVirtualGroup.value || isInGroupEditMode.value
+);
 
 // --- 显示用的变换属性 ---
 // 如果是单选，双向绑定到 useStyleSync 的 ref
@@ -651,7 +659,7 @@ function applyPreset(theme: {
 }
 
 // --- Helpers ---
-// isShape, isText, isImage, isGroup 已从 useStyleSync 导入
+// isShape, isText, isImage 来自 useStyleSync，isGroup 为统一的组态标识
 
 function collectGroupDescendants(group: GroupState): NodeState[] {
   const result: NodeState[] = [];
@@ -688,9 +696,9 @@ const groupDescendants = computed(() => {
   const node = activeNode.value as GroupState;
   if (!node.children) {
     // 多选模式：递归收集所有选中元素的后代
-    return store.activeElements.flatMap(e =>
-      e?.type === NodeType.GROUP ? collectGroupDescendants(e as GroupState) : [e]
-    ).filter(Boolean);
+    return store.activeElements
+      .flatMap((e) => (e?.type === NodeType.GROUP ? collectGroupDescendants(e as GroupState) : [e]))
+      .filter(Boolean);
   }
   return collectGroupDescendants(node);
 });
