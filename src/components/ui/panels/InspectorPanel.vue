@@ -49,6 +49,14 @@
             >
           </div>
         </div>
+        <a-divider style="margin: 12px 0" />
+        <div class="panel-section">
+          <div class="section-title">性能工具</div>
+          <a-button type="outline" size="small" long @click="openPerformancePanel"
+            >性能测试</a-button
+          >
+          <div class="helper-text">点击后在左侧弹出性能测试工具</div>
+        </div>
       </div>
     </div>
     <!-- Node Property Mode -->
@@ -446,6 +454,12 @@ function applyPreset(theme: {
   store.viewport.gridDotColor = theme.gridColor;
   store.viewport.gridSize = theme.gridSize;
 }
+
+const openPerformancePanel = () => {
+  ui.setPanelExpanded(true);
+  ui.setActivePanel('canvas');
+  ui.setPerformancePanelVisible(true);
+};
 
 // --- Helpers ---
 // isShape, isText, isImage, isGroup 已从 useStyleSync 导入
@@ -1015,6 +1029,12 @@ const resetFilter = () => {
   color: var(--color-text-3);
   margin-bottom: 8px;
   text-transform: uppercase;
+}
+
+.helper-text {
+  font-size: 12px;
+  color: var(--color-text-3);
+  margin-top: 6px;
 }
 
 .prop-row {
