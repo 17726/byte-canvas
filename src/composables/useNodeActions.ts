@@ -389,7 +389,7 @@ export function useNodeActions() {
     }
 
     //等 DOM 重绘
-    await nextTick(); // 需要添加 await
+    await nextTick();
 
     Notification.success({
       content: '已清空画布',
