@@ -226,7 +226,7 @@ export class ToolManager {
       this.store.isInteracting = true; // 标记交互中
       this.selectionStore.clearSelection();
       if (this.selectionStore.editingGroupId) {
-        GroupService.exitGroupEdit(this.store);
+        GroupService.exitGroupEdit();
       }
       // 文本处理器：结束编辑态
       this.textSelectionHandler.exitEditing();
@@ -257,7 +257,7 @@ export class ToolManager {
 
       // 原有业务逻辑：退出组合编辑
       if (this.selectionStore.editingGroupId) {
-        GroupService.exitGroupEdit(this.store);
+        GroupService.exitGroupEdit();
       }
 
       // 文本处理器：点击空白处结束编辑态

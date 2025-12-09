@@ -20,6 +20,7 @@ export const useSelectionStore = defineStore('selection', () => {
   const activeNode = computed<NodeState | null>(() => {
     if (activeElementIds.value.size !== 1) return null;
     const [id] = Array.from(activeElementIds.value);
+    if (!id) return null; // 如果没选中则直接返回 null
     return canvasStore.nodes[id] || null;
   });
 

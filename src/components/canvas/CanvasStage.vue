@@ -78,6 +78,7 @@ import {
 import { GroupService } from '@/core/services/GroupService';
 import { ToolManager } from '@/core/ToolManager';
 import { useCanvasStore } from '@/store/canvasStore';
+import { useHistoryStore } from '@/store/historyStore';
 import { useSelectionStore } from '@/store/selectionStore';
 import { useUIStore } from '@/store/uiStore';
 import { useNodeActions } from '@/composables/useNodeActions';
@@ -94,6 +95,7 @@ import SelectionOverlay from './SelectionOverlay.vue';
 import PerformanceTestPanel from '../performance/PerformanceTestPanel.vue';
 
 const store = useCanvasStore();
+const historyStore = useHistoryStore();
 const selectionStore = useSelectionStore();
 const ui = useUIStore();
 const stageRef = ref<HTMLElement | null>(null);
@@ -323,7 +325,7 @@ const handleKeyDown = (e: KeyboardEvent) => {
     }
     // 其次处理组合编辑模式
     if (selectionStore.editingGroupId) {
-      GroupService.exitGroupEdit(store);
+      GroupService.exitGroupEdit();
       return;
     }
   }
@@ -366,20 +368,20 @@ const handleKeyDown = (e: KeyboardEvent) => {
   // Ctrl/Cmd + Z: 撤销
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
     e.preventDefault();
-    store.undo();
+    historyStore.undo();
     return;
   }
 
   // Ctrl/Cmd + Y: 重做
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'y') {
     e.preventDefault();
-    store.redo();
+    historyStore.redo();
     return;
   }
   // Ctrl/Cmd + Shift + Z: 重做
   if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z') {
     e.preventDefault();
-    store.redo();
+    historyStore.redo();
     return;
   }
 

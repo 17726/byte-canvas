@@ -69,6 +69,7 @@ import {
 import { v4 as uuidv4 } from 'uuid';
 import { cloneDeep } from 'lodash-es';
 import { useSelectionStore } from './selectionStore';
+import { useHistoryStore } from './historyStore';
 
 /**
  * Canvas Store
@@ -106,113 +107,6 @@ export const useCanvasStore = defineStore('canvas', () => {
   // 预览节点（Ghost Node，用于拖拽创建时的半透明预览）
   const previewNode = ref<NodeState | null>(null);
 
-  // ==================== 历史记录（Undo/Redo） ====================
-  type CanvasSnapshot = {
-    nodes: Record<string, NodeState>;
-    nodeOrder: string[];
-    viewport: ViewportState;
-    activeElementIds: string[];
-    editingGroupId: string | null;
-  };
-
-  const historyStack = ref<CanvasSnapshot[]>([]);
-  const redoStack = ref<CanvasSnapshot[]>([]);
-  const MAX_HISTORY = 50;
-  let isRestoringSnapshot = false;
-  let isHistoryLocked = false;
-
-  const canUndo = computed(() => historyStack.value.length > 0);
-  const canRedo = computed(() => redoStack.value.length > 0);
-
-  const createSnapshot = (): CanvasSnapshot => ({
-    nodes: cloneDeep(nodes.value),
-    nodeOrder: [...nodeOrder.value],
-    viewport: { ...(viewport as ViewportState) },
-    activeElementIds: Array.from(selectionStore.activeElementIds),
-    editingGroupId: selectionStore.editingGroupId,
-  });
-
-  const pushSnapshot = () => {
-    if (isRestoringSnapshot || isHistoryLocked) return;
-    historyStack.value.push(createSnapshot());
-    if (historyStack.value.length > MAX_HISTORY) {
-      historyStack.value.shift();
-    }
-    redoStack.value = [];
-  };
-
-  /**
-   * 批量操作时锁定历史记录，避免重复记录快照
-   * 使用方式：
-   * const unlock = lockHistory();
-   * // ... 批量操作
-   * unlock();
-   */
-  const lockHistory = () => {
-    const wasLocked = isHistoryLocked;
-    if (!wasLocked) {
-      pushSnapshot(); // 在锁定前记录一次快照
-      isHistoryLocked = true;
-    }
-    return () => {
-      if (!wasLocked) {
-        isHistoryLocked = false;
-      }
-    };
-  };
-
-  /**
-   * 锁定历史记录但不记录快照（用于自动操作，如调整组合边界）
-   * 使用方式：
-   * const unlock = lockHistoryWithoutSnapshot();
-   * // ... 自动操作
-   * unlock();
-   */
-  const lockHistoryWithoutSnapshot = () => {
-    const wasLocked = isHistoryLocked;
-    if (!wasLocked) {
-      isHistoryLocked = true;
-    }
-    return () => {
-      if (!wasLocked) {
-        isHistoryLocked = false;
-      }
-    };
-  };
-
-  const restoreSnapshot = (snapshot: CanvasSnapshot) => {
-    isRestoringSnapshot = true;
-    nodes.value = cloneDeep(snapshot.nodes);
-    nodeOrder.value = [...snapshot.nodeOrder];
-    Object.assign(viewport, snapshot.viewport);
-    selectionStore.activeElementIds = new Set(snapshot.activeElementIds);
-    selectionStore.editingGroupId = snapshot.editingGroupId;
-    version.value++; // 标记一次变更，触发依赖更新
-    // 使用 queueMicrotask 延迟重置标志，确保所有响应式更新都完成后再重置
-    // 这样可以避免在恢复快照后触发的异步响应式更新（如 watch 监听器）调用 updateNode 时记录快照
-    queueMicrotask(() => {
-      isRestoringSnapshot = false;
-    });
-  };
-
-  const undo = () => {
-    if (!historyStack.value.length) return false;
-    const current = createSnapshot();
-    const previous = historyStack.value.pop()!;
-    redoStack.value.push(current);
-    restoreSnapshot(previous);
-    return true;
-  };
-
-  const redo = () => {
-    if (!redoStack.value.length) return false;
-    const current = createSnapshot();
-    const next = redoStack.value.pop()!;
-    historyStack.value.push(current);
-    restoreSnapshot(next);
-    return true;
-  };
-
   // Getters
   // 获取排序后的渲染列表，供 v-for 使用
   const renderList = computed(() => {
@@ -239,8 +133,9 @@ export const useCanvasStore = defineStore('canvas', () => {
     if (Object.keys(updates).length === 0) return;
 
     // 非交互态下，记录快照以支持撤销（只记录一次）
-    if (!isInteracting.value && !isRestoringSnapshot && !isHistoryLocked) {
-      pushSnapshot();
+    if (!isInteracting.value) {
+      const history = useHistoryStore();
+      history.pushSnapshot();
     }
 
     // 遍历所有更新
@@ -284,8 +179,9 @@ export const useCanvasStore = defineStore('canvas', () => {
 
     // 非交互态下，记录快照以支持撤销
     // 但如果正在恢复快照或历史锁定，则跳过（避免撤销时重复记录）
-    if (!isInteracting.value && !isRestoringSnapshot && !isHistoryLocked) {
-      pushSnapshot();
+    if (!isInteracting.value) {
+      const history = useHistoryStore();
+      history.pushSnapshot();
     }
 
     // 核心优化：处理 props 的深度合并 (Deep Merge for props)
@@ -321,13 +217,15 @@ export const useCanvasStore = defineStore('canvas', () => {
     // 如果刚结束交互（isInteracting 刚变为 false），说明交互开始时的快照已经记录了
     // 此时不应该再记录快照，避免重复记录
     // 使用 lockHistoryWithoutSnapshot 来防止在添加节点后可能触发的 updateNode 记录快照
-    const unlockHistory = lockHistoryWithoutSnapshot();
+    const history = useHistoryStore();
 
     // 只有在非交互状态下才记录快照
     // 如果 isInteracting 为 true，说明交互开始时的 watch 已经记录了快照
     if (!isInteracting.value) {
-      pushSnapshot();
+      history.pushSnapshot();
     }
+
+    const unlockHistory = history.lockHistoryWithoutSnapshot();
 
     nodes.value[node.id] = node;
     nodeOrder.value.push(node.id);
@@ -339,48 +237,52 @@ export const useCanvasStore = defineStore('canvas', () => {
 
   // 3. 删除节点（如果是组合，递归删除所有子节点）
   function deleteNode(id: string) {
-    const wasLocked = isHistoryLocked;
-    if (!wasLocked) {
-      pushSnapshot();
-      isHistoryLocked = true; // 避免递归删除时重复记录
-    }
     const node = nodes.value[id];
     if (!node) return;
 
-    // 如果是组合节点，先递归删除所有子节点
-    if (node.type === NodeType.GROUP) {
-      const groupNode = node as import('@/types/state').GroupState;
-      groupNode.children.forEach((childId) => {
-        deleteNode(childId); // 递归删除子节点
-      });
-    }
+    const history = useHistoryStore();
+    const unlockHistory = history.lockHistory();
 
-    delete nodes.value[id];
-    nodeOrder.value = nodeOrder.value.filter((nId) => nId !== id);
-    // 清除选中态
-    selectionStore.setActive(
-      Array.from(selectionStore.activeElementIds).filter((selectedId) => selectedId !== id)
-    );
+    const deleteRecursive = (targetId: string) => {
+      const current = nodes.value[targetId];
+      if (!current) return;
 
-    // 如果正在编辑这个组合，退出编辑模式
-    if (selectionStore.editingGroupId === id) {
-      selectionStore.setEditingGroup(null);
-    }
+      // 如果是组合节点，先递归删除所有子节点
+      if (current.type === NodeType.GROUP) {
+        const groupNode = current as import('@/types/state').GroupState;
+        groupNode.children.forEach((childId) => {
+          deleteRecursive(childId);
+        });
+      }
+
+      delete nodes.value[targetId];
+      nodeOrder.value = nodeOrder.value.filter((nId) => nId !== targetId);
+      // 清除选中态
+      selectionStore.setActive(
+        Array.from(selectionStore.activeElementIds).filter((selectedId) => selectedId !== targetId)
+      );
+
+      // 如果正在编辑这个组合，退出编辑模式
+      if (selectionStore.editingGroupId === targetId) {
+        selectionStore.setEditingGroup(null);
+      }
+    };
+
+    deleteRecursive(id);
 
     version.value++; // 触发更新
-
-    if (!wasLocked) {
-      isHistoryLocked = false;
-    }
+    unlockHistory();
   }
 
   // 4. 批量删除节点（仅触发一次 version 更新）
   // 注意：如果包含组合，会递归删除其子节点
   function deleteNodes(ids: string[]) {
     if (ids.length === 0) return;
-    pushSnapshot();
     const idsToDelete = ids.filter((id) => nodes.value[id]);
     if (idsToDelete.length === 0) return;
+
+    const history = useHistoryStore();
+    const unlockHistory = history.lockHistory();
 
     // 收集所有需要删除的节点（包括组合的子节点）
     const allIdsToDelete = new Set<string>();
@@ -417,6 +319,7 @@ export const useCanvasStore = defineStore('canvas', () => {
 
     // 仅触发一次版本更新
     version.value++;
+    unlockHistory();
   }
 
   // ==================== 创建工具操作 ====================
@@ -483,9 +386,9 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
 
     console.log('[CanvasStore] 状态已从 localStorage 恢复');
-    historyStack.value = [];
-    redoStack.value = [];
-    pushSnapshot(); // 初始化快照，保证首次撤销可返回到加载状态
+    const history = useHistoryStore();
+    history.clearHistory();
+    history.pushSnapshot(); // 初始化快照，保证首次撤销可返回到加载状态
     return true;
   }
 
@@ -507,8 +410,8 @@ export const useCanvasStore = defineStore('canvas', () => {
     selectionStore.setEditingGroup(null);
     Object.assign(viewport, DEFAULT_VIEWPORT);
     version.value = 0;
-    historyStack.value = [];
-    redoStack.value = [];
+    const history = useHistoryStore();
+    history.clearHistory();
     console.log('[CanvasStore] 画布已重置');
   }
 
@@ -552,7 +455,8 @@ export const useCanvasStore = defineStore('canvas', () => {
     () => isInteracting.value,
     (next, prev) => {
       if (next && !prev) {
-        pushSnapshot();
+        const history = useHistoryStore();
+        history.pushSnapshot();
       }
     }
   );
@@ -642,9 +546,8 @@ export const useCanvasStore = defineStore('canvas', () => {
     const offset = PASTE_OFFSET * pasteCount;
 
     const newIds: string[] = [];
-    const prevLock = isHistoryLocked;
-    pushSnapshot(); // 记录粘贴前的状态
-    isHistoryLocked = true; // 避免循环内的 addNode 反复写入历史
+    const history = useHistoryStore();
+    const unlockHistory = history.lockHistory();
 
     /**
      * 深拷贝组合及其所有子节点，生成全新的 ID 和 parentId 关系
@@ -748,7 +651,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     }
 
     console.log(`[Clipboard] 粘贴 ${newIds.length} 个元素`);
-    isHistoryLocked = prevLock;
+    unlockHistory();
     return true;
   }
 
@@ -850,14 +753,6 @@ export const useCanvasStore = defineStore('canvas', () => {
     initFromStorage,
     saveToStorage,
     clearStorage,
-    // 历史记录
-    undo,
-    redo,
-    canUndo,
-    canRedo,
-    // 仅供调试使用(undo/redo栈)
-    // historyStack,
-    // redoStack,
     // 复制/剪切/粘贴
     copySelected,
     cutSelected,
@@ -868,9 +763,6 @@ export const useCanvasStore = defineStore('canvas', () => {
     getAbsoluteTransform,
     // UI 状态请使用 uiStore 中的 activePanel 和 isPanelExpanded
     updateGlobalTextSelection,
-    // 批量操作支持
-    lockHistory,
-    lockHistoryWithoutSnapshot,
     // 创建工具相关
     creationTool,
     creationToolOptions,

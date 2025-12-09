@@ -30,9 +30,11 @@ import { v4 as uuidv4 } from 'uuid';
 import { NodeType, type GroupState, type NodeState } from '@/types/state';
 import type { useCanvasStore } from '@/store/canvasStore';
 import { useSelectionStore } from '@/store/selectionStore';
+import { useHistoryStore } from '@/store/historyStore';
 
 type CanvasStore = ReturnType<typeof useCanvasStore>;
 const getSelectionStore = () => useSelectionStore();
+const getHistoryStore = () => useHistoryStore();
 
 /**
  * 组合管理服务类
@@ -76,7 +78,7 @@ export class GroupService {
 
     // 锁定历史记录，避免在更新子节点时重复记录快照
     // 这样整个组合操作只会记录一次快照，撤销时一次性恢复到组合前的状态
-    const unlockHistory = store.lockHistory();
+    const unlockHistory = getHistoryStore().lockHistory();
 
     // 创建新的组合节点
     const groupId = uuidv4();
@@ -253,10 +255,8 @@ export class GroupService {
    * 退出组合编辑模式
    *
    * 退出后会自动选中当前编辑的组合节点。
-   *
-   * @param store - Canvas Store 实例
    */
-  static exitGroupEdit(store: CanvasStore): void {
+  static exitGroupEdit(): void {
     const selectionStore = getSelectionStore();
     if (selectionStore.editingGroupId) {
       console.log(`[Group] 退出组合编辑模式: ${selectionStore.editingGroupId}`);
@@ -380,7 +380,7 @@ export class GroupService {
     // 锁定历史记录但不记录快照，避免在调整组合边界时记录快照
     // 这个操作是自动的边界调整，不应该作为独立的操作记录到历史中
     // 交互开始时的快照已经记录了初始状态，这个自动调整不应该创建新的快照
-    const unlockHistory = store.lockHistoryWithoutSnapshot();
+    const unlockHistory = getHistoryStore().lockHistoryWithoutSnapshot();
 
     // 批量提交所有更新（原子化操作，只触发一次响应式更新）
     store.batchUpdateNodes(updates);

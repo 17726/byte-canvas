@@ -29,12 +29,14 @@
 
 import { computed, nextTick } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
+import { useHistoryStore } from '@/store/historyStore';
 import { useSelectionStore } from '@/store/selectionStore';
 import { GroupService } from '@/core/services/GroupService';
 import { Notification } from '@arco-design/web-vue';
 
 export function useNodeActions() {
   const store = useCanvasStore();
+  const historyStore = useHistoryStore();
   const selectionStore = useSelectionStore();
 
   // ==================== 计算属性 ====================
@@ -53,8 +55,12 @@ export function useNodeActions() {
    * 是否可以取消组合（选中的节点中包含组合）
    */
   const canUngroup = computed(() => GroupService.canUngroup(store));
+  const canUndo = computed(() => historyStore.canUndo);
+  const canRedo = computed(() => historyStore.canRedo);
 
   // ==================== 节点操作方法 ====================
+  const undo = () => historyStore.undo();
+  const redo = () => historyStore.redo();
 
   /**
    * 删除选中的节点
@@ -407,8 +413,12 @@ export function useNodeActions() {
     hasSelection,
     canGroup,
     canUngroup,
+    canUndo,
+    canRedo,
 
     // 操作方法
+    undo,
+    redo,
     deleteSelected,
     copy,
     cut,
