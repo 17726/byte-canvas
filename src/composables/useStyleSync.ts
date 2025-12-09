@@ -137,9 +137,17 @@ export function useStyleSync() {
       if (node.type === NodeType.RECT || node.type === NodeType.CIRCLE) {
         return (node as ShapeState).style.backgroundColor || '#ffffff';
       }
-      return '#ffffff';
+      // 对于文本和图片节点，也返回它们的背景色（而不是固定返回白色）
+      return node.style?.backgroundColor || '#ffffff';
     },
-    (node, value) => ({ style: { ...node.style, backgroundColor: value } }),
+    (node, value) => {
+      // 只对矩形和圆形节点应用填充色
+      if (node.type === NodeType.RECT || node.type === NodeType.CIRCLE) {
+        return { style: { ...node.style, backgroundColor: value } };
+      }
+      // 对于其他节点类型，不做任何修改
+      return {};
+    },
     '#ffffff'
   );
 
