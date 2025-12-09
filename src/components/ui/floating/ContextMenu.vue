@@ -10,17 +10,17 @@
       <!-- 画布右键菜单 -->
       <div v-if="!hasSelection">
         <a-menu mode="pop" style="min-width: 180px">
-          <a-menu-item key="paste" v-if="isClipboardAvailable" @click="paste">
+          <a-menu-item key="paste" v-if="isClipboardAvailable" @click="handleAction(paste)">
             <template #icon><icon-paste /></template>
             粘贴
             <span class="label">Ctrl+V</span>
           </a-menu-item>
-          <a-menu-item key="selectAll" @click="selectAll">
+          <a-menu-item key="selectAll" @click="handleAction(selectAll)">
             <template #icon><FullSelection /></template>
             全选
             <span class="label">Ctrl+A</span>
           </a-menu-item>
-          <a-menu-item key="clearCanvas" @click="clearModalVisible = true">
+          <a-menu-item key="clearCanvas" @click="openClearModal">
             <template #icon><IconDelete /></template>
             清空画布
           </a-menu-item>
@@ -37,7 +37,7 @@
               :disabled="!hasSelection"
               key="copy"
               title="复制"
-              @click="copy"
+              @click="handleAction(copy)"
             >
               <template #icon><icon-copy /></template>
             </a-button>
@@ -47,7 +47,7 @@
               :disabled="!isClipboardAvailable"
               key="paste"
               title="粘贴"
-              @click="paste"
+              @click="handleAction(paste)"
             >
               <template #icon><icon-paste /></template>
             </a-button>
@@ -57,7 +57,7 @@
               :disabled="!hasSelection"
               key="cut"
               title="剪切"
-              @click="cut"
+              @click="handleAction(cut)"
             >
               <template #icon><icon-scissor /></template>
             </a-button>
@@ -67,7 +67,7 @@
               :disabled="!hasSelection"
               key="delete"
               title="删除"
-              @click="delModalVisible = true"
+              @click="handleAction(deleteSelected)"
             >
               <template #icon><icon-delete /></template>
             </a-button>
@@ -75,7 +75,7 @@
 
           <a-divider margin="5px" />
 
-          <a-menu-item key="selectAll" @click="selectAll">
+          <a-menu-item key="selectAll" @click="handleAction(selectAll)">
             <template #icon><FullSelection /></template>
             全选
             <span class="label">Ctrl+A</span>
@@ -85,11 +85,11 @@
 
           <a-sub-menu key="sort" title="图层" :disabled="!hasSelection">
             <template #icon><icon-layers /></template>
-            <a-menu-item key="moveToFront" @click="bringToFront">
+            <a-menu-item key="moveToFront" @click="handleAction(bringToFront)">
               <template #icon><MinusTheTop /></template>
               置于顶层
             </a-menu-item>
-            <a-menu-item key="moveToBack" @click="sendToBack">
+            <a-menu-item key="moveToBack" @click="handleAction(sendToBack)">
               <template #icon><MinusTheBottom /></template>
               置于底层
             </a-menu-item>
@@ -97,12 +97,12 @@
 
           <a-sub-menu key="grouping" title="组合" :disabled="!hasSelection">
             <template #icon><GraphicStitchingFour /></template>
-            <a-menu-item key="group" @click="groupSelected">
+            <a-menu-item key="group" @click="handleAction(groupSelected)">
               <template #icon><Group /></template>
               组合
               <span class="label">Ctrl+G</span>
             </a-menu-item>
-            <a-menu-item key="ungroup" @click="ungroupSelected">
+            <a-menu-item key="ungroup" @click="handleAction(ungroupSelected)">
               <template #icon><Ungroup /></template>
               取消组合
               <span class="label">Ctrl+Shift+G</span>
@@ -112,16 +112,6 @@
       </div>
     </div>
   </teleport>
-
-  <!-- 确认删除弹窗 -->
-  <a-modal
-    v-model:visible="delModalVisible"
-    @ok="onDeleteConfirm"
-    @cancel="delModalVisible = false"
-  >
-    <template #title>确认删除</template>
-    <div>确定要删除选中的元素吗？</div>
-  </a-modal>
 
   <!-- 画布清空确认弹窗 -->
   <a-modal
@@ -192,7 +182,6 @@ function handleKeyDown(e: KeyboardEvent) {
 const pos = ref({ x: 0, y: 0 });
 const visible = ref(false);
 const menuRef = ref<HTMLDivElement | null>(null);
-const delModalVisible = ref(false);
 const clearModalVisible = ref(false);
 const isClipboardAvailable = ref(false);
 
@@ -224,13 +213,18 @@ function close() {
   visible.value = false;
 }
 
-/* ---------- 删除确认 ---------- */
-function onDeleteConfirm() {
-  deleteSelected();
-  delModalVisible.value = false;
+/* ---------- 操作包装函数 ---------- */
+function handleAction(action: () => boolean | void) {
+  action();
+  close();
 }
 
 /* ---------- 清空画布确认 ---------- */
+function openClearModal() {
+  clearModalVisible.value = true;
+  close();
+}
+
 function confirmClear() {
   clearCanvas();
   clearModalVisible.value = false;

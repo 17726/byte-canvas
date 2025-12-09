@@ -40,16 +40,6 @@
       <!-- Canvas Settings moved to top-right header -->
     </a-menu>
   </div>
-
-  <!-- 确认删除弹窗 -->
-  <a-modal
-    v-model:visible="delModalVisible"
-    @ok="onDeleteConfirm"
-    @cancel="delModalVisible = false"
-  >
-    <template #title>确认删除</template>
-    <div>确定要删除选中的元素吗？</div>
-  </a-modal>
 </template>
 
 <script setup lang="ts">
@@ -62,9 +52,6 @@ import { useNodeActions } from '@/composables/useNodeActions';
 import ImageMenu from '../common/ImageMenu.vue';
 
 const { hasSelection, deleteSelected } = useNodeActions();
-
-//状态
-const delModalVisible = ref(false);
 
 //NOTE：按钮返回值需提前在MenuKey进行注册
 enum MenuKey {
@@ -105,19 +92,12 @@ function onMenuItemClick(key: string) {
       store.setCreationTool('text');
       break;
     case MenuKey.Delete:
-      if (!hasSelection.value) return;
-      delModalVisible.value = true;
+      deleteSelected();
       break;
     default:
       console.warn(`未处理的菜单项: ${key}`);
       break;
   }
-}
-
-/* ---------- 删除确认 ---------- */
-function onDeleteConfirm() {
-  deleteSelected();
-  delModalVisible.value = false;
 }
 </script>
 
