@@ -380,6 +380,25 @@ const handleKeyDown = (e: KeyboardEvent) => {
     deleteSelected();
     return;
   }
+  // Ctrl/Cmd + A: 选中所有元素
+  if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+    e.preventDefault();
+    // 根据当前模式选中不同的元素
+    if (store.editingGroupId) {
+      // 组合编辑模式：选中当前组合的所有子元素
+      const groupNode = store.nodes[store.editingGroupId];
+      if (groupNode && 'children' in groupNode) {
+        store.setActive((groupNode.children as string[]) || []);
+      }
+    } else {
+      // 普通模式：选中所有顶层元素
+      const toplevelIds = Object.entries(store.nodes)
+        .filter(([, node]) => node && node.parentId === null)
+        .map(([id]) => id);
+      store.setActive(toplevelIds);
+    }
+    return;
+  }
 };
 
 // 空格键松开（迁移自ToolManager）
