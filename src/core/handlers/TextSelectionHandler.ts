@@ -148,7 +148,7 @@ export class TextSelectionHandler {
     if (!this.isEditing) {
       // 非编辑态阻止文本框单击聚焦（避免单击时光标出现，不进入编辑态）
       e.preventDefault();
-    } //console.log('处理文本节点的handleMouseDown');
+    }
   }
 
   /**
@@ -208,11 +208,11 @@ export class TextSelectionHandler {
 
     const startNodeContent = range.startContainer.textContent;
     const startNodeParent = range.startContainer.parentElement;
-    if (!startNodeContent || !startNodeParent) return;
+    if (startNodeContent === null || !startNodeParent) return;
 
     const endNodeContent = range.endContainer.textContent;
     const endNodeParent = range.endContainer.parentElement;
-    if (!endNodeContent || !endNodeParent) return;
+    if (endNodeContent === null || !endNodeParent) return;
 
     // 计算选区的「绝对起始索引」（totalStart）
     //const startNode = range.startContainer; // 选区开始的节点（比如某个文本节点）
@@ -510,11 +510,6 @@ export class TextSelectionHandler {
   }
 
   /**
-   * 新增：恢复完整的选区 Range（支持选区+光标）
-   * @param savedRange 保存的克隆 Range 对象
-   * @param id 文本节点 ID（指定要恢复的编辑器）
-   */
-  /**
    * 重写：基于静态序列化信息恢复选区/光标（彻底解决 Range 失效问题）
    * @param savedData 保存的静态序列化信息
    * @param id 文本节点ID
@@ -578,7 +573,7 @@ export class TextSelectionHandler {
     // 第一步：找到起始位置的文本节点和偏移
     let startNode: Node | null = null;
     let startNodeOffset = 0;
-    while ((currentNode = walker.nextNode()) && !startNode) {
+    while ((currentNode = walker.nextNode())) {
       const nodeText = currentNode.textContent || '';
       const nodeLength = nodeText.length;
       // 起始索引落在当前节点内
