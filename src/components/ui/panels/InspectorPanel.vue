@@ -67,6 +67,7 @@
             <span class="node-id">#{{ displayNode?.id?.slice(-4) }}</span>
           </template>
         </div>
+        <!-- Section 1: 变换 (Transform) -->
         <div class="panel-section">
           <div class="section-title">变换</div>
           <a-row :gutter="8" class="prop-row">
