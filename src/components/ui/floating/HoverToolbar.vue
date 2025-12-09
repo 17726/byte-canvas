@@ -87,7 +87,12 @@
         <div class="divider"></div>
         <div class="tool-item">
           <!-- 字体选择下拉菜单 -->
-          <a-select style="width: 180px" placeholder="选择字体" @change="handleFontFamilyChange">
+          <a-select
+            size="mini"
+            style="width: 180px"
+            placeholder="选择字体"
+            @change="handleFontFamilyChange"
+          >
             <a-option v-for="font in fontList" :key="font.value" :value="font.value">
               {{ font.label }}
             </a-option>
