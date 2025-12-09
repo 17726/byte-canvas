@@ -638,7 +638,7 @@ export class ToolManager {
     }
 
     this.textSelectionHandler.handleTextBoxClick(e, id);
-    console.log('单击文本节点');
+    //console.log('单击文本节点');
 
     if (!this.store.activeElementIds.has(id)) {
       this.store.setActive([id]);
@@ -655,7 +655,7 @@ export class ToolManager {
       'bold', // 样式值（支持 'bold' 或 700）
       true // toggle：有则移除，无则添加
     );
-    console.log('真的设置粗体完毕');
+    //console.log('真的设置粗体完毕');
   }
 
   handleToggleItalic(id: string) {

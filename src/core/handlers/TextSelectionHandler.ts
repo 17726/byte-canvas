@@ -90,7 +90,7 @@ export class TextSelectionHandler {
     if (this.transformHandler.isTransforming || this.viewportHandler.isPanning) {
       return;
     }
-    console.log('handler中处理进入编辑态的节点id:', id);
+    //console.log('handler中处理进入编辑态的节点id:', id);
     // 通过 id 获取节点
     const node = this.store.nodes[id] as TextState;
     if (!node || node.type !== NodeType.TEXT) return;
@@ -108,7 +108,7 @@ export class TextSelectionHandler {
         editor.focus();
         const selection = window.getSelection();
         const range = document.createRange();
-        console.log('editor节点：', editor);
+        //console.log('editor节点：', editor);
         range.selectNodeContents(editor); // 选中编辑器内所有内容
         selection?.removeAllRanges();
         selection?.addRange(range);
@@ -147,7 +147,7 @@ export class TextSelectionHandler {
     if (!this.isEditing) {
       // 非编辑态阻止文本框单击聚焦（避免单击时光标出现，不进入编辑态）
       e.preventDefault();
-    } else console.log('处理文本节点的handleMouseDown');
+    } //console.log('处理文本节点的handleMouseDown');
   }
 
   /**
@@ -158,7 +158,7 @@ export class TextSelectionHandler {
     if (this.isEditing) {
       e.stopPropagation();
     }
-    console.log('处理文本节点的handleMouseMove');
+    //console.log('处理文本节点的handleMouseMove');
   }
 
   /**
@@ -265,7 +265,7 @@ export class TextSelectionHandler {
   handleTextBoxClick(e: MouseEvent, id: string) {
     const editor = this.editors[id];
     if (!this.isEditing) {
-      console.log('没有在编辑状态');
+      //console.log('没有在编辑状态');
       // 阻止文本框聚焦（避免单击时光标出现，不进入编辑态）
       //e.preventDefault();
 
@@ -278,11 +278,11 @@ export class TextSelectionHandler {
       if (this.currentSelection && this.currentSelection.end - this.currentSelection.start > 0) {
         e.preventDefault();
         e.stopPropagation();
-        console.log('拦截了选中文本导致的错误click');
+        //console.log('拦截了选中文本导致的错误click');
         return;
       }
       // 编辑状态下，正常响应点击（选中文本、输入等）
-      console.log('处于编辑态 正常响应点击');
+      //console.log('处于编辑态 正常响应点击');
       e.stopPropagation();
 
       // 修复：点击时如果当前是全选状态，清除全选并将光标设置到点击位置
@@ -427,6 +427,181 @@ export class TextSelectionHandler {
       selection.removeAllRanges();
       selection.addRange(range);
     });
+  }
+
+  /**
+   * 新增：保存完整的选区 Range（支持选中一段文本 + 光标）
+   * 区别于仅保存光标，此方法保存完整的选区范围，恢复后能保留文本选中的视觉效果
+   */
+  /**
+   * 重写：保存选区的静态序列化信息（避免 Range 活引用失效）
+   * @param id 文本节点ID
+   * @returns 静态序列化数据（无活引用，不会被浏览器修改）
+   */
+  saveFullSelection(id: string): {
+    isCollapsed: boolean; // 是否是光标（折叠选区）
+    startOffset: number; // 选区起始的「文本逻辑索引」（整个文本的第n个字符）
+    endOffset: number; // 选区结束的「文本逻辑索引」
+    nodeText: string; // 光标/选区所在文本节点的内容（用于匹配新DOM）
+  } | null {
+    const editor = this.editors[id];
+    const node = this.store.nodes[id] as TextState | undefined;
+    if (!editor || !node || !this.isEditing) return null;
+
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return null;
+
+    const range = selection.getRangeAt(0);
+    // 复用你已有的 getTextOffset 方法，计算「文本逻辑索引」（整个文本的绝对位置）
+    const getTextOffset = (node: Node, root: HTMLElement): number => {
+      let offset = 0;
+      const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+      let currentNode: Node | null;
+      while ((currentNode = walker.nextNode())) {
+        if (currentNode === node) break;
+        offset += currentNode.textContent?.length || 0;
+      }
+      return offset;
+    };
+
+    // 计算选区起始/结束的「文本逻辑索引」（核心：和DOM节点解耦）
+    const startBaseOffset = getTextOffset(range.startContainer, editor);
+    const startTextOffset = startBaseOffset + range.startOffset; // 整个文本的第n个字符
+    const endBaseOffset = getTextOffset(range.endContainer, editor);
+    const endTextOffset = endBaseOffset + range.endOffset;
+
+    return {
+      isCollapsed: range.collapsed, // 是否是光标（折叠）
+      startOffset: Math.max(0, startTextOffset),
+      endOffset: Math.max(0, endTextOffset),
+      nodeText: range.startContainer.textContent || '', // 保存节点文本（兜底匹配）
+    };
+  }
+
+  /**
+   * 新增：恢复完整的选区 Range（支持选区+光标）
+   * @param savedRange 保存的克隆 Range 对象
+   * @param id 文本节点 ID（指定要恢复的编辑器）
+   */
+  /**
+   * 重写：基于静态序列化信息恢复选区/光标（彻底解决 Range 失效问题）
+   * @param savedData 保存的静态序列化信息
+   * @param id 文本节点ID
+   */
+  restoreFullSelection(savedData: ReturnType<typeof this.saveFullSelection>, id: string) {
+    if (!savedData || !this.isEditing) return;
+
+    const editor = this.editors[id];
+    const node = this.store.nodes[id] as TextState | undefined;
+    if (!editor || !node) return;
+
+    const selection = window.getSelection();
+    if (!selection) return;
+
+    // 关键：nextTick 等待 DOM 重渲染完成
+    nextTick(() => {
+      try {
+        // 核心：根据「文本逻辑索引」在新 DOM 中创建全新 Range
+        const newRange = this.createRangeFromTextOffsets(
+          editor,
+          savedData.startOffset,
+          savedData.endOffset
+        );
+
+        if (newRange) {
+          // 恢复选区/光标（折叠则是光标，非折叠则是选中）
+          if (savedData.isCollapsed) {
+            newRange.collapse(true);
+          }
+          selection.removeAllRanges();
+          selection.addRange(newRange);
+          console.log('选区恢复成功:', newRange);
+        } else {
+          // 降级：定位到文本末尾
+          this.fallbackToTextEnd(editor, selection);
+        }
+      } catch (e) {
+        console.warn('恢复选区失败，降级到文本末尾', e);
+        this.fallbackToTextEnd(editor, selection);
+      }
+    });
+  }
+
+  /**
+   * 新增：辅助方法 - 根据文本逻辑索引创建 Range
+   * @param editor 编辑器DOM
+   * @param startOffset 选区起始逻辑索引
+   * @param endOffset 选区结束逻辑索引
+   * @returns 新创建的Range（匹配新DOM）
+   */
+  private createRangeFromTextOffsets(
+    editor: HTMLElement,
+    startOffset: number,
+    endOffset: number
+  ): Range | null {
+    const range = document.createRange();
+    let currentOffset = 0;
+    const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT);
+    let currentNode: Node | null;
+
+    // 第一步：找到起始位置的文本节点和偏移
+    let startNode: Node | null = null;
+    let startNodeOffset = 0;
+    while ((currentNode = walker.nextNode()) && !startNode) {
+      const nodeText = currentNode.textContent || '';
+      const nodeLength = nodeText.length;
+      // 起始索引落在当前节点内
+      if (currentOffset + nodeLength > startOffset) {
+        startNode = currentNode;
+        startNodeOffset = startOffset - currentOffset;
+        break;
+      }
+      currentOffset += nodeLength;
+    }
+
+    if (!startNode) return null; // 起始位置无效
+
+    // 第二步：找到结束位置的文本节点和偏移（重置walker）
+    walker.currentNode = editor; // 重置walker到编辑器根节点
+    currentOffset = 0;
+    let endNode: Node | null = null;
+    let endNodeOffset = 0;
+    while ((currentNode = walker.nextNode()) && !endNode) {
+      const nodeText = currentNode.textContent || '';
+      const nodeLength = nodeText.length;
+      // 结束索引落在当前节点内
+      if (currentOffset + nodeLength > endOffset) {
+        endNode = currentNode;
+        endNodeOffset = endOffset - currentOffset;
+        break;
+      }
+      currentOffset += nodeLength;
+    }
+
+    // 结束位置无效则用起始位置（光标）
+    if (!endNode) {
+      endNode = startNode;
+      endNodeOffset = startNodeOffset;
+    }
+
+    // 第三步：设置Range（关联新DOM的文本节点）
+    range.setStart(startNode, startNodeOffset);
+    range.setEnd(endNode, endNodeOffset);
+    return range;
+  }
+
+  /**
+   * 新增：辅助方法 - 兜底到文本末尾
+   */
+  private fallbackToTextEnd(editor: HTMLElement, selection: Selection) {
+    const lastTextNode = this.getLastTextNode(editor);
+    if (lastTextNode) {
+      const fallbackRange = document.createRange();
+      fallbackRange.setStart(lastTextNode, lastTextNode.textContent?.length || 0);
+      fallbackRange.collapse(true);
+      selection.removeAllRanges();
+      selection.addRange(fallbackRange);
+    }
   }
 
   /**
@@ -589,16 +764,16 @@ export class TextSelectionHandler {
       // 移除目标属性，保留其他样式
       const remainingStyles = { ...origStyles };
 
-      console.log('remaining:', remainingStyles);
+      //console.log('remaining:', remainingStyles);
 
       // 处理textDecoration多值移除
       if (styleKey === 'textDecoration' && styleValue) {
         const targetValue = styleValue.toString().trim();
         const origValues = remainingStyles.textDecoration?.toString().split(/\s+/) || [];
         const hasTargetDecoration = origValues.includes(targetValue);
-        console.log('targetValue:', targetValue);
-        console.log('origValues:', origValues);
-        console.log('hasTargetDecoration:', hasTargetDecoration);
+        //console.log('targetValue:', targetValue);
+        //console.log('origValues:', origValues);
+        //console.log('hasTargetDecoration:', hasTargetDecoration);
         if (hasTargetDecoration) {
           // 已有，过滤掉目标值，保留其他值（如移除underline，保留line-through）
           const newValues = origValues.filter((v) => v !== targetValue);
@@ -612,9 +787,9 @@ export class TextSelectionHandler {
       } else {
         // 非textDecoration：删除整个属性（原有逻辑）
         delete remainingStyles[styleKey];
-        console.log('已删除原有属性');
-        console.log('删除后的remaining:', remainingStyles);
-        console.log('删除后的remaining长度:', Object.keys(remainingStyles).length);
+        //console.log('已删除原有属性');
+        //console.log('删除后的remaining:', remainingStyles);
+        //console.log('删除后的remaining长度:', Object.keys(remainingStyles).length);
       }
 
       if (Object.keys(remainingStyles).length > 0) {
@@ -635,7 +810,7 @@ export class TextSelectionHandler {
         styles: { ...origStyles }, // 保留原样式
       });
     }
-    console.log('newStyles:', JSON.stringify(newStyles));
+    //console.log('newStyles:', JSON.stringify(newStyles));
     return newStyles;
   }
 
@@ -646,7 +821,10 @@ export class TextSelectionHandler {
     styleValue: InlineStyleProps[keyof InlineStyleProps],
     toggle = true
   ) {
-    console.log('开始处理部分属性');
+    //console.log('开始处理部分属性');
+    // ========== 新增：第一步：修改前保存完整选区 ==========
+    const savedData = this.saveFullSelection(id);
+    console.log('保存后savedRange:', savedData);
     // 1. 安全校验：获取有效文本节点（原有逻辑）
     const node = store.nodes[id] as TextState | undefined;
     if (!node || node.type !== NodeType.TEXT) return;
@@ -666,7 +844,7 @@ export class TextSelectionHandler {
     // ===================== 修复核心：全局样式联动逻辑 =====================
     // 2.1 提取全局样式当前值
     const globalStyleValue = (node.props as TextGlobalStyleProps)[styleKey];
-    console.log('全局样式值：', globalStyleValue);
+    //console.log('全局样式值：', globalStyleValue);
     // 标记是否需要取消全局样式
     let needClearGlobalStyle = false;
     // 存储从全局拆分出的内联样式（未选中区域+选中区域）
@@ -704,24 +882,24 @@ export class TextSelectionHandler {
       // ========== 合并：未选中区域样式 + 选中区域样式 ==========
       globalSplitStyles = [...unselectedStyles, ...selectedStyles]; //从全局属性中拆出来的三部分 要加入到内联样式数组中
     }
-    console.log('globalSplitStyles:', JSON.stringify(globalSplitStyles));
+    //console.log('globalSplitStyles:', JSON.stringify(globalSplitStyles));
     // ===================== 预处理现有样式（无修改） =====================
     const validInlineStyles = [
       ...inlineStyles.filter((style) => style.start < style.end),
       ...globalSplitStyles,
     ]; //原有内联样式数组+全局拆分处理得到的内联样式数组（就是对全局样式做简单拆分）
-    console.log('validInlineStyles:', JSON.stringify(validInlineStyles));
+    //console.log('validInlineStyles:', JSON.stringify(validInlineStyles));
 
     // 4. 处理范围重叠
     const updatedStyles: Array<{ start: number; end: number; styles: InlineStyleProps }> = [];
-    console.log('初始updatedstyles:', JSON.stringify(updatedStyles));
+    //console.log('初始updatedstyles:', JSON.stringify(updatedStyles));
 
     for (const style of validInlineStyles) {
       if (style.end <= selectionStart || style.start >= selectionEnd) {
         //完全不在选中范围内（无重叠） 直接保留
         updatedStyles.push(style);
-        console.log('style:', JSON.stringify(style));
-        console.log('updatedstyles:', JSON.stringify(updatedStyles));
+        //console.log('style:', JSON.stringify(style));
+        //console.log('updatedstyles:', JSON.stringify(updatedStyles));
         continue;
       }
 
@@ -734,8 +912,8 @@ export class TextSelectionHandler {
         styleValue
       );
       updatedStyles.push(...splitStyles);
-      console.log('splitStyles:', JSON.stringify(splitStyles));
-      console.log('处理重叠范围后的updatedstyles:', JSON.stringify(updatedStyles));
+      //console.log('splitStyles:', JSON.stringify(splitStyles));
+      // console.log('处理重叠范围后的updatedstyles:', JSON.stringify(updatedStyles));
     }
 
     //5. 处理样式的【添加】
@@ -800,6 +978,9 @@ export class TextSelectionHandler {
     }
 
     store.updateNode(id, updateData);
+    // ========== 新增：第二步：更新后恢复完整选区 ==========
+    console.log('恢复前savedRange:', savedData);
+    this.restoreFullSelection(savedData, id);
   }
   /**
    * 更新文本节点的全局样式属性（同步处理内联样式）
@@ -822,10 +1003,12 @@ export class TextSelectionHandler {
     styleValue: InlineStyleProps[keyof InlineStyleProps],
     toggle = true
   ) {
+    // ========== 新增：第一步：修改前保存完整选区 ==========
+    const savedData = this.saveFullSelection(id);
     // ===================== 1. 基础安全校验 =====================
     const node = store.nodes[id] as TextState | undefined;
     if (!node || node.type !== NodeType.TEXT) {
-      console.log(`updateGlobalStyles: 节点${id}不存在或非文本节点，跳过更新`);
+      // console.log(`updateGlobalStyles: 节点${id}不存在或非文本节点，跳过更新`);
       return;
     }
 
@@ -834,7 +1017,7 @@ export class TextSelectionHandler {
     const contentLength = content.length;
     // 无文本内容时直接返回（无需设置样式）
     if (contentLength === 0) {
-      console.log(`updateGlobalStyles: 节点${id}无文本内容，跳过更新`);
+      // console.log(`updateGlobalStyles: 节点${id}无文本内容，跳过更新`);
       return;
     }
 
@@ -913,7 +1096,7 @@ export class TextSelectionHandler {
 
     if (!toggle) {
       // -------------------- 场景1：toggle=false 强制覆盖 --------------------
-      console.log(`updateGlobalStyles: 节点${id}强制设置全局样式 ${styleKey}=${styleValue}`);
+      // console.log(`updateGlobalStyles: 节点${id}强制设置全局样式 ${styleKey}=${styleValue}`);
       // 修复点2：显式类型断言，兼容TextGlobalStyleProps的属性类型
       finalGlobalStyles[styleKey] = styleValue as string | number | undefined;
       // 清理所有内联样式中的该属性
@@ -928,9 +1111,9 @@ export class TextSelectionHandler {
       // -------------------- 场景2：toggle=true 智能切换 --------------------
       // 子场景A：内联有该样式但未覆盖全部文本 → 全局应用（合并值），清理内联
       if (styleRanges.length > 0 && !isInlineCoversAll) {
-        console.log(
-          `updateGlobalStyles: 节点${id}内联样式未全覆盖，全局应用 ${styleKey}=${styleValue}`
-        );
+        // console.log(
+        // `updateGlobalStyles: 节点${id}内联样式未全覆盖，全局应用 ${styleKey}=${styleValue}`
+        //);
         // 核心修改：textDecoration合并值，非textDecoration直接赋值
         if (styleKey === 'textDecoration' && styleValue) {
           const targetValue = styleValue.toString().trim();
@@ -1060,5 +1243,8 @@ export class TextSelectionHandler {
       globalStyles: finalGlobalStyles,
       inlineStylesCount: finalInlineStyles.length,
     });
+
+    // ========== 新增：第二步：更新后恢复完整选区 ==========
+    this.restoreFullSelection(savedData, id);
   }
 }

@@ -363,7 +363,7 @@ const handleFontFamilyChange = (fontFamily: string) => {
 
 //粗体
 const isBold = computed(() => {
-  const selection = toolManagerRef?.value.getCurrentSelection();
+  const selection = store.globalTextSelection;
   if (!activeTextNode.value || !selection) return false;
 
   const { start, end } = selection;
@@ -400,7 +400,7 @@ const toggleBold = () => {
 
 //斜体
 const isItalic = computed(() => {
-  const selection = toolManagerRef?.value.getCurrentSelection();
+  const selection = store.globalTextSelection;
   if (!activeTextNode.value || !selection) return false;
 
   const { start, end } = selection;
@@ -432,7 +432,7 @@ const toggleItalic = () => {
 
 //下划线
 const isUnderline = computed(() => {
-  const selection = toolManagerRef?.value.getCurrentSelection();
+  const selection = store.globalTextSelection;
   if (!activeTextNode.value || !selection) return false;
 
   const { start, end } = selection;
@@ -472,7 +472,7 @@ const toggleUnderline = () => {
 
 //删除线
 const isStrikethrough = computed(() => {
-  const selection = toolManagerRef?.value.getCurrentSelection();
+  const selection = store.globalTextSelection;
   if (!activeTextNode.value || !selection) return false;
 
   const { start, end } = selection;

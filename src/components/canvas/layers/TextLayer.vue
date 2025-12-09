@@ -198,8 +198,8 @@ const handleSelectionChange = (id: string) => {
 };
 
 const enterEditing = (e: MouseEvent, id: string) => {
-  console.log('双击的节点：', e.target);
-  console.log('即将进入编辑态的节点id：', id);
+  //console.log('双击的节点：', e.target);
+  //console.log('即将进入编辑态的节点id：', id);
   toolManagerRef?.value?.handleNodeDoubleClick(e, id); // 调用 ToolManager 节点双击事件（内部路由到文本编辑）
 };
 

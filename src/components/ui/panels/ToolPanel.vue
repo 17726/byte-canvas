@@ -81,15 +81,15 @@ const selectedKeys = computed(() => {
 function onMenuItemClick(key: string) {
   switch (key) {
     case MenuKey.AddRect:
-      console.log('矩形工具被激活');
+      //console.log('矩形工具被激活');
       store.setCreationTool('rect');
       break;
     case MenuKey.AddCircle:
-      console.log('圆形工具被激活');
+      //console.log('圆形工具被激活');
       store.setCreationTool('circle');
       break;
     case MenuKey.AddText:
-      console.log('文本工具被激活');
+      //console.log('文本工具被激活');
       store.setCreationTool('text');
       break;
     //NOTE: 菜单项不支持预览图 故创建图片独立出去处理(ImageMenu.vue)
