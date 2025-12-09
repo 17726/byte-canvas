@@ -254,34 +254,6 @@ export class TextSelectionHandler {
   }
 
   /**
-   * 精准计算选中文本的 start 和 end
-   * 核心工具函数：计算「目标文本节点」在「整个编辑器文本」中的「绝对偏移量」
-   * 为什么需要？因为编辑器内的文本可能被多个标签包裹（比如 <span>文字1</span>文字2）
-   * 浏览器原生的 offset 是「相对当前节点」的，需要转换成「相对整个编辑器文本」的绝对索引
-   */
-  getTextOffset = (targetText: string, targetParent: Element, root: HTMLElement): number => {
-    let offset = 0; // 累计偏移量（目标节点前面有多少个字符）
-    // TreeWalker：浏览器提供的DOM遍历工具，这里只遍历「文本节点」（SHOW_TEXT）
-    const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-    let currentNode: Node | null;
-
-    // 遍历编辑器内所有文本节点，累加前面节点的文本长度
-    while ((currentNode = walker.nextNode())) {
-      // console.log('currentNode.textContent:', currentNode.textContent);
-      // console.log('targetText:', targetText);
-
-      // 匹配条件：文本内容相同 + 父节点相同（避免多个相同内容的文本节点混淆）
-      const isMatch =
-        currentNode.textContent === targetText && currentNode.parentElement === targetParent;
-      // console.log('isMatch', isMatch);
-      if (isMatch) break;
-
-      // console.log('currentNode.textContent?.length:', currentNode.textContent?.length);
-      offset += currentNode.textContent?.length || 0;
-    }
-    return offset;
-  };
-  /**
    * 处理文本框点击事件
    * @param e 鼠标事件
    * @param node 文本节点数据
@@ -422,12 +394,12 @@ export class TextSelectionHandler {
     const endNodeContent = range.endContainer.textContent;
     const endNodeParent = range.endContainer.parentElement;
 
-    // 计算选区起始/结束的「文本逻辑索引」（核心：和DOM节点解耦）
+    // 计算选区起始/结束的「文本逻辑索引」（核心：和DOM节点解耦, \n 计1个字符）
     const startBaseOffset = this.getTextOffset(startNodeContent!, startNodeParent!, editor);
     const startTextOffset = startBaseOffset + range.startOffset; // 整个文本的第n个字符
     const endBaseOffset = this.getTextOffset(endNodeContent!, endNodeParent!, editor);
     const endTextOffset = endBaseOffset + range.endOffset;
-
+    console.log('保存的光标位置：', Math.max(0, startTextOffset), Math.max(0, endTextOffset));
     return {
       isCollapsed: range.collapsed, // 是否是光标（折叠）
       startOffset: Math.max(0, startTextOffset),
@@ -481,65 +453,195 @@ export class TextSelectionHandler {
   }
 
   /**
-   * 新增：辅助方法 - 根据文本逻辑索引创建 Range
-   * @param editor 编辑器DOM
-   * @param startOffset 选区起始逻辑索引
-   * @param endOffset 选区结束逻辑索引
-   * @returns 新创建的Range（匹配新DOM）
+   * 核心修改：计算文本节点的绝对偏移量（包含 \n 计1个字符）
+   * @param targetText 目标文本节点内容
+   * @param targetParent 目标文本节点的父元素
+   * @param root 编辑器根节点
+   * @returns 目标节点在整个文本中的起始偏移（\n 计1个字符）
+   */
+  private getTextOffset = (
+    targetText: string,
+    targetParent: Element,
+    root: HTMLElement
+  ): number => {
+    let totalOffset = 0; // 累计偏移量
+
+    // 递归遍历所有节点（文本+元素），计算偏移量
+    const traverseNodes = (node: Node): boolean => {
+      // 1. 文本节点：累加字符数（包含 \n，每个 \n 计1）
+      if (node.nodeType === Node.TEXT_NODE) {
+        // 匹配到目标节点：终止遍历
+        if (node.textContent === targetText && node.parentElement === targetParent) {
+          return true;
+        }
+        // 未匹配：累加当前文本节点长度
+        totalOffset += node.textContent?.length || 0;
+        return false;
+      }
+
+      // 2. 元素节点：处理换行相关标签
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        const el = node as HTMLElement;
+        // <br> 对应 \n，偏移量+1
+        if (el.nodeName === 'BR') {
+          totalOffset += 1;
+          return false;
+        }
+        // <div> 对应换行，偏移量+1（块级换行） 仅对「根节点的子节点中的DIV」计数，跳过根节点本身
+        if (el.nodeName === 'DIV' && el !== root) {
+          totalOffset += 1;
+        }
+
+        // 递归遍历子节点
+        for (const child of el.childNodes) {
+          const found = traverseNodes(child);
+          if (found) return true; // 找到目标节点，终止递归
+        }
+      }
+
+      return false;
+    };
+
+    // 从根节点开始遍历
+    traverseNodes(root);
+    return totalOffset;
+  };
+
+  /**
+   * 核心修改：根据文本偏移量创建Range（包含 \n 计1个字符）
+   * @param editor 编辑器根节点
+   * @param startOffset 起始偏移（\n 计1个字符）
+   * @param endOffset 结束偏移（\n 计1个字符）
+   * @returns 匹配的Range对象
    */
   private createRangeFromTextOffsets(
     editor: HTMLElement,
     startOffset: number,
     endOffset: number
   ): Range | null {
+    console.log('传入createRangeFromTextOffsets的光标位置：', startOffset, endOffset);
     const range = document.createRange();
-    let currentOffset = 0;
-    const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT);
-    let currentNode: Node | null;
+    let currentOffset = 0; // 当前累计偏移量
+    let lastTextNode: Node | null = null; // 记录最后一个文本节点（兜底用）
+    let lastElementNode: Node | null = null; // 记录最后一个元素节点（兜底用）
 
-    // 第一步：找到起始位置的文本节点和偏移
-    let startNode: Node | null = null;
-    let startNodeOffset = 0;
-    while ((currentNode = walker.nextNode())) {
-      const nodeText = currentNode.textContent || '';
-      const nodeLength = nodeText.length;
-      // 起始索引落在当前节点内
-      if (currentOffset + nodeLength > startOffset) {
-        startNode = currentNode;
-        startNodeOffset = startOffset - currentOffset;
-        break;
+    // 存储找到的起始/结束位置
+    interface Position {
+      node: Node;
+      offset: number;
+    }
+    let startPos: Position | null = null;
+    let endPos: Position | null = null;
+
+    // 递归遍历所有节点，找到对应偏移量的位置
+    const traverseForOffset = (node: Node) => {
+      // 已找到起始+结束位置，终止遍历
+      if (startPos && endPos) return;
+
+      // 记录最后一个节点（兜底用）
+      if (node.nodeType === Node.TEXT_NODE) {
+        lastTextNode = node;
+      } else if (node.nodeType === Node.ELEMENT_NODE) {
+        lastElementNode = node;
       }
-      currentOffset += nodeLength;
-    }
 
-    if (!startNode) return null; // 起始位置无效
+      // 1. 文本节点：处理字符偏移
+      if (node.nodeType === Node.TEXT_NODE) {
+        const text = node.textContent || '';
+        const textLength = text.length;
 
-    // 第二步：找到结束位置的文本节点和偏移（重置walker）
-    walker.currentNode = editor; // 重置walker到编辑器根节点
-    currentOffset = 0;
-    let endNode: Node | null = null;
-    let endNodeOffset = 0;
-    while ((currentNode = walker.nextNode()) && !endNode) {
-      const nodeText = currentNode.textContent || '';
-      const nodeLength = nodeText.length;
-      // 结束索引落在当前节点内
-      if (currentOffset + nodeLength > endOffset) {
-        endNode = currentNode;
-        endNodeOffset = endOffset - currentOffset;
-        break;
+        // 找起始位置
+        if (!startPos && currentOffset + textLength >= startOffset) {
+          startPos = {
+            node,
+            offset: startOffset - currentOffset, // 节点内相对偏移
+          };
+        }
+
+        // 找结束位置
+        if (!endPos && currentOffset + textLength >= endOffset) {
+          endPos = {
+            node,
+            offset: endOffset - currentOffset,
+          };
+        }
+
+        // 累加偏移量
+        currentOffset += textLength;
+        console.log('文本节点：', text, '累计偏移：', currentOffset);
+        return;
       }
-      currentOffset += nodeLength;
-    }
 
-    // 结束位置无效则用起始位置（光标）
-    if (!endNode) {
-      endNode = startNode;
-      endNodeOffset = startNodeOffset;
-    }
+      // 2. 元素节点：处理换行标签
+      if (node.nodeType === Node.ELEMENT_NODE) {
+        const el = node as HTMLElement;
 
-    // 第三步：设置Range（关联新DOM的文本节点）
-    range.setStart(startNode, startNodeOffset);
-    range.setEnd(endNode, endNodeOffset);
+        // <br> 对应 \n，计1个字符
+        if (el.nodeName === 'BR') {
+          // 起始位置落在当前 <br>
+          if (!startPos && currentOffset + 1 >= startOffset) {
+            startPos = { node, offset: 0 };
+          }
+          // 结束位置落在当前 <br>
+          if (!endPos && currentOffset + 1 >= endOffset) {
+            endPos = { node, offset: 0 };
+          }
+          currentOffset += 1; // 偏移量+1
+          console.log('BR节点：累计偏移：', currentOffset); // 调试日志
+          return;
+        }
+
+        // <div> 对应换行，计1个字符（修复匹配逻辑 + 排除根节点）
+        if (el.nodeName === 'DIV' && el !== editor) {
+          // 修复：匹配条件改为 currentOffset +1 >= startOffset
+          if (!startPos && currentOffset + 1 >= startOffset) {
+            startPos = { node, offset: 0 };
+          }
+          if (!endPos && currentOffset + 1 >= endOffset) {
+            endPos = { node, offset: 0 };
+          }
+          currentOffset += 1; // 累加偏移量
+          console.log('DIV节点：累计偏移：', currentOffset); // 调试日志
+        }
+
+        // 递归遍历子节点
+        for (const child of el.childNodes) {
+          traverseForOffset(child);
+        }
+      }
+    };
+
+    // 从编辑器根节点开始遍历
+    traverseForOffset(editor);
+    console.log(
+      '遍历结束后累计偏移：',
+      currentOffset,
+      '遍历结束后定位的光标位置：',
+      startPos,
+      endPos
+    );
+    // 核心兜底：未找到位置时，定位到最后一个节点的末尾
+    if (!startPos) {
+      // 优先用最后一个文本节点
+      if (lastTextNode) {
+        const textLength = ((lastTextNode as Node).textContent || '').length;
+        startPos = { node: lastTextNode, offset: textLength };
+        endPos = startPos;
+      } else if (lastElementNode) {
+        // 没有文本节点，用最后一个元素节点
+        startPos = { node: lastElementNode, offset: 0 };
+        endPos = startPos;
+      } else {
+        // 编辑器为空，定位到根节点
+        startPos = { node: editor, offset: 0 };
+        endPos = startPos;
+      }
+      console.log('兜底后的光标位置：', startPos, endPos);
+    }
+    // 设置Range的起始/结束位置
+    range.setStart((startPos as Position).node, (startPos as Position).offset);
+    range.setEnd((endPos as Position).node, (endPos as Position).offset);
+
     return range;
   }
 
@@ -1202,4 +1304,82 @@ export class TextSelectionHandler {
     console.log('全局恢复前savedRange:', savedData);
     this.restoreFullSelection(savedData, id);
   }
+
+  /**
+   * 处理 Enter 换行（仅末尾换行时修复多余 <br>）
+   * @param editor 编辑器根节点
+   * @param e 键盘事件对象
+   */
+  handleEnterKey = (id: string, e: KeyboardEvent) => {
+    console.log('handleEnterKey触发');
+    const editor = this.editors[id];
+    if (e.key !== 'Enter' || !editor) return;
+
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+
+    const range = selection.getRangeAt(0);
+    // 步骤1：判断是否在文本末尾（核心：光标在最后一个节点的末尾）
+    const isAtEnd = this.isCursorAtTextEnd(id, range);
+    console.log('isAtEnd:', isAtEnd);
+    if (isAtEnd) {
+      // 步骤2：阻止浏览器默认行为（避免插入两个 <br>）
+      e.preventDefault();
+
+      // 步骤3：手动插入 1 个 <br>（仅一个）
+      const br = document.createElement('br');
+      range.insertNode(br);
+
+      // 步骤4：移动光标到 <br> 后面（避免光标贴在 <br> 上）
+      range.setStartAfter(br);
+      range.collapse(true);
+      selection.removeAllRanges();
+      selection.addRange(range);
+
+      // 兜底：清理可能残留的多余 <br>（防止偶发的浏览器补全）
+      this.cleanExtraBrAtEnd(id);
+    }
+    // 非末尾换行：保留浏览器默认行为（只插一个 <br>，无需处理）
+  };
+
+  /**
+   * 辅助：判断光标是否在文本末尾
+   */
+  private isCursorAtTextEnd = (id: string, range: Range): boolean => {
+    const editor = this.editors[id];
+    if (!editor) return false;
+    // 1. 创建一个“末尾范围”（编辑器最后一个节点的末尾）
+    const endRange = document.createRange();
+    endRange.selectNodeContents(editor);
+    endRange.collapse(false); // 折叠到末尾
+
+    console.log('当前range:', range);
+    // 2. 比较当前光标范围和末尾范围是否重合
+    return range.compareBoundaryPoints(Range.END_TO_END, endRange) === 0;
+  };
+
+  /**
+   * 辅助：清理末尾多余的 <br>（只保留一个）
+   */
+  private cleanExtraBrAtEnd = (id: string) => {
+    const editor = this.editors[id];
+    if (!editor) return;
+    const childNodes = Array.from(editor.childNodes);
+    // 从后往前找连续的 <br>
+    let brCount = 0;
+    for (let i = childNodes.length - 1; i >= 0; i--) {
+      const node = childNodes[i];
+      if (!node) continue;
+      if (node.nodeName === 'BR') {
+        brCount++;
+        // 超过1个则删除
+        if (brCount > 1) {
+          editor.removeChild(node as Node);
+        }
+      } else {
+        // 遇到非 <br> 节点，终止遍历
+        break;
+      }
+    }
+  };
 }

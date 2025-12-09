@@ -43,19 +43,35 @@ export class TextService {
     const target = e.target as HTMLElement;
     // 保存当前光标位置
     const savedCursorPos = saveCursorPosition(id);
-    console.log('子节点内容:', target.childNodes);
-    const newContent = Array.from(target.childNodes)
-      .map((node) => {
-        if (node.nodeName === 'DIV') {
-          return '\n' + node.textContent; // 将 <div> 转换为换行符
-        } else if (node.nodeName === 'BR') {
-          return '\n'; // 将 <br> 转换为换行符
+    // 递归处理所有层级的节点
+    const getContentWithNewlines = (target) => {
+      // 核心：只遍历 target 的直接子节点，不处理 target 本身
+      const processChildNode = (node) => {
+        // 1. 处理 <br> 节点（包括嵌套的）
+        if (node.nodeName === 'BR') {
+          return '\n';
         }
-        return node.textContent; // 其他节点直接取文本内容
-      })
-      .join(''); // 合并所有文本节点
+        // 2. 处理 <div> 节点（包括嵌套的）：div 本身加换行，再递归处理其内部
+        if (node.nodeName === 'DIV') {
+          return '\n' + Array.from(node.childNodes).map(processChildNode).join('');
+        }
+        // 3. 文本节点：直接返回内容
+        if (node.nodeType === Node.TEXT_NODE) {
+          return node.textContent || '';
+        }
+        // 4. 其他元素（如 <span>）：递归遍历其内部子节点（处理嵌套的 <br>/<div>）
+        return Array.from(node.childNodes).map(processChildNode).join('');
+      };
+
+      // 只处理 target 的直接子节点，不处理 target 本身
+      return Array.from(target.childNodes).map(processChildNode).join('');
+    };
+
+    // 使用时：传入target元素
+    const newContent = getContentWithNewlines(target);
     console.log('新内容:', JSON.stringify(newContent));
     const oldContent = node.props.content || '';
+    console.log('旧内容:', JSON.stringify(oldContent));
     // 通过 ID 更新节点内容
     store.updateNode(id, {
       props: { ...node.props, content: newContent },
@@ -64,7 +80,7 @@ export class TextService {
     // DOM 重新渲染后，恢复光标位置
     restoreCursorPosition(savedCursorPos);
     console.log('恢复光标位置:', savedCursorPos);
-    console.log('新存储的内容:', node.props.content);
+    console.log('新存储的内容:', JSON.stringify(node.props.content));
     // 同步调整内联样式（传递 id 给内部方法）
     if (oldContent && newContent) {
       this.updateInlineStylesOnContentChange(oldContent, newContent, id, store);
