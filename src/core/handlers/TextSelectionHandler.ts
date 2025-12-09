@@ -148,7 +148,7 @@ export class TextSelectionHandler {
     if (!this.isEditing) {
       // 非编辑态阻止文本框单击聚焦（避免单击时光标出现，不进入编辑态）
       e.preventDefault();
-    } //console.log('处理文本节点的handleMouseDown');
+    }
   }
 
   /**
