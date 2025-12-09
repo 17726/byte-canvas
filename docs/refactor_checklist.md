@@ -57,9 +57,9 @@
 - [x] 修改 `InspectorPanel.vue` - applyFillColor 和applyStrokeStyle 对 Group 使用 GroupService
 - [x] 修改 `GroupService.ts` 自身 - expandGroupToFitChildren 使用 batchUpdateNodes
 
-### 阶段 3: 回归测试 🔲
+### 阶段 3: 回归测试
 
-- [ ] 编写 GroupService 单元测试
+- [x] 编写 GroupService 单元测试 (9/9 passed)
 - [ ] 拖拽/缩放 Group
 - [ ] 修改 Group 颜色/透明度
 - [ ] 撤销/重做 (检查是否产生多余快照)
