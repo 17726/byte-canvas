@@ -1,6 +1,5 @@
 <template>
   <div class="property-panel">
-    <!-- Canvas Settings Mode -->
     <div v-if="isCanvas" class="panel-content">
       <div class="panel-header">
         <span class="node-type">画布设置</span>
@@ -51,39 +50,43 @@
         </div>
       </div>
     </div>
-    <!-- Node Property Mode -->
     <div v-else>
-      <div v-if="!activeNode" class="empty-state">
+      <div v-if="!displayNode" class="empty-state">
         <a-empty description="未选中元素" />
       </div>
       <div v-else class="panel-content">
         <div class="panel-header">
-          <span class="node-type">{{ activeNode?.type?.toUpperCase() }}</span>
-          <span class="node-id">#{{ activeNode?.id?.slice(-4) }}</span>
+          <template v-if="isMultiSelect">
+            <span class="node-type">多选</span>
+            <span class="node-id">{{ store.activeElements.length }} 个元素</span>
+          </template>
+          <template v-else>
+            <span class="node-type">{{ displayNode?.type?.toUpperCase() }}</span>
+            <span class="node-id">#{{ displayNode?.id?.slice(-4) }}</span>
+          </template>
         </div>
-        <!-- Section 1: 变换 (Transform) -->
         <div class="panel-section">
           <div class="section-title">变换</div>
           <a-row :gutter="8" class="prop-row">
             <a-col :span="12">
-              <a-input-number v-model="transformX" size="small" :precision="2">
+              <a-input-number v-model="displayX" size="small" :precision="2">
                 <template #prefix>X</template>
               </a-input-number>
             </a-col>
             <a-col :span="12">
-              <a-input-number v-model="transformY" size="small" :precision="2">
+              <a-input-number v-model="displayY" size="small" :precision="2">
                 <template #prefix>Y</template>
               </a-input-number>
             </a-col>
           </a-row>
           <a-row :gutter="8" class="prop-row">
             <a-col :span="12">
-              <a-input-number v-model="transformW" size="small" :min="1" :precision="2">
+              <a-input-number v-model="displayW" size="small" :min="1" :precision="2">
                 <template #prefix>W</template>
               </a-input-number>
             </a-col>
             <a-col :span="12">
-              <a-input-number v-model="transformH" size="small" :min="1" :precision="2">
+              <a-input-number v-model="displayH" size="small" :min="1" :precision="2">
                 <template #prefix>H</template>
               </a-input-number>
             </a-col>
@@ -92,7 +95,7 @@
             <a-col :span="24">
               <span class="section-title">旋转角度</span>
               <a-slider
-                v-model="transformRotation"
+                v-model="transformRotationPanel"
                 :min="-180"
                 :max="180"
                 :step="0.1"
@@ -104,17 +107,14 @@
           </a-row>
         </div>
         <a-divider style="margin: 12px 0" />
-        <!-- Section 2: 外观 (Appearance) -->
         <div class="panel-section">
           <div class="label">外观</div>
-          <!-- Fill -->
           <div class="prop-item" v-if="canEditShapeStyle && !isImage">
             <span class="section-title">填充</span>
             <div class="flex-row">
               <a-color-picker v-model="fillColorTemp" size="small" @change="applyFillColor" />
             </div>
           </div>
-          <!-- Stroke -->
           <div class="prop-item" v-if="canEditShapeStyle">
             <span class="section-title">描边</span>
             <div class="flex-row">
@@ -134,10 +134,16 @@
               </a-input-number>
             </div>
           </div>
-          <!-- Opacity -->
           <div class="prop-item">
             <div class="section-title">不透明度</div>
-            <a-slider v-model="opacity" :min="0" :max="1" :step="0.01" show-input size="small" />
+            <a-slider
+              v-model="panelOpacity"
+              :min="0"
+              :max="1"
+              :step="0.01"
+              show-input
+              size="small"
+            />
           </div>
           <template v-if="isRect">
             <div class="prop-item">
@@ -154,13 +160,12 @@
           </template>
         </div>
         <a-divider style="margin: 12px 0" />
-        <!-- Section 3: 特有属性 (Specific) -->
         <div class="panel-section" v-if="isText || isShape || isImage || isGroup">
           <div class="label">属性</div>
           <div class="common">
             <span class="section-title">z-Index</span>
             <a-input-number
-              v-model="zIndex"
+              v-model="displayZIndex"
               size="small"
               :min="1"
               mode="button"
@@ -168,7 +173,6 @@
             />
           </div>
           <br />
-          <!-- Text Specific -->
           <template v-if="canEditText">
             <div class="prop-item">
               <div class="section-title">内容</div>
@@ -190,15 +194,12 @@
               <a-color-picker :value="textColor" show-text size="small" />
             </div>
           </template>
-          <!-- Image Specific -->
           <template v-if="isImage">
             <div class="prop-item">
               <span class="label">滤镜</span>
               <div class="filter-options">
-                <!-- 黑白滤镜 -->
                 <div class="filter-item" @click="selectFilter('grayscale')">
                   <div class="filter-preview" :class="{ active: selectedFilter === 'grayscale' }">
-                    <!-- 新增内部层：仅承载背景图和滤镜 -->
                     <div
                       class="filter-preview-inner"
                       :style="{
@@ -209,10 +210,8 @@
                   </div>
                   <span class="filter-name">黑白</span>
                 </div>
-                <!-- 模糊滤镜 -->
                 <div class="filter-item" @click="selectFilter('blur')">
                   <div class="filter-preview" :class="{ active: selectedFilter === 'blur' }">
-                    <!-- 新增内部层：仅承载背景图和滤镜 -->
                     <div
                       class="filter-preview-inner"
                       :style="{
@@ -223,10 +222,8 @@
                   </div>
                   <span class="filter-name">模糊</span>
                 </div>
-                <!-- 复古滤镜 -->
                 <div class="filter-item" @click="selectFilter('vintage')">
                   <div class="filter-preview" :class="{ active: selectedFilter === 'vintage' }">
-                    <!-- 新增内部层：仅承载背景图和滤镜 -->
                     <div
                       class="filter-preview-inner"
                       :style="{
@@ -238,10 +235,8 @@
                   </div>
                   <span class="filter-name">复古</span>
                 </div>
-                <!-- 重置滤镜 -->
                 <div class="filter-item" @click="selectFilter('reset')">
                   <div class="filter-preview" :class="{ active: selectedFilter === 'reset' }">
-                    <!-- 新增内部层：仅承载背景图和滤镜 -->
                     <div
                       class="filter-preview-inner"
                       :style="{
@@ -254,9 +249,7 @@
                 </div>
               </div>
             </div>
-            <!-- 滤镜参数调节 -->
             <div class="prop-item">
-              <!-- 灰度 -->
               <div class="filter-param-item">
                 <div class="filter-param-label">灰度</div>
                 <a-slider
@@ -270,7 +263,6 @@
                 />
               </div>
 
-              <!-- 模糊 -->
               <div class="filter-param-item">
                 <div class="filter-param-label">模糊</div>
                 <a-slider
@@ -284,7 +276,6 @@
                 />
               </div>
 
-              <!-- 亮度 -->
               <div class="filter-param-item">
                 <div class="filter-param-label">亮度</div>
                 <a-slider
@@ -298,7 +289,6 @@
                 />
               </div>
 
-              <!-- 对比度 -->
               <div class="filter-param-item">
                 <div class="filter-param-label">对比度</div>
                 <a-slider
@@ -312,7 +302,6 @@
                 />
               </div>
 
-              <!-- 饱和度 -->
               <div class="filter-param-item">
                 <div class="filter-param-label">饱和度</div>
                 <a-slider
@@ -326,7 +315,6 @@
                 />
               </div>
 
-              <!-- 色相旋转 -->
               <div class="filter-param-item">
                 <div class="filter-param-label">色相旋转</div>
                 <a-slider
@@ -340,7 +328,6 @@
                 />
               </div>
 
-              <!-- 滤镜透明度 -->
               <div class="filter-param-item">
                 <div class="filter-param-label">滤镜透明度</div>
                 <a-slider
@@ -354,7 +341,6 @@
                 />
               </div>
 
-              <!-- 反转 -->
               <div class="filter-param-item">
                 <div class="filter-param-label">反转</div>
                 <a-slider
@@ -368,7 +354,6 @@
                 />
               </div>
 
-              <!-- 棕褐色 -->
               <div class="filter-param-item">
                 <div class="filter-param-label">棕褐色</div>
                 <a-slider
@@ -406,12 +391,13 @@ const store = useCanvasStore();
 const ui = useUIStore();
 
 // 使用 useStyleSync 进行属性绑定（基础变换和通用属性）
+// 拦截原生的 activeNode 和 isGroup，以便在多选时进行重写
 const {
-  activeNode,
+  activeNode: syncActiveNode,
   isShape,
   isText,
   isImage,
-  isGroup,
+  isGroup: syncIsGroup,
   isRect,
   x: transformX,
   y: transformY,
@@ -421,6 +407,157 @@ const {
   opacity,
   cornerRadius,
 } = useStyleSync();
+
+// --- 多选逻辑扩展 (Multi-Selection Logic) ---
+
+// 判断是否为多选模式：当前无单一聚焦节点，但 store 中有多个选中元素
+const isMultiSelect = computed(() => {
+  return !syncActiveNode.value && store.activeElements.length > 1;
+});
+
+// 计算多选时的包围盒（虚拟节点的尺寸）
+const selectionBounds = computed(() => {
+  if (!isMultiSelect.value) return null;
+  const elements = store.activeElements.filter(Boolean);
+  if (elements.length === 0) return null;
+
+  const minX = Math.min(...elements.map((e) => e!.transform.x));
+  const minY = Math.min(...elements.map((e) => e!.transform.y));
+  const maxX = Math.max(...elements.map((e) => e!.transform.x + e!.transform.width));
+  const maxY = Math.max(...elements.map((e) => e!.transform.y + e!.transform.height));
+
+  return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+});
+
+// 构建用于显示的 Node 代理
+// 如果是单选，返回 syncActiveNode；如果是多选，返回一个虚拟的 GROUP 节点
+const displayNode = computed(() => {
+  if (syncActiveNode.value) return syncActiveNode.value;
+  if (isMultiSelect.value && selectionBounds.value) {
+    // 创建一个假的 Group 节点结构，骗过 UI 渲染
+    return {
+      id: 'selection-group-temp',
+      type: NodeType.GROUP,
+      x: selectionBounds.value.x,
+      y: selectionBounds.value.y,
+      width: selectionBounds.value.width,
+      height: selectionBounds.value.height,
+      rotation: 0,
+      children: store.activeElements.map((e) => e!.id),
+      style: {
+        zIndex: Math.max(...store.activeElements.map((e) => e!.style.zIndex || 1)),
+        opacity: 1, // 默认不透明度
+      },
+      props: {},
+    } as unknown as NodeState;
+  }
+  return null;
+});
+
+// 重写 activeNode 供内部逻辑使用
+const activeNode = displayNode;
+
+// 编辑组模式检测（双击组进入编辑模式时为 true）
+const isEditingGroup = computed(() => !!store.editingGroupId);
+
+// 重写 isGroup：如果是原生的 Group 或者是多选模式（视为临时 Group）或处于组合编辑模式
+const isGroup = computed(() => syncIsGroup.value || isMultiSelect.value || isEditingGroup.value);
+
+// --- 显示用的变换属性 ---
+// 如果是单选，双向绑定到 useStyleSync 的 ref
+// 如果是多选，只读显示计算出的包围盒数据 (避免直接修改导致逻辑复杂，或者需要 store 支持批量更新)
+const displayX = computed({
+  get: () => (isMultiSelect.value ? (selectionBounds.value?.x ?? 0) : transformX.value),
+  set: (val) => {
+    if (!isMultiSelect.value) {
+      transformX.value = val;
+      return;
+    }
+
+    // 多选时：将所有选中元素整体平移到新的 X（按 delta 平移）
+    const bounds = selectionBounds.value;
+    if (!bounds) return;
+    const dx = val - bounds.x;
+    if (dx === 0) return;
+
+    store.activeElements.forEach((n) => {
+      if (!n) return;
+      store.updateNode(n.id, { transform: { ...n.transform, x: n.transform.x + dx } });
+    });
+  },
+});
+
+const displayY = computed({
+  get: () => (isMultiSelect.value ? (selectionBounds.value?.y ?? 0) : transformY.value),
+  set: (val) => {
+    if (!isMultiSelect.value) {
+      transformY.value = val;
+      return;
+    }
+
+    const bounds = selectionBounds.value;
+    if (!bounds) return;
+    const dy = val - bounds.y;
+    if (dy === 0) return;
+
+    store.activeElements.forEach((n) => {
+      if (!n) return;
+      store.updateNode(n.id, { transform: { ...n.transform, y: n.transform.y + dy } });
+    });
+  },
+});
+
+const displayW = computed({
+  get: () => (isMultiSelect.value ? (selectionBounds.value?.width ?? 0) : transformW.value),
+  set: (val) => {
+    if (!isMultiSelect.value) {
+      transformW.value = val;
+      return;
+    }
+
+    const bounds = selectionBounds.value;
+    if (!bounds || bounds.width === 0) return;
+    const scaleX = val / bounds.width;
+    if (!isFinite(scaleX) || scaleX <= 0) return;
+
+    store.activeElements.forEach((n) => {
+      if (!n) return;
+      const node = n;
+      const offsetX = node.transform.x - bounds.x;
+      const newX = bounds.x + offsetX * scaleX;
+      const newWidth = Math.max(1, node.transform.width * scaleX);
+      store.updateNode(node.id, {
+        transform: { ...node.transform, x: newX, width: newWidth },
+      });
+    });
+  },
+});
+
+const displayH = computed({
+  get: () => (isMultiSelect.value ? (selectionBounds.value?.height ?? 0) : transformH.value),
+  set: (val) => {
+    if (!isMultiSelect.value) {
+      transformH.value = val;
+      return;
+    }
+
+    const bounds = selectionBounds.value;
+    if (!bounds || bounds.height === 0) return;
+    const scaleY = val / bounds.height;
+    if (!isFinite(scaleY) || scaleY <= 0) return;
+
+    store.activeElements.forEach((n) => {
+      if (!n) return;
+      const node = n;
+      const offsetY = node.transform.y - bounds.y;
+      const newY = bounds.y + offsetY * scaleY;
+      const newHeight = Math.max(1, node.transform.height * scaleY);
+      store.updateNode(node.id, {
+        transform: { ...node.transform, y: newY, height: newHeight },
+      });
+    });
+  },
+});
 
 // 说明：PropertyPanel 有两种模式：'canvas' (显示画布设置) 与 'node' (显示节点属性)
 // 由 store.activePanel 决定，store.isPanelExpanded 控制面板折叠/展开
@@ -467,12 +604,28 @@ function collectGroupDescendants(group: GroupState): NodeState[] {
 }
 
 const groupDescendants = computed(() => {
-  if (!isGroup.value || !activeNode.value) return [];
-  return collectGroupDescendants(activeNode.value as GroupState);
+  // 支持两种 group 情形：1) 正在编辑的真实组合（editingGroupId） 2) 通过 activeNode 表示的组合（或虚拟多选 group）
+  if (!isGroup.value) return [];
+
+  // 优先处理编辑模式下的真实组合
+  if (isEditingGroup.value) {
+    const gid = store.editingGroupId;
+    if (!gid) return [];
+    const groupNode = store.nodes[gid] as GroupState | undefined;
+    if (!groupNode) return [];
+    if (!groupNode.children) return [];
+    return collectGroupDescendants(groupNode);
+  }
+
+  // 其他情况：使用 activeNode（可能是虚拟的临时 group）
+  if (!activeNode.value) return [];
+  const node = activeNode.value as GroupState;
+  if (!node.children) return store.activeElements; // 多选模式直接返回 activeElements
+  return collectGroupDescendants(node);
 });
 
 const groupTextNodes = computed(() =>
-  groupDescendants.value.filter((node): node is TextState => node.type === NodeType.TEXT)
+  groupDescendants.value.filter((node): node is TextState => node!.type === NodeType.TEXT)
 );
 
 const canEditShapeStyle = computed(() => isShape.value || isGroup.value);
@@ -501,8 +654,52 @@ function applyTextProps(propsPatch: Partial<TextState['props']>) {
 
 const resetRotationToZero = () => {
   if (!activeNode.value) return;
-  transformRotation.value = 0;
+  // 重置当前面板所指向的旋转（支持组合子元素与单选）
+  transformRotationPanel.value = 0;
 };
+
+// 面板专用的旋转绑定：支持组合模式下操作子元素的旋转，也支持单选与多选
+const transformRotationPanel = computed<number>({
+  get: () => {
+    // 组合编辑模式：如果 lastSelectedChildId 存在，优先读取子元素的旋转
+    if (isGroup.value && lastSelectedChildId.value) {
+      const child = store.nodes[lastSelectedChildId.value];
+      if (child) return child.transform.rotation ?? 0;
+    }
+
+    // 多选模式（非组合编辑）：返回 0 或者第一个选中元素的旋转作为回显
+    if (isMultiSelect.value) {
+      const first = store.activeElements.find((n) => !!n);
+      return first ? (first!.transform.rotation ?? 0) : 0;
+    }
+
+    // 单选 / 默认：使用 useStyleSync 提供的绑定
+    return transformRotation.value ?? 0;
+  },
+  set: (val: number) => {
+    // 组合编辑模式：如果存在 lastSelectedChildId，则更新子元素的旋转
+    if (isGroup.value && lastSelectedChildId.value) {
+      const childId = lastSelectedChildId.value;
+      const node = store.nodes[childId];
+      if (node) {
+        store.updateNode(childId, { transform: { ...node.transform, rotation: val } });
+      }
+      return;
+    }
+
+    // 多选时：对所有选中元素统一设置旋转（覆盖每个元素的 rotation）
+    if (isMultiSelect.value) {
+      store.activeElements.forEach((n) => {
+        if (!n) return;
+        store.updateNode(n.id, { transform: { ...n.transform, rotation: val } });
+      });
+      return;
+    }
+
+    // 单选：委托给 useStyleSync 的 binding
+    transformRotation.value = val;
+  },
+});
 
 // --- Appearance Bindings ---
 const fillColorTemp = ref('#ffffff');
@@ -569,11 +766,33 @@ watch(
 );
 const syncShapeStyleTemps = () => {
   if (!activeNode.value || !canEditShapeStyle.value) return;
+
+  // 多选模式下：简单取第一个元素的样式作为显示
+  if (isMultiSelect.value) {
+    const firstShape = store.activeElements.find(
+      (e) => e!.type === NodeType.RECT || e!.type === NodeType.CIRCLE
+    );
+    if (firstShape) {
+      fillColorTemp.value = firstShape.style.backgroundColor || '#ffffff';
+      strokeColorTemp.value = firstShape.style.borderColor || '#000000';
+      strokeWidthTemp.value = firstShape.style.borderWidth || 0;
+    } else {
+      // 如果多选中没有形状，给默认值
+      fillColorTemp.value = '#ffffff';
+      strokeColorTemp.value = '#000000';
+      strokeWidthTemp.value = 0;
+    }
+    return;
+  }
+
   // 对于组合节点，不读取组合节点本身的 style，而是读取最后选中的形状子节点的 style
   // 如果没有最后选中的子节点，则读取第一个形状子节点的 style
   // 这样可以避免在退出编辑模式时触发样式同步
   if (isGroup.value) {
-    const groupNode = activeNode.value as GroupState;
+    // 如果是在组合编辑模式，优先使用 store.editingGroupId 对应的真实组节点
+    const groupNode = isEditingGroup.value
+      ? (store.nodes[store.editingGroupId as string] as GroupState)
+      : (activeNode.value as GroupState);
     // 优先使用最后选中的子节点
     let targetChild: NodeState | null = null;
     if (lastSelectedChildId.value) {
@@ -581,6 +800,8 @@ const syncShapeStyleTemps = () => {
       if (
         child &&
         (child.type === NodeType.RECT || child.type === NodeType.CIRCLE) &&
+        groupNode &&
+        Array.isArray(groupNode.children) &&
         groupNode.children.includes(child.id)
       ) {
         targetChild = child;
@@ -588,12 +809,16 @@ const syncShapeStyleTemps = () => {
     }
     // 如果没有最后选中的子节点，或者最后选中的子节点不是形状节点，则使用第一个形状子节点
     if (!targetChild) {
-      targetChild =
-        groupNode.children
-          .map((id) => store.nodes[id])
-          .find(
-            (child) => child && (child.type === NodeType.RECT || child.type === NodeType.CIRCLE)
-          ) || null;
+      if (groupNode && Array.isArray(groupNode.children)) {
+        targetChild =
+          groupNode.children
+            .map((id) => store.nodes[id])
+            .find(
+              (child) => child && (child.type === NodeType.RECT || child.type === NodeType.CIRCLE)
+            ) || null;
+      } else {
+        targetChild = null;
+      }
     }
 
     if (targetChild) {
@@ -646,6 +871,10 @@ watch(
     borderColor: activeNode.value?.style.borderColor,
     borderWidth: activeNode.value?.style.borderWidth,
     canEdit: canEditShapeStyle.value,
+    isMultiSelect: isMultiSelect.value,
+    isEditingGroup: isEditingGroup.value,
+    lastSelectedChild: lastSelectedChildId.value,
+    descendants: groupDescendants.value.length,
   }),
   () => {
     syncShapeStyleTemps();
@@ -653,8 +882,12 @@ watch(
   { immediate: true }
 );
 
+// 如果是多选模式，应用颜色到所有选中的形状
 const applyFillColor = (newColor?: unknown) => {
-  if (!activeNode.value || !canEditShapeStyle.value) return;
+  // 修改逻辑：支持多选与组合编辑
+  if (!canEditShapeStyle.value) return;
+  if (!activeNode.value && !isMultiSelect.value && !isEditingGroup.value) return;
+
   if (newColor !== undefined && ignoreFillChange.value) {
     ignoreFillChange.value = false;
     return;
@@ -662,6 +895,50 @@ const applyFillColor = (newColor?: unknown) => {
   if (isSyncingShapeStyle.value && newColor !== undefined) return;
   const color = extractColorValue(newColor, fillColorTemp.value);
   fillColorTemp.value = color;
+
+  // 组合编辑模式：优先修改最后选中的子元素，否则修改组中所有形状子元素
+  if (isEditingGroup.value) {
+    if (lastSelectedChildId.value) {
+      const child = store.nodes[lastSelectedChildId.value];
+      if (child && (child.type === NodeType.RECT || child.type === NodeType.CIRCLE)) {
+        if (child.style.backgroundColor !== color) {
+          store.updateNode(child.id, { style: { ...child.style, backgroundColor: color } });
+        }
+      }
+      return;
+    }
+
+    // 无指定子节点，批量更新组内所有形状
+    groupDescendants.value.forEach((node) => {
+      if (!node) return;
+      if (node.type === NodeType.RECT || node.type === NodeType.CIRCLE) {
+        if (node.style.backgroundColor !== color) {
+          store.updateNode(node.id, { style: { ...node.style, backgroundColor: color } });
+        }
+      }
+    });
+    return;
+  }
+
+  // 多选处理：更新所有选中的形状和组合
+  if (isMultiSelect.value) {
+    store.activeElements.forEach((node) => {
+      if (!node) return;
+      if (
+        node.type === NodeType.RECT ||
+        node.type === NodeType.CIRCLE ||
+        node.type === NodeType.GROUP
+      ) {
+        if (node.style.backgroundColor !== color) {
+          store.updateNode(node.id, { style: { ...node.style, backgroundColor: color } });
+        }
+      }
+    });
+    return;
+  }
+
+  // 单选处理
+  if (!activeNode.value) return;
   if (activeNode.value.style.backgroundColor === color) return;
   store.updateNode(activeNode.value.id, {
     style: { ...activeNode.value.style, backgroundColor: color },
@@ -669,7 +946,9 @@ const applyFillColor = (newColor?: unknown) => {
 };
 
 const applyStrokeStyle = (options?: { color?: unknown; width?: number }) => {
-  if (!activeNode.value || !canEditShapeStyle.value) return;
+  if (!canEditShapeStyle.value) return;
+  if (!activeNode.value && !isMultiSelect.value && !isEditingGroup.value) return;
+
   if (options?.color !== undefined) {
     if (ignoreStrokeColorChange.value) {
       ignoreStrokeColorChange.value = false;
@@ -687,14 +966,67 @@ const applyStrokeStyle = (options?: { color?: unknown; width?: number }) => {
   const nextColor = strokeColorTemp.value;
   const nextWidth = strokeWidthTemp.value;
 
-  const colorChanged = activeNode.value.style.borderColor !== nextColor;
-  const widthChanged = activeNode.value.style.borderWidth !== nextWidth;
+  // 组合编辑模式：优先修改最后选中的子元素，否则修改组中所有形状子元素
+  if (isEditingGroup.value) {
+    if (lastSelectedChildId.value) {
+      const child = store.nodes[lastSelectedChildId.value];
+      if (child && (child.type === NodeType.RECT || child.type === NodeType.CIRCLE)) {
+        const colorChanged = child.style.borderColor !== nextColor;
+        const widthChanged = child.style.borderWidth !== nextWidth;
+        if (colorChanged || widthChanged) {
+          store.updateNode(child.id, {
+            style: { ...child.style, borderColor: nextColor, borderWidth: nextWidth },
+          });
+        }
+      }
+      return;
+    }
+
+    groupDescendants.value.forEach((node) => {
+      if (!node) return;
+      if (node.type === NodeType.RECT || node.type === NodeType.CIRCLE) {
+        const colorChanged = node.style.borderColor !== nextColor;
+        const widthChanged = node.style.borderWidth !== nextWidth;
+        if (colorChanged || widthChanged) {
+          store.updateNode(node.id, {
+            style: { ...node.style, borderColor: nextColor, borderWidth: nextWidth },
+          });
+        }
+      }
+    });
+    return;
+  }
+
+  // 多选处理：更新所有选中的形状和组合
+  if (isMultiSelect.value) {
+    store.activeElements.forEach((node) => {
+      if (!node) return;
+      if (
+        node.type === NodeType.RECT ||
+        node.type === NodeType.CIRCLE ||
+        node.type === NodeType.GROUP
+      ) {
+        const colorChanged = node.style.borderColor !== nextColor;
+        const widthChanged = node.style.borderWidth !== nextWidth;
+        if (colorChanged || widthChanged) {
+          store.updateNode(node.id, {
+            style: { ...node.style, borderColor: nextColor, borderWidth: nextWidth },
+          });
+        }
+      }
+    });
+    return;
+  }
+
+  // 单选处理
+  const colorChanged = activeNode.value!.style.borderColor !== nextColor;
+  const widthChanged = activeNode.value!.style.borderWidth !== nextWidth;
 
   if (!colorChanged && !widthChanged) return;
 
-  store.updateNode(activeNode.value.id, {
+  store.updateNode(activeNode.value!.id, {
     style: {
-      ...activeNode.value.style,
+      ...activeNode.value!.style,
       borderColor: nextColor,
       borderWidth: nextWidth,
     },
@@ -710,15 +1042,77 @@ const handleStrokeWidthChange = (value: unknown) => {
   const width = extractNumericValue(value, strokeWidthTemp.value);
   applyStrokeStyle({ width });
 };
+
+// 面板专用的不透明度绑定：支持组合编辑、多选、单选
+const panelOpacity = computed<number>({
+  get: () => {
+    // 组合编辑模式：如果有 lastSelectedChildId，取该子元素的 opacity
+    if (isEditingGroup.value && lastSelectedChildId.value) {
+      const child = store.nodes[lastSelectedChildId.value];
+      if (child) return child.style.opacity ?? 1;
+    }
+
+    // 多选模式：取所有选中元素的平均 opacity，或第一个元素的值作为回显
+    if (isMultiSelect.value) {
+      const first = store.activeElements.find((n) => !!n);
+      return first ? (first!.style.opacity ?? 1) : 1;
+    }
+
+    // 单选 / 默认：使用 useStyleSync 提供的绑定
+    return opacity.value ?? 1;
+  },
+  set: (val: number) => {
+    const clampedVal = Math.max(0, Math.min(1, val)); // 约束到 [0, 1]
+
+    // 组合编辑模式：如果存在 lastSelectedChildId，则仅更新该子元素
+    if (isEditingGroup.value && lastSelectedChildId.value) {
+      const childId = lastSelectedChildId.value;
+      const node = store.nodes[childId];
+      if (node) {
+        store.updateNode(childId, { style: { ...node.style, opacity: clampedVal } });
+      }
+      return;
+    }
+
+    // 多选时：对所有选中元素统一设置 opacity
+    if (isMultiSelect.value) {
+      store.activeElements.forEach((n) => {
+        if (!n) return;
+        store.updateNode(n.id, { style: { ...n.style, opacity: clampedVal } });
+      });
+      return;
+    }
+
+    // 单选：委托给 useStyleSync 的 binding
+    opacity.value = clampedVal;
+  },
+});
+
 // opacity 已从 useStyleSync 导入
 
-const zIndex = computed({
-  get: () => activeNode.value?.style.zIndex ?? 1,
-  set: (val) =>
-    activeNode.value &&
-    store.updateNode(activeNode.value.id, {
-      style: { ...activeNode.value.style, zIndex: val as number },
-    }),
+// 修改 zIndex 计算属性以支持多选显示 (取最大值)
+const displayZIndex = computed({
+  get: () => {
+    if (isMultiSelect.value) {
+      return Math.max(...store.activeElements.map((e) => e!.style.zIndex || 1));
+    }
+    return activeNode.value?.style.zIndex ?? 1;
+  },
+  set: (val) => {
+    const newZ = val as number;
+    if (isMultiSelect.value) {
+      store.activeElements.forEach((node) => {
+        if (!node) return;
+        store.updateNode(node.id, { style: { ...node.style, zIndex: newZ } });
+      });
+      return;
+    }
+    if (activeNode.value) {
+      store.updateNode(activeNode.value.id, {
+        style: { ...activeNode.value.style, zIndex: newZ },
+      });
+    }
+  },
 });
 
 // --- Specific Bindings ---
