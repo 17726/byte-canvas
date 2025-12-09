@@ -78,6 +78,7 @@ export class TextSelectionHandler {
 
   // 公共方法，更新全局选区
   updateGlobalSelection(selection: { start: number; end: number } | null) {
+    console.log('updateGlobalSelection:', selection);
     this.store.updateGlobalTextSelection(selection);
   }
 
@@ -181,7 +182,6 @@ export class TextSelectionHandler {
    * @param id 文本节点 ID
    */
   public handleSelectionChange(id: string) {
-    const node = this.store.nodes[id] as TextState;
     const editor = this.editors[id];
     if (!this.isEditing || !editor) {
       this.currentSelection = null;
@@ -212,7 +212,11 @@ export class TextSelectionHandler {
      * 为什么需要？因为编辑器内的文本可能被多个标签包裹（比如 <span>文字1</span>文字2）
      * 浏览器原生的 offset 是「相对当前节点」的，需要转换成「相对整个编辑器文本」的绝对索引
      */
-    const getTextOffset = (node: Node, root: HTMLElement): number => {
+    const getTextOffset = (
+      targetText: string,
+      targetParent: Element,
+      root: HTMLElement
+    ): number => {
       let offset = 0; // 累计偏移量（目标节点前面有多少个字符）
       // TreeWalker：浏览器提供的DOM遍历工具，这里只遍历「文本节点」（SHOW_TEXT）
       const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
@@ -220,37 +224,62 @@ export class TextSelectionHandler {
 
       // 遍历编辑器内所有文本节点，累加前面节点的文本长度
       while ((currentNode = walker.nextNode())) {
-        if (currentNode === node) break;
+        console.log('currentNode.textContent:', currentNode.textContent);
+        console.log('targetText:', targetText);
+
+        // 匹配条件：文本内容相同 + 父节点相同（避免多个相同内容的文本节点混淆）
+        const isMatch =
+          currentNode.textContent === targetText && currentNode.parentElement === targetParent;
+        console.log('isMatch', isMatch);
+        if (isMatch) break;
+
+        console.log('currentNode.textContent?.length:', currentNode.textContent?.length);
         offset += currentNode.textContent?.length || 0;
       }
       return offset;
     };
 
-    // 计算选区的「绝对起始索引」（totalStart）
-    const startNode = range.startContainer; // 选区开始的节点（比如某个文本节点）
-    const startOffset = range.startOffset; // 相对startNode的偏移量（比如在startNode第2个字符后）
-    const baseOffset = getTextOffset(startNode, editor);
-    const totalStart = baseOffset + startOffset;
+    const startNodeContent = range.startContainer.textContent;
+    const startNodeParent = range.startContainer.parentElement;
+    if (!startNodeContent || !startNodeParent) return;
 
-    const endNode = range.endContainer;
+    const endNodeContent = range.endContainer.textContent;
+    const endNodeParent = range.endContainer.parentElement;
+    if (!endNodeContent || !endNodeParent) return;
+
+    // 计算选区的「绝对起始索引」（totalStart）
+    //const startNode = range.startContainer; // 选区开始的节点（比如某个文本节点）
+    const startOffset = range.startOffset; // 相对startNode的偏移量（比如在startNode第2个字符后）
+    const baseOffset = getTextOffset(startNodeContent, startNodeParent, editor);
+    const totalStart = baseOffset + startOffset;
+    console.log('baseOffset=', baseOffset);
+    console.log('startOffset=', startOffset);
+    console.log('totalStart=', totalStart);
+
+    //const endNode = range.endContainer;
     const endOffset = range.endOffset;
-    const endBaseOffset = getTextOffset(endNode, editor); // endNode的绝对偏移
+    const endBaseOffset = getTextOffset(endNodeContent, endNodeParent, editor); // endNode的绝对偏移
     const totalEnd = endBaseOffset + endOffset; // 最终：选区在整个文本中的绝对结束索引
+    console.log('endBaseOffset=', endBaseOffset);
+    console.log('endOffset=', endOffset);
+    console.log('totalEnd=', totalEnd);
 
     // 统一选区方向：确保 start ≤ end（用户可能从后往前选，比如从第8个字符选到第2个）
     const start = Math.min(totalStart, totalEnd); // 取较小值为真正的起始
     const end = Math.max(totalStart, totalEnd); // 取较大值为真正的结束
-
+    console.log('保存选区前currentSelection：', this.currentSelection);
     // 保存有效选区：只有「真正选中文字」（start < end）才保存
     if (start < end) {
       this.currentSelection = { start, end }; // 比如 { start:2, end:8 } 表示选中第2-8个字符
+      console.log('保存选区后currentSelection：', this.currentSelection);
     } else {
       this.currentSelection = null; // 无有效选中（比如选中长度为0）
     }
 
     // 同步选区到全局状态：让其他功能（比如设置字体样式）能获取当前选区
-    const isActive = this.store.activeElements[0]?.id === node.id || this.isEditing;
+    const isActive = this.store.activeElements[0]?.id === id || this.isEditing;
     if (isActive && this.currentSelection) {
+      console.log('handler中updateGlobalSelection：', this.currentSelection);
       this.updateGlobalSelection(this.currentSelection);
     } else {
       this.updateGlobalSelection(null);
@@ -824,7 +853,7 @@ export class TextSelectionHandler {
     //console.log('开始处理部分属性');
     // ========== 新增：第一步：修改前保存完整选区 ==========
     const savedData = this.saveFullSelection(id);
-    console.log('保存后savedRange:', savedData);
+    //console.log('保存后savedRange:', savedData);
     // 1. 安全校验：获取有效文本节点（原有逻辑）
     const node = store.nodes[id] as TextState | undefined;
     if (!node || node.type !== NodeType.TEXT) return;
@@ -979,7 +1008,7 @@ export class TextSelectionHandler {
 
     store.updateNode(id, updateData);
     // ========== 新增：第二步：更新后恢复完整选区 ==========
-    console.log('恢复前savedRange:', savedData);
+    //console.log('恢复前savedRange:', savedData);
     this.restoreFullSelection(savedData, id);
   }
   /**
@@ -1005,6 +1034,7 @@ export class TextSelectionHandler {
   ) {
     // ========== 新增：第一步：修改前保存完整选区 ==========
     const savedData = this.saveFullSelection(id);
+    console.log('全局保存后savedRange:', savedData);
     // ===================== 1. 基础安全校验 =====================
     const node = store.nodes[id] as TextState | undefined;
     if (!node || node.type !== NodeType.TEXT) {
@@ -1245,6 +1275,7 @@ export class TextSelectionHandler {
     });
 
     // ========== 新增：第二步：更新后恢复完整选区 ==========
+    console.log('全局恢复前savedRange:', savedData);
     this.restoreFullSelection(savedData, id);
   }
 }

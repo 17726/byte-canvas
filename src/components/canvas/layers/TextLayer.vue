@@ -134,6 +134,7 @@ watch(
   ([newSelection, isActive]) => {
     console.log('watch-选区/激活变化：', { newSelection, isActive });
     if (isActive && newSelection) {
+      console.log('文本组件内updateGlobalSelection:', newSelection);
       store.updateGlobalTextSelection(newSelection); // 激活且有选区时同步
     } else {
       store.updateGlobalTextSelection(null); // 其他情况清空
