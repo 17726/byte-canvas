@@ -34,7 +34,7 @@
 import { computed } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
 import { useSelectionStore } from '@/store/selectionStore';
-import { worldToClient } from '@/core/utils/geometry';
+import { worldToClient, computeSelectionBounds } from '@/core/utils/geometry';
 import { Group as IconGroup, Ungroup as IconUngroup } from '@icon-park/vue-next';
 import { useNodeActions } from '@/composables/useNodeActions';
 
@@ -63,7 +63,7 @@ const positionStyle = computed(() => {
   if (ids.length === 0) return {};
 
   // 计算所有选中节点的边界框
-  const bounds = store.getSelectionBounds(ids);
+  const bounds = computeSelectionBounds(ids, store.nodes);
 
   // 计算边界框顶部中心点的屏幕坐标
   const worldPos = {

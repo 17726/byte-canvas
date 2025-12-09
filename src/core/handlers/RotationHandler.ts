@@ -2,7 +2,7 @@
 import { useCanvasStore } from '@/store/canvasStore';
 import { useSelectionStore } from '@/store/selectionStore';
 import type { BaseNodeState } from '@/types/state';
-import { eventToWorld } from '../utils/geometry';
+import { eventToWorld, computeAbsoluteTransform } from '../utils/geometry';
 
 /** 旋转相关状态 */
 interface RotationState {
@@ -66,7 +66,7 @@ export class RotationHandler {
     const firstNode = this.store.nodes[firstNodeId] as BaseNodeState;
     if (!firstNode) return; // 新增：空值校验，避免后续错误
     const firstNodeAbsTransform =
-      this.store.getAbsoluteTransform(firstNodeId) || firstNode.transform;
+      computeAbsoluteTransform(firstNodeId, this.store.nodes) || firstNode.transform;
     // 计算节点中心的世界坐标
     const nodeCenter = {
       x: firstNodeAbsTransform.x + firstNodeAbsTransform.width / 2,
@@ -102,7 +102,7 @@ export class RotationHandler {
     if (!firstNodeId) return;
     const firstNode = this.store.nodes[firstNodeId] as BaseNodeState;
     const firstNodeAbsTransform =
-      this.store.getAbsoluteTransform(firstNodeId) || firstNode.transform;
+      computeAbsoluteTransform(firstNodeId, this.store.nodes) || firstNode.transform;
     // 计算节点中心的世界坐标
     const nodeCenter = {
       x: firstNodeAbsTransform.x + firstNodeAbsTransform.width / 2,

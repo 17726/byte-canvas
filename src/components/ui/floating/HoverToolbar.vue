@@ -221,6 +221,7 @@
 <script setup lang="ts">
 import { computed, inject, type Ref, type CSSProperties } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
+import { computeAbsoluteTransform } from '@/core/utils/geometry';
 import { useSelectionStore } from '@/store/selectionStore';
 import { useStyleSync } from '@/composables/useStyleSync';
 import { NodeType, type TextDecorationValue, type TextState } from '@/types/state';
@@ -275,7 +276,7 @@ const positionStyle = computed<CSSProperties>(() => {
   if (!activeNode.value) return {};
   // 使用绝对坐标，保证组合编辑模式下子元素位置正确
   const absTransform =
-    store.getAbsoluteTransform(activeNode.value.id) || activeNode.value.transform;
+    computeAbsoluteTransform(activeNode.value.id, store.nodes) || activeNode.value.transform;
   const { x, y, width } = absTransform;
   // 计算节点在屏幕上的位置（相对于 CanvasStage 容器）
   const worldCenter = {

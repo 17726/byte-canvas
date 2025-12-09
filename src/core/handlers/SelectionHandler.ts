@@ -25,7 +25,12 @@
  * - reset: 重置所有框选状态
  */
 
-import { isNodeHitRectSAT, containerToWorld, eventToContainer } from '@/core/utils/geometry';
+import {
+  isNodeHitRectSAT,
+  containerToWorld,
+  eventToContainer,
+  computeAbsoluteTransform,
+} from '@/core/utils/geometry';
 import type { ViewportState, BaseNodeState } from '@/types/state';
 import type { useCanvasStore } from '@/store/canvasStore';
 import { useSelectionStore } from '@/store/selectionStore';
@@ -158,7 +163,7 @@ export class SelectionHandler {
       }
 
       // 使用绝对坐标进行碰撞检测
-      const absTransform = this.store.getAbsoluteTransform(id);
+      const absTransform = computeAbsoluteTransform(id, this.store.nodes);
       if (!absTransform) return;
 
       // 创建一个使用绝对坐标的虚拟节点进行检测

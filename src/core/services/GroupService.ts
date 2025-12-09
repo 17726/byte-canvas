@@ -31,6 +31,7 @@ import { NodeType, type GroupState, type NodeState } from '@/types/state';
 import type { useCanvasStore } from '@/store/canvasStore';
 import { useSelectionStore } from '@/store/selectionStore';
 import { useHistoryStore } from '@/store/historyStore';
+import { computeAbsoluteTransform, computeSelectionBounds } from '@/core/utils/geometry';
 
 type CanvasStore = ReturnType<typeof useCanvasStore>;
 const getSelectionStore = () => useSelectionStore();
@@ -74,7 +75,7 @@ export class GroupService {
     }
 
     // 计算组合的边界框（使用绝对坐标）
-    const bounds = store.getSelectionBounds(validIds);
+    const bounds = computeSelectionBounds(validIds, store.nodes);
 
     // 锁定历史记录，避免在更新子节点时重复记录快照
     // 这样整个组合操作只会记录一次快照，撤销时一次性恢复到组合前的状态
@@ -112,7 +113,7 @@ export class GroupService {
       const node = store.nodes[id];
       if (node) {
         // 获取节点的绝对坐标
-        const absTransform = store.getAbsoluteTransform(id);
+        const absTransform = computeAbsoluteTransform(id, store.nodes);
         const absX = absTransform ? absTransform.x : node.transform.x;
         const absY = absTransform ? absTransform.y : node.transform.y;
 

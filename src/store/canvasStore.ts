@@ -42,8 +42,6 @@
  * - paste: 粘贴节点
  *
  * 辅助方法：
- * - getAbsoluteTransform: 计算节点的绝对坐标
- * - getSelectionBounds: 计算选中节点的包围盒
  *
  * 计算属性：
  * - renderList: 按顺序的可渲染节点列表
@@ -56,7 +54,6 @@ import { ref, reactive, computed, watch } from 'vue';
 import type { NodeState, ShapeState, TextState, ImageState, ViewportState } from '@/types/state';
 import { NodeType } from '@/types/state';
 import { DEFAULT_VIEWPORT } from '@/config/defaults';
-import { calculateBounds } from '@/core/utils/geometry';
 import {
   loadFromLocalStorage,
   createDebouncedSave,
@@ -681,60 +678,6 @@ export const useCanvasStore = defineStore('canvas', () => {
       .filter((node) => node && node.parentId === null);
   });
 
-  /**
-   * 获取节点的绝对坐标（考虑父组合的位置）
-   */
-  function getAbsoluteTransform(
-    nodeId: string
-  ): { x: number; y: number; width: number; height: number; rotation: number } | null {
-    const node = nodes.value[nodeId];
-    if (!node) return null;
-
-    let absoluteX = node.transform.x;
-    let absoluteY = node.transform.y;
-    let currentNode = node;
-
-    // 遍历父链，累加所有父组合的偏移
-    while (currentNode.parentId) {
-      const parent = nodes.value[currentNode.parentId];
-      if (!parent) break;
-      absoluteX += parent.transform.x;
-      absoluteY += parent.transform.y;
-      currentNode = parent;
-    }
-
-    return {
-      x: absoluteX,
-      y: absoluteY,
-      width: node.transform.width,
-      height: node.transform.height,
-      rotation: node.transform.rotation,
-    };
-  }
-
-  /**
-   * 获取选中节点的边界框（供UI使用，使用绝对坐标）
-   */
-  function getSelectionBounds(nodeIds: string[]) {
-    // 创建一个使用绝对坐标的虚拟节点映射
-    const absoluteNodes: Record<
-      string,
-      { transform: { x: number; y: number; width: number; height: number; rotation: number } }
-    > = {};
-
-    nodeIds.forEach((id) => {
-      const absTransform = getAbsoluteTransform(id);
-      if (absTransform) {
-        absoluteNodes[id] = { transform: absTransform };
-      }
-    });
-
-    return calculateBounds(
-      absoluteNodes as Record<string, import('@/types/state').BaseNodeState>,
-      nodeIds
-    );
-  }
-
   return {
     nodes,
     nodeOrder,
@@ -759,8 +702,6 @@ export const useCanvasStore = defineStore('canvas', () => {
     paste,
     // 组合相关状态（只读）
     visibleRenderList,
-    getSelectionBounds,
-    getAbsoluteTransform,
     // UI 状态请使用 uiStore 中的 activePanel 和 isPanelExpanded
     updateGlobalTextSelection,
     // 创建工具相关

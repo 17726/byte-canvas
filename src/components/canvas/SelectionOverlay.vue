@@ -63,6 +63,7 @@ import { useSelectionStore } from '@/store/selectionStore';
 import type { ToolManager } from '@/core/ToolManager';
 import type { ResizeHandle } from '@/types/editor';
 import { NodeType, type BaseNodeState, type NodeState } from '@/types/state';
+import { computeAbsoluteTransform } from '@/core/utils/geometry';
 
 const store = useCanvasStore();
 const selectionStore = useSelectionStore();
@@ -154,7 +155,7 @@ const selectedNodes = computed(() => {
 
 // 单个元素选中框样式（使用绝对坐标）
 const getIndividualStyle = (node: BaseNodeState) => {
-  const absTransform = store.getAbsoluteTransform(node.id);
+  const absTransform = computeAbsoluteTransform(node.id, store.nodes);
   const { x, y, width, height, rotation } = absTransform || node.transform;
   return {
     transform: `translate(${x}px, ${y}px) rotate(${rotation}deg)`,
@@ -169,7 +170,7 @@ const getIndividualStyle = (node: BaseNodeState) => {
  * 使用绝对坐标，考虑父组合位置
  */
 const getRotatedBounds = (node: BaseNodeState) => {
-  const absTransform = store.getAbsoluteTransform(node.id);
+  const absTransform = computeAbsoluteTransform(node.id, store.nodes);
   const { x, y, width, height, rotation } = absTransform || node.transform;
 
   if (rotation === 0) {
@@ -225,7 +226,7 @@ const editingGroupBounds = computed(() => {
 
   if (children.length === 0) {
     // 如果没有子元素，使用组合的 transform
-    const absTransform = store.getAbsoluteTransform(editingId);
+    const absTransform = computeAbsoluteTransform(editingId, store.nodes);
     if (!absTransform) return null;
     return {
       x: absTransform.x,
@@ -277,7 +278,7 @@ const selectionBounds = computed(() => {
   // 单选时：返回节点绝对边界（选中框会跟着旋转）
   if (nodes.length === 1) {
     const node = nodes[0];
-    const absTransform = store.getAbsoluteTransform(node!.id);
+    const absTransform = computeAbsoluteTransform(node!.id, store.nodes);
     const transform = absTransform || node!.transform;
     return {
       x: transform.x,
@@ -342,7 +343,7 @@ const operationBounds = computed(() => {
         const firstNode = nodesToCalculate[0];
         if (!firstNode) return editingGroupBounds.value;
 
-        const absTransform = store.getAbsoluteTransform(firstNode.id);
+        const absTransform = computeAbsoluteTransform(firstNode.id, store.nodes);
         if (!absTransform) return editingGroupBounds.value;
 
         return {
