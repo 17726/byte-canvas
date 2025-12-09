@@ -7,34 +7,142 @@
       :style="menuStyle"
       @contextmenu.prevent
     >
-      <a-menu mode="vertical" @menu-item-click="handleMenuItemClick" style="min-width: 200px">
-        <a-menu-item :disabled="!hasSelection" key="copy">复制</a-menu-item>
-        <a-menu-item key="paste">粘贴</a-menu-item>
-        <a-menu-item :disabled="!hasSelection" key="cut">剪切</a-menu-item>
-        <a-menu-item :disabled="!hasSelection" key="delete">删除</a-menu-item>
+      <!-- 画布右键菜单 -->
+      <div v-if="!hasSelection">
+        <a-menu mode="pop" style="min-width: 180px">
+          <a-menu-item key="paste" v-if="isClipboardAvailable" @click="handleAction(paste)">
+            <template #icon><icon-paste /></template>
+            粘贴
+            <span class="label">Ctrl+V</span>
+          </a-menu-item>
+          <a-menu-item key="selectAll" @click="handleAction(selectAll)">
+            <template #icon><FullSelection /></template>
+            全选
+            <span class="label">Ctrl+A</span>
+          </a-menu-item>
+          <a-menu-item key="clearCanvas" @click="openClearModal">
+            <template #icon><IconDelete /></template>
+            清空画布
+          </a-menu-item>
+        </a-menu>
+      </div>
 
-        <a-sub-menu key="sort" title="排序" :disabled="!hasSelection">
-          <a-menu-item key="moveToFront">置于顶层</a-menu-item>
-          <a-menu-item key="moveToBack">置于底层</a-menu-item>
-        </a-sub-menu>
+      <!-- 元素右键菜单 -->
+      <div v-else>
+        <a-menu mode="pop" style="min-width: 180px">
+          <a-button-group>
+            <a-button
+              type="text"
+              class="shortcut-button"
+              :disabled="!hasSelection"
+              key="copy"
+              title="复制"
+              @click="handleAction(copy)"
+            >
+              <template #icon><icon-copy /></template>
+            </a-button>
+            <a-button
+              type="text"
+              class="shortcut-button"
+              :disabled="!isClipboardAvailable"
+              key="paste"
+              title="粘贴"
+              @click="handleAction(paste)"
+            >
+              <template #icon><icon-paste /></template>
+            </a-button>
+            <a-button
+              type="text"
+              class="shortcut-button"
+              :disabled="!hasSelection"
+              key="cut"
+              title="剪切"
+              @click="handleAction(cut)"
+            >
+              <template #icon><icon-scissor /></template>
+            </a-button>
+            <a-button
+              type="text"
+              class="shortcut-button"
+              :disabled="!hasSelection"
+              key="delete"
+              title="删除"
+              @click="handleAction(deleteSelected)"
+            >
+              <template #icon><icon-delete /></template>
+            </a-button>
+          </a-button-group>
 
-        <a-sub-menu key="grouping" title="组合" :disabled="!hasSelection">
-          <a-menu-item key="group">组合</a-menu-item>
-          <a-menu-item key="ungroup">取消组合</a-menu-item>
-        </a-sub-menu>
+          <a-divider margin="5px" />
 
-        <a-divider margin="5px" />
+          <a-menu-item key="selectAll" @click="handleAction(selectAll)">
+            <template #icon><FullSelection /></template>
+            全选
+            <span class="label">Ctrl+A</span>
+          </a-menu-item>
 
-        <a-menu-item key="selectAll">全选</a-menu-item>
-        <a-menu-item key="clearSelection">取消选择</a-menu-item>
-      </a-menu>
+          <a-divider margin="5px" />
+
+          <a-sub-menu key="sort" title="图层" :disabled="!hasSelection">
+            <template #icon><icon-layers /></template>
+            <a-menu-item key="moveToFront" @click="handleAction(bringToFront)">
+              <template #icon><MinusTheTop /></template>
+              置于顶层
+            </a-menu-item>
+            <a-menu-item key="moveToBack" @click="handleAction(sendToBack)">
+              <template #icon><MinusTheBottom /></template>
+              置于底层
+            </a-menu-item>
+          </a-sub-menu>
+
+          <a-sub-menu key="grouping" title="组合" :disabled="!hasSelection">
+            <template #icon><GraphicStitchingFour /></template>
+            <a-menu-item key="group" @click="handleAction(groupSelected)">
+              <template #icon><Group /></template>
+              组合
+              <span class="label">Ctrl+G</span>
+            </a-menu-item>
+            <a-menu-item key="ungroup" @click="handleAction(ungroupSelected)">
+              <template #icon><Ungroup /></template>
+              取消组合
+              <span class="label">Ctrl+Shift+G</span>
+            </a-menu-item>
+          </a-sub-menu>
+        </a-menu>
+      </div>
     </div>
   </teleport>
+
+  <!-- 画布清空确认弹窗 -->
+  <a-modal
+    v-model:visible="clearModalVisible"
+    @ok="confirmClear"
+    @cancel="clearModalVisible = false"
+  >
+    <template #title>确认清空</template>
+    <div>您确定要清空整个画布吗？所有内容将被永久删除，且无法恢复！</div>
+  </a-modal>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue';
 import { useNodeActions } from '@/composables/useNodeActions';
+import {
+  IconCopy,
+  IconPaste,
+  IconScissor,
+  IconDelete,
+  IconLayers,
+} from '@arco-design/web-vue/es/icon';
+import {
+  MinusTheTop,
+  MinusTheBottom,
+  GraphicStitchingFour,
+  Group,
+  Ungroup,
+  FullSelection,
+} from '@icon-park/vue-next';
+import { loadClipboard } from '@/store/persistence.ts';
 
 const {
   hasSelection,
@@ -47,13 +155,15 @@ const {
   bringToFront,
   sendToBack,
   selectAll,
-  clearSelection,
+  clearCanvas,
 } = useNodeActions();
 
 // 监听来自 ToolManager 的右键菜单事件
 function handleShowContextMenu(e: CustomEvent) {
   const { x, y } = e.detail;
   openAt(x, y);
+  // 检测粘贴板可用性
+  checkClipboardAvailability();
 }
 
 // 监听全局点击事件，用于关闭菜单
@@ -72,6 +182,8 @@ function handleKeyDown(e: KeyboardEvent) {
 const pos = ref({ x: 0, y: 0 });
 const visible = ref(false);
 const menuRef = ref<HTMLDivElement | null>(null);
+const clearModalVisible = ref(false);
+const isClipboardAvailable = ref(false);
 
 /* ---------- 计算属性 ---------- */
 const menuStyle = computed(() => ({
@@ -80,60 +192,6 @@ const menuStyle = computed(() => ({
   top: `${pos.value.y}px`,
   zIndex: 9999,
 }));
-
-/* ---------- 菜单枚举 ---------- */
-//NOTE：枚举值与菜单项 key 保持一致，使用前注册
-enum MenuKey {
-  Copy = 'copy',
-  Paste = 'paste',
-  Cut = 'cut',
-  Delete = 'delete',
-  MoveToFront = 'moveToFront',
-  MoveToBack = 'moveToBack',
-  Group = 'group',
-  Ungroup = 'ungroup',
-  SelectAll = 'selectAll',
-  ClearSelection = 'clearSelection',
-}
-
-/* ---------- 菜单点击处理 ---------- */
-function handleMenuItemClick(key: string) {
-  switch (key) {
-    case MenuKey.Copy:
-      copy();
-      break;
-    case MenuKey.Paste:
-      paste();
-      break;
-    case MenuKey.Cut:
-      cut();
-      break;
-    case MenuKey.Delete:
-      deleteSelected();
-      break;
-    case MenuKey.MoveToFront:
-      bringToFront();
-      break;
-    case MenuKey.MoveToBack:
-      sendToBack();
-      break;
-    case MenuKey.Group:
-      groupSelected();
-      break;
-    case MenuKey.Ungroup:
-      ungroupSelected();
-      break;
-    case MenuKey.SelectAll:
-      selectAll();
-      break;
-    case MenuKey.ClearSelection:
-      clearSelection();
-      break;
-    default:
-      console.warn(`未处理的菜单项: ${key}`);
-  }
-  close();
-}
 
 /* ---------- 打开/关闭 ---------- */
 function openAt(clientX: number, clientY: number) {
@@ -153,6 +211,34 @@ function openAt(clientX: number, clientY: number) {
 
 function close() {
   visible.value = false;
+}
+
+/* ---------- 操作包装函数 ---------- */
+function handleAction(action: () => boolean | void) {
+  action();
+  close();
+}
+
+/* ---------- 清空画布确认 ---------- */
+function openClearModal() {
+  clearModalVisible.value = true;
+  close();
+}
+
+function confirmClear() {
+  clearCanvas();
+  clearModalVisible.value = false;
+}
+
+/* ---------- 检测粘贴板可用性 ---------- */
+function checkClipboardAvailability() {
+  const clipboardData = loadClipboard();
+  // 确保赋值前进行类型检查，避免null值导致的类型错误
+  if (clipboardData && clipboardData.nodes && Array.isArray(clipboardData.nodes)) {
+    isClipboardAvailable.value = clipboardData.nodes.length > 0;
+  } else {
+    isClipboardAvailable.value = false;
+  }
 }
 
 /* ---------- 生命周期 ---------- */
@@ -179,9 +265,30 @@ defineExpose({ openAt, close, visible });
   border-radius: 6px;
   box-shadow: 0 6px 18px rgba(20, 23, 28, 0.12);
   padding: 6px 0;
-  min-width: 200px;
+  min-width: 180px;
   user-select: none;
   position: fixed;
   z-index: 1001;
+}
+
+.label {
+  color: #ffffff;
+  font-size: 13px;
+  background: rgba(0, 0, 0, 0.2);
+  padding: 2px 8px;
+  border-radius: 5px;
+  float: right;
+  display: flex;
+  align-items: center;
+  height: 1.4em;
+  line-height: 1.4;
+  margin-top: 10px;
+  margin-bottom: 10px;
+  margin-left: 10px;
+}
+
+.shortcut-button {
+  height: 40px;
+  width: 40px;
 }
 </style>

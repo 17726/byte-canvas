@@ -72,7 +72,7 @@
         </div>
         <div class="divider"></div>
         <div class="tool-item">
-          <a-tooltip content="文本颜色" :mouse-enter-delay="0.5">
+          <a-tooltip content="文本颜色" :mouse-enter-delay="0.5" position="bottom">
             <a-color-picker
               :popup-offset="-150"
               :popup-translate="[-100, -160]"
@@ -84,18 +84,16 @@
             </a-color-picker>
           </a-tooltip>
         </div>
+        <div class="divider"></div>
         <div class="tool-item">
           <!-- 字体选择下拉菜单 -->
-          <a-select
-            style="width: 180px; margin-bottom: 10px"
-            placeholder="选择字体"
-            @change="handleFontFamilyChange"
-          >
+          <a-select style="width: 180px" placeholder="选择字体" @change="handleFontFamilyChange">
             <a-option v-for="font in fontList" :key="font.value" :value="font.value">
               {{ font.label }}
             </a-option>
           </a-select>
         </div>
+        <div class="divider"></div>
         <div class="tool-item">
           <a-tooltip content="加粗" :mouse-enter-delay="0.5">
             <a-button size="mini" :type="isBold ? 'primary' : 'text'" @click="toggleBold">
@@ -189,7 +187,7 @@
         <div class="tool-item">
           <a-popover trigger="hover" position="right" content-class="layer-popover">
             <a-tooltip placement="top" content="图层顺序">
-              <a-button fontsize="24px" type="text">
+              <a-button size="mini" type="text">
                 <icon-layers />
               </a-button>
             </a-tooltip>
