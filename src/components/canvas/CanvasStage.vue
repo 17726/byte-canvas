@@ -64,7 +64,7 @@
     </div>
 
     <!-- 性能测试面板 -->
-    <PerformanceTestPanel />
+    <PerformanceTestPanel v-if="ui.showPerformancePanel" />
   </div>
 </template>
 
@@ -78,6 +78,7 @@ import {
 import { GroupService } from '@/core/services/GroupService';
 import { ToolManager } from '@/core/ToolManager';
 import { useCanvasStore } from '@/store/canvasStore';
+import { useUIStore } from '@/store/uiStore';
 import { useNodeActions } from '@/composables/useNodeActions';
 import { NodeType } from '@/types/state';
 import { computed, onMounted, onUnmounted, provide, ref, watch, type CSSProperties } from 'vue';
@@ -92,6 +93,7 @@ import SelectionOverlay from './SelectionOverlay.vue';
 import PerformanceTestPanel from '../performance/PerformanceTestPanel.vue';
 
 const store = useCanvasStore();
+const ui = useUIStore();
 const stageRef = ref<HTMLElement | null>(null);
 
 // 使用 useNodeActions 提供的操作方法（带 UI 反馈）

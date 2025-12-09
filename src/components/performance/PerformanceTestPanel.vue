@@ -2,7 +2,10 @@
   <div class="performance-test-panel">
     <div class="panel-header">
       <h3>性能测试工具</h3>
-      <a-button size="small" @click="togglePanel">{{ isExpanded ? '收起' : '展开' }}</a-button>
+      <div class="header-actions">
+        <a-button size="small" @click="togglePanel">{{ isExpanded ? '收起' : '展开' }}</a-button>
+        <a-button size="small" type="text" @click="closePanel">关闭</a-button>
+      </div>
     </div>
 
     <div v-if="isExpanded" class="panel-content">
@@ -79,10 +82,11 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
+import { useUIStore } from '@/store/uiStore';
 import { NodeFactory } from '@/core/services/NodeFactory';
-import { NodeType } from '@/types/state';
 
 const store = useCanvasStore();
+const uiStore = useUIStore();
 
 // 面板状态
 const isExpanded = ref(true);
@@ -92,7 +96,6 @@ const fps = ref(60);
 const avgFrameTime = ref(16.67);
 const minFps = ref(60);
 const maxFps = ref(60);
-const frameCount = ref(0);
 const lastTime = ref(performance.now());
 const frameTimes: number[] = [];
 const MAX_FRAME_SAMPLES = 60;
@@ -150,7 +153,6 @@ const create100Elements = async () => {
 
     // 计算布局：10x10网格
     const cols = 10;
-    const rows = 10;
     const spacing = 120;
     const startX = 100;
     const startY = 100;
@@ -314,6 +316,10 @@ const togglePanel = () => {
   isExpanded.value = !isExpanded.value;
 };
 
+const closePanel = () => {
+  uiStore.setPerformancePanelVisible(false);
+};
+
 // 监听元素数量变化，自动停止动画
 watch(
   () => store.nodeOrder.length,
@@ -361,6 +367,12 @@ onUnmounted(() => {
   padding: 12px 16px;
   border-bottom: 1px solid var(--color-border);
   background: var(--color-bg-1);
+}
+
+.header-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
 }
 
 .panel-header h3 {
