@@ -134,6 +134,7 @@ watch(
   ([newSelection, isActive]) => {
     console.log('watch-选区/激活变化：', { newSelection, isActive });
     if (isActive && newSelection) {
+      console.log('文本组件内updateGlobalSelection:', newSelection);
       store.updateGlobalTextSelection(newSelection); // 激活且有选区时同步
     } else {
       store.updateGlobalTextSelection(null); // 其他情况清空
@@ -198,8 +199,8 @@ const handleSelectionChange = (id: string) => {
 };
 
 const enterEditing = (e: MouseEvent, id: string) => {
-  console.log('双击的节点：', e.target);
-  console.log('即将进入编辑态的节点id：', id);
+  //console.log('双击的节点：', e.target);
+  //console.log('即将进入编辑态的节点id：', id);
   toolManagerRef?.value?.handleNodeDoubleClick(e, id); // 调用 ToolManager 节点双击事件（内部路由到文本编辑）
 };
 
