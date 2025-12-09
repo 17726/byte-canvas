@@ -686,7 +686,12 @@ const groupDescendants = computed(() => {
   // 其他情况：使用 activeNode（可能是虚拟的临时 group）
   if (!activeNode.value) return [];
   const node = activeNode.value as GroupState;
-  if (!node.children) return store.activeElements; // 多选模式直接返回 activeElements
+  if (!node.children) {
+    // 多选模式：递归收集所有选中元素的后代
+    return store.activeElements.flatMap(e =>
+      e?.type === NodeType.GROUP ? collectGroupDescendants(e as GroupState) : [e]
+    ).filter(Boolean);
+  }
   return collectGroupDescendants(node);
 });
 
