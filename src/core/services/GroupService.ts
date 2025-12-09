@@ -340,27 +340,25 @@ export class GroupService {
 
     if (!needsAdjust) return;
 
-    // 锁定历史记录但不记录快照，避免在调整组合边界时记录快照
-    // 这个操作是自动的边界调整，不应该作为独立的操作记录到历史中
-    // 交互开始时的快照已经记录了初始状态，这个自动调整不应该创建新的快照
-    const unlockHistory = store.lockHistoryWithoutSnapshot();
+    // 收集所有需要更新的节点
+    const updates: Record<string, Partial<NodeState>> = {};
 
     // 调整所有子元素的相对坐标（相对于新的组合原点）
     const offsetX = -minX;
     const offsetY = -minY;
 
     children.forEach((child) => {
-      store.updateNode(child.id, {
+      updates[child.id] = {
         transform: {
           ...child.transform,
           x: child.transform.x + offsetX,
           y: child.transform.y + offsetY,
         },
-      });
+      };
     });
 
     // 更新组合的位置和尺寸
-    store.updateNode(editingGroupId, {
+    updates[editingGroupId] = {
       transform: {
         ...groupNode.transform,
         x: newGroupX,
@@ -368,7 +366,15 @@ export class GroupService {
         width: newBoundsWidth,
         height: newBoundsHeight,
       },
-    });
+    };
+
+    // 锁定历史记录但不记录快照，避免在调整组合边界时记录快照
+    // 这个操作是自动的边界调整，不应该作为独立的操作记录到历史中
+    // 交互开始时的快照已经记录了初始状态，这个自动调整不应该创建新的快照
+    const unlockHistory = store.lockHistoryWithoutSnapshot();
+
+    // 批量提交所有更新（原子化操作，只触发一次响应式更新）
+    store.batchUpdateNodes(updates);
 
     // 解锁历史记录
     unlockHistory();

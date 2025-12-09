@@ -401,6 +401,7 @@ import {
   type TextState,
 } from '@/types/state';
 import { DEFAULT_CANVAS_THEMES, DEFAULT_IMAGE_FILTERS, DEFAULT_IMAGE_URL } from '@/config/defaults';
+import { GroupService } from '@/core/services/GroupService';
 
 const store = useCanvasStore();
 const ui = useUIStore();
@@ -663,9 +664,15 @@ const applyFillColor = (newColor?: unknown) => {
   const color = extractColorValue(newColor, fillColorTemp.value);
   fillColorTemp.value = color;
   if (activeNode.value.style.backgroundColor === color) return;
-  store.updateNode(activeNode.value.id, {
-    style: { ...activeNode.value.style, backgroundColor: color },
-  });
+
+  // 判断是否为 Group 节点
+  if (activeNode.value.type === NodeType.GROUP) {
+    GroupService.updateGroupStyle(store, activeNode.value.id, { backgroundColor: color });
+  } else {
+    store.updateNode(activeNode.value.id, {
+      style: { ...activeNode.value.style, backgroundColor: color },
+    });
+  }
 };
 
 const applyStrokeStyle = (options?: { color?: unknown; width?: number }) => {
@@ -692,13 +699,21 @@ const applyStrokeStyle = (options?: { color?: unknown; width?: number }) => {
 
   if (!colorChanged && !widthChanged) return;
 
-  store.updateNode(activeNode.value.id, {
-    style: {
-      ...activeNode.value.style,
+  // 判断是否为 Group 节点
+  if (activeNode.value.type === NodeType.GROUP) {
+    GroupService.updateGroupStyle(store, activeNode.value.id, {
       borderColor: nextColor,
       borderWidth: nextWidth,
-    },
-  });
+    });
+  } else {
+    store.updateNode(activeNode.value.id, {
+      style: {
+        ...activeNode.value.style,
+        borderColor: nextColor,
+        borderWidth: nextWidth,
+      },
+    });
+  }
 };
 
 const handleStrokeColorChange = (value: unknown) => {

@@ -43,25 +43,27 @@
 
 ## 2. 🎯 重构路线图
 
-### 阶段 1: 扩展 Service & 改造 Store
+### 阶段 1: 扩展 Service & 改造 Store ✅
 
-- [ ] `src/core/services/GroupService.ts`: 新增 `updateGroupTransform` (迁移原 Store 逻辑)
-- [ ] `src/core/services/GroupService.ts`: 新增 `updateGroupStyle` (迁移原 Store 逻辑)
-- [ ] `src/store/canvasStore.ts`: 新增 `batchUpdateNodes` (原子化批量更新)
-- [ ] `src/store/canvasStore.ts`: **净化** `updateNode` (移除所有 Group 级联逻辑)
+- [x] `src/core/services/GroupService.ts`: 新增 `updateGroupTransform` (迁移原 Store 逻辑)
+- [x] `src/core/services/GroupService.ts`: 新增 `updateGroupStyle` (迁移原 Store 逻辑)
+- [x] `src/store/canvasStore.ts`: 新增 `batchUpdateNodes` (原子化批量更新)
+- [x] `src/store/canvasStore.ts`: **净化** `updateNode` (移除所有 Group 级联逻辑)
 
-### 阶段 2: 修改调用方 (Fix Call Sites)
+### 阶段 2: 修改调用方 (Fix Call Sites) ✅
 
-- [ ] 修改 `TransformHandler.ts`
-- [ ] 修改 `useStyleSync.ts`
-- [ ] 修改 `InspectorPanel.vue`
-- [ ] 修改 `GroupService.ts` 自身
+- [x] 修改 `TransformHandler.ts` - updateResize 和 updateMultiResize 对 Group 使用 GroupService
+- [x] 修改 `useStyleSync.ts` - createBinding 智能分发 transform/style 更新
+- [x] 修改 `InspectorPanel.vue` - applyFillColor 和applyStrokeStyle 对 Group 使用 GroupService
+- [x] 修改 `GroupService.ts` 自身 - expandGroupToFitChildren 使用 batchUpdateNodes
 
-### 阶段 3: 回归测试
+### 阶段 3: 回归测试 🔲
 
+- [ ] 编写 GroupService 单元测试
 - [ ] 拖拽/缩放 Group
 - [ ] 修改 Group 颜色/透明度
 - [ ] 撤销/重做 (检查是否产生多余快照)
+- [ ] Lint 检查
 
 ## 3. 🔍 详细分析
 
@@ -115,7 +117,24 @@ if ('style' in patch && patch.style) {
 
 ## 5. 📝 实施记录
 
-### 2025-12-09
+### 2025-12-09 Phase 1 & 2 完成 ✅
 
-- ✅ 创建重构任务清单文档
-- 🔲 开始实施阶段 1
+#### Phase 1: 扩展 Service & 改造 Store
+
+- ✅ 在 `GroupService` 中新增 `updateGroupTransform` 方法
+- ✅ 在 `GroupService` 中新增 `updateGroupStyle` 方法
+- ✅ 在 `canvasStore` 中新增 `batchUpdateNodes` 方法
+- ✅ 重构 `canvasStore.updateNode`，移除所有 Group 级联逻辑
+
+#### Phase 2: 修改调用方
+
+- ✅ **TransformHandler.ts**: updateResize 和 updateMultiResize 对 Group 使用 GroupService
+- ✅ **useStyleSync.ts**: createBinding 智能分发 transform/style 更新
+- ✅ **InspectorPanel.vue**: applyFillColor 和 applyStrokeStyle 对 Group 使用 GroupService
+- ✅ **GroupService.ts**: expandGroupToFitChildren 使用 batchUpdateNodes
+
+#### 技术亮点
+
+- 类型安全：零编译错误
+- 性能优化：批量更新只触发一次响应式更新
+- 架构清晰：Store 回归纯数据管理，Service 负责业务逻辑
