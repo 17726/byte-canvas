@@ -29,6 +29,7 @@
 import { computed, type WritableComputedRef } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
 import { NodeType, type NodeState, type ShapeState, type TextState } from '@/types/state';
+import { GroupService } from '@/core/services/GroupService';
 
 export function useStyleSync() {
   const store = useCanvasStore();
@@ -86,8 +87,25 @@ export function useStyleSync() {
       },
       set: (value: T) => {
         if (!activeNode.value) return;
-        const patch = setter(activeNode.value, value);
-        store.updateNode(activeNode.value.id, patch);
+        const node = activeNode.value;
+        const patch = setter(node, value);
+
+        // 智能分发：判断是否为 Group 节点且涉及 transform/style 更新
+        if (node.type === NodeType.GROUP) {
+          if ('transform' in patch && patch.transform) {
+            // Group 的 transform 更新 -> 调用 GroupService
+            GroupService.updateGroupTransform(store, node.id, patch.transform);
+          } else if ('style' in patch && patch.style) {
+            // Group 的 style 更新 -> 调用 GroupService
+            GroupService.updateGroupStyle(store, node.id, patch.style);
+          } else {
+            // 其他属性更新（如 props）
+            store.updateNode(node.id, patch);
+          }
+        } else {
+          // 普通节点：直接使用 updateNode
+          store.updateNode(node.id, patch);
+        }
       },
     });
   }
