@@ -601,6 +601,21 @@ export class ToolManager {
     this.textSelectionHandler.handleHeightAdaptation(id);
 
     this.textSelectionHandler.restoreFullSelection(savedCursorPos, id);
+    console.log('触发handleHeightAdaptation');
+  }
+
+  handleFontSizeChange(id: string) {
+    if (this.transformHandler.isTransforming) return;
+
+    // 仅需校验节点是否存在（无需传递给 TextService，TextService 内部会二次校验）
+    const node = this.store.nodes[id];
+    if (!node || node.type !== NodeType.TEXT) return;
+
+    // 保存当前光标位置
+    const savedCursorPos = this.textSelectionHandler.saveFullSelection(id);
+    this.textSelectionHandler.handleHeightAdaptation(id);
+
+    this.textSelectionHandler.restoreFullSelection(savedCursorPos, id);
   }
 
   /**

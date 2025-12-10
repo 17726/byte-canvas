@@ -47,6 +47,8 @@ import type { ToolManager } from '@/core/ToolManager';
 import { useCanvasStore } from '@/store/canvasStore';
 import { useSelectionStore } from '@/store/selectionStore';
 import { getCurrentInstance } from 'vue';
+import { useStyleSync } from '@/composables/useStyleSync';
+const { fontSize } = useStyleSync();
 
 const props = defineProps<{
   node: TextState;
@@ -111,7 +113,6 @@ const style = computed((): CSSProperties => {
     outline: 'none !important',
     outlineOffset: '0',
     boxShadow: 'none !important',
-    overflow: 'hidden',
   };
 });
 
@@ -143,6 +144,14 @@ watch(
     }
   },
   { immediate: true, deep: true }
+);
+
+watch(
+  () => props.node.props.fontSize,
+  () => {
+    if (toolManagerRef?.value) toolManagerRef?.value.handleFontSizeChange(props.node.id);
+  },
+  { deep: true }
 );
 
 // 组件内定义执行锁
@@ -271,8 +280,8 @@ const handleDragStart = (e: DragEvent) => {
 <style scoped>
 /* 样式部分保持不变 */
 .textBox {
-  width: 100%;
   height: 100%;
+  width: 100%;
   margin: 0;
   background: transparent;
   cursor: move;
@@ -284,15 +293,32 @@ const handleDragStart = (e: DragEvent) => {
   outline: none !important;
   box-shadow: none !important;
   padding: 2px 4px;
+  line-height: 1.6;
+  font-size: v-bind('fontSize + "px"');
+}
+
+.textBox > div,
+.textBox > p,
+.textBox > span,
+.textBox > br {
+  /* 强制继承父元素行高，覆盖默认值 */
+  line-height: inherit !important;
+  /* 清除默认边距，避免行间距变大 */
+  margin: 0 !important;
+  padding: 0 !important;
+  /* 确保块级显示，行高生效 */
+  display: block;
+  content: '';
 }
 
 /* 给编辑器内的br添加样式，让br后有光标位置 */
 .textBox br {
+  min-height: calc(1em * 1.6);
   display: block; /* 让br成为块级元素，撑起换行 */
   content: '';
   margin: 0;
   padding: 0;
-  line-height: inherit; /* 继承编辑器行高，保证光标高度 */
+  line-height: inherit !important; /* 继承编辑器行高，保证光标高度 */
 }
 
 .textBox.is-editing {
@@ -304,6 +330,7 @@ const handleDragStart = (e: DragEvent) => {
   pointer-events: auto;
   white-space: pre-line; /* 保留换行符的视觉效果 */
   caret-color: inherit; /* 光标颜色正常显示 */
+  line-height: 1.6;
 }
 
 /* 文本选中样式（兼容不同浏览器） */
