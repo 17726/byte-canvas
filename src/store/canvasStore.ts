@@ -842,6 +842,7 @@ export const useCanvasStore = defineStore('canvas', () => {
 
   /**
    * 获取节点的绝对坐标（考虑父组合的位置）
+   * 注意：此方法只累加平移，不考虑旋转。如需考虑旋转，请使用 getAbsoluteTransformWithRotation
    */
   function getAbsoluteTransform(
     nodeId: string
@@ -868,6 +869,100 @@ export const useCanvasStore = defineStore('canvas', () => {
       width: node.transform.width,
       height: node.transform.height,
       rotation: node.transform.rotation,
+    };
+  }
+
+  /**
+   * 获取节点的绝对坐标和旋转角度（考虑所有父组合的旋转和平移）
+   * 递归遍历父链，从内到外逐层应用变换
+   */
+  function getAbsoluteTransformWithRotation(
+    nodeId: string
+  ): { x: number; y: number; width: number; height: number; rotation: number } | null {
+    const node = nodes.value[nodeId];
+    if (!node) return null;
+
+    // 收集所有父组合（从直接父组合到最外层）
+    const parentChain: NodeState[] = [];
+    let currentNode: NodeState | undefined = node;
+
+    while (currentNode?.parentId) {
+      const parentNode = nodes.value[currentNode.parentId];
+      if (!parentNode || parentNode.type !== NodeType.GROUP) break;
+      parentChain.push(parentNode);
+      currentNode = parentNode;
+    }
+
+    // 保存子元素的尺寸（在整个转换过程中不变）
+    const childWidth = node.transform.width;
+    const childHeight = node.transform.height;
+
+    // 从子节点开始，逐层向上应用变换
+    // 初始坐标是相对于直接父组合的（子元素左上角）
+    let x = node.transform.x;
+    let y = node.transform.y;
+    // 初始旋转角度是子元素自身的旋转角度
+    let rotation = node.transform.rotation || 0;
+
+    // 从内到外遍历父链，累加所有父组合的旋转角度
+    for (const parent of parentChain) {
+      const parentRotation = parent.transform.rotation || 0;
+      rotation += parentRotation; // 累加父组合的旋转角度
+
+      const parentX = parent.transform.x;
+      const parentY = parent.transform.y;
+      const parentWidth = parent.transform.width;
+      const parentHeight = parent.transform.height;
+      const parentCenterX = parentWidth / 2;
+      const parentCenterY = parentHeight / 2;
+
+      if (parentRotation === 0) {
+        // 无旋转：直接累加平移
+        x += parentX;
+        y += parentY;
+      } else {
+        // 有旋转：旋转中心是父组合的中心点
+        // 当前 x, y 是子元素左上角相对于父组合左上角的坐标
+        // 计算子元素中心点相对于父组合左上角的坐标
+        const childCenterLocalX = x + childWidth / 2;
+        const childCenterLocalY = y + childHeight / 2;
+
+        // 转换为相对于父组合中心的坐标
+        const relativeX = childCenterLocalX - parentCenterX;
+        const relativeY = childCenterLocalY - parentCenterY;
+
+        // 应用旋转矩阵
+        const rad = (parentRotation * Math.PI) / 180;
+        const cos = Math.cos(rad);
+        const sin = Math.sin(rad);
+
+        const rotatedX = relativeX * cos - relativeY * sin;
+        const rotatedY = relativeX * sin + relativeY * cos;
+
+        // 计算子元素中心在世界坐标系中的位置（或相对于更上层父组合的坐标）
+        const childCenterWorldX = parentX + parentCenterX + rotatedX;
+        const childCenterWorldY = parentY + parentCenterY + rotatedY;
+
+        // 从中心反算左上角坐标
+        x = childCenterWorldX - childWidth / 2;
+        y = childCenterWorldY - childHeight / 2;
+      }
+    }
+
+    // 归一化旋转角度到 -180 ~ +180° 范围
+    rotation = rotation % 360;
+    if (rotation > 180) {
+      rotation -= 360;
+    } else if (rotation < -180) {
+      rotation += 360;
+    }
+
+    return {
+      x,
+      y,
+      width: childWidth,
+      height: childHeight,
+      rotation,
     };
   }
 
@@ -935,6 +1030,7 @@ export const useCanvasStore = defineStore('canvas', () => {
     canUngroup,
     getSelectionBounds,
     getAbsoluteTransform,
+    getAbsoluteTransformWithRotation,
     // UI 状态请使用 uiStore 中的 activePanel 和 isPanelExpanded
     updateGlobalTextSelection,
     // 批量操作支持

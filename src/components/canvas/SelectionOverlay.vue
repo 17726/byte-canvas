@@ -148,9 +148,10 @@ const selectedNodes = computed(() => {
   return store.activeElements as BaseNodeState[];
 });
 
-// 单个元素选中框样式（使用绝对坐标）
+// 单个元素选中框样式（使用绝对坐标，考虑父组合的旋转）
 const getIndividualStyle = (node: BaseNodeState) => {
-  const absTransform = store.getAbsoluteTransform(node.id);
+  // 使用能正确处理旋转的绝对坐标计算方法
+  const absTransform = store.getAbsoluteTransformWithRotation(node.id);
   const { x, y, width, height, rotation } = absTransform || node.transform;
   return {
     transform: `translate(${x}px, ${y}px) rotate(${rotation}deg)`,
@@ -162,10 +163,11 @@ const getIndividualStyle = (node: BaseNodeState) => {
 
 /**
  * 计算旋转后的节点边界框（AABB）
- * 使用绝对坐标，考虑父组合位置
+ * 使用绝对坐标，考虑父组合位置和旋转
  */
 const getRotatedBounds = (node: BaseNodeState) => {
-  const absTransform = store.getAbsoluteTransform(node.id);
+  // 使用能正确处理旋转的绝对坐标计算方法
+  const absTransform = store.getAbsoluteTransformWithRotation(node.id);
   const { x, y, width, height, rotation } = absTransform || node.transform;
 
   if (rotation === 0) {
@@ -205,7 +207,8 @@ const getRotatedBounds = (node: BaseNodeState) => {
   return { minX, maxX, minY, maxY };
 };
 
-// 组合编辑模式下：实时计算组合的整体边界框（基于所有子元素）
+// 组合编辑模式下：使用组合的 transform 作为组合框
+// 与非组合编辑模式下选中组合时的计算方式一致
 // 子元素的选中框通过 selectedNodes 单独显示
 const editingGroupBounds = computed(() => {
   const editingId = store.editingGroupId;
@@ -214,47 +217,16 @@ const editingGroupBounds = computed(() => {
   const group = store.nodes[editingId];
   if (!group || group.type !== NodeType.GROUP) return null;
 
-  // 实时计算所有子元素的边界框（使用绝对坐标）
-  const children = group.children
-    .map((id) => store.nodes[id])
-    .filter((node): node is NodeState => Boolean(node));
-
-  if (children.length === 0) {
-    // 如果没有子元素，使用组合的 transform
-    const absTransform = store.getAbsoluteTransform(editingId);
-    if (!absTransform) return null;
-    return {
-      x: absTransform.x,
-      y: absTransform.y,
-      width: absTransform.width,
-      height: absTransform.height,
-      rotation: absTransform.rotation || 0,
-    };
-  }
-
-  // 计算所有子元素的边界（考虑旋转，使用绝对坐标）
-  let minX = Infinity,
-    maxX = -Infinity,
-    minY = Infinity,
-    maxY = -Infinity;
-
-  children.forEach((child) => {
-    const bounds = getRotatedBounds(child as BaseNodeState);
-    minX = Math.min(minX, bounds.minX);
-    maxX = Math.max(maxX, bounds.maxX);
-    minY = Math.min(minY, bounds.minY);
-    maxY = Math.max(maxY, bounds.maxY);
-  });
-
-  // 使用组合的旋转角度
-  const rotation = group.transform.rotation || 0;
+  // 直接使用组合的绝对坐标，与非组合编辑模式下的计算方式一致
+  const absTransform = store.getAbsoluteTransform(editingId);
+  if (!absTransform) return null;
 
   return {
-    x: minX,
-    y: minY,
-    width: maxX - minX,
-    height: maxY - minY,
-    rotation: rotation,
+    x: absTransform.x,
+    y: absTransform.y,
+    width: absTransform.width,
+    height: absTransform.height,
+    rotation: group.transform.rotation || 0, // 使用组合本身的旋转角度
   };
 });
 
@@ -338,7 +310,8 @@ const operationBounds = computed(() => {
         const firstNode = nodesToCalculate[0];
         if (!firstNode) return editingGroupBounds.value;
 
-        const absTransform = store.getAbsoluteTransform(firstNode.id);
+        // 使用能正确处理旋转的绝对坐标计算方法
+        const absTransform = store.getAbsoluteTransformWithRotation(firstNode.id);
         if (!absTransform) return editingGroupBounds.value;
 
         return {
