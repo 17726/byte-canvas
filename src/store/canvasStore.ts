@@ -692,6 +692,30 @@ export const useCanvasStore = defineStore('canvas', () => {
       .filter((node) => node && node.parentId === null);
   });
 
+  // ==================== 批量更新支持（startBatch / endBatch ） ====================
+  // 实现：基于 historyStore.lockHistory() 做事务锁
+  // 作用：对外暴露通用批量操作 API（与 executeBatchUpdate 兼容）
+  let __batchUnlock: (() => void) | null = null;
+
+  function startBatch() {
+    // 防止嵌套批量
+    if (__batchUnlock) return;
+
+    const history = useHistoryStore();
+    __batchUnlock = history.lockHistory(); // 进入事务，不记录多次快照
+  }
+
+  function endBatch() {
+    if (!__batchUnlock) return;
+
+    // 结束事务
+    __batchUnlock();
+    __batchUnlock = null;
+
+    // 批量操作结束后仅更新一次版本号
+    version.value++;
+  }
+
   return {
     nodes,
     nodeOrder,
@@ -724,5 +748,8 @@ export const useCanvasStore = defineStore('canvas', () => {
     previewNode,
     setCreationTool,
     setPreviewNode,
+    // 添加批量 API
+    startBatch,
+    endBatch,
   };
 });
