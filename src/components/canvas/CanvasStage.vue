@@ -302,9 +302,13 @@ const handleNodeContextMenu = (e: MouseEvent, id: string) => {
 
 // 键盘事件处理（整合所有键盘逻辑：快捷键 + 空格键）
 const handleKeyDown = (e: KeyboardEvent) => {
-  // 忽略输入框内的键盘事件
+  // 输入框内的键盘事件
   const target = e.target as HTMLElement;
   if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+    if (e.key === 'Enter' && toolManagerRef.value) {
+      console.log('文本输入框内按键，交给 ToolManager 处理：', e.key);
+      //toolManagerRef.value.handleEnterKey(e);
+    }
     return;
   }
 

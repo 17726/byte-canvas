@@ -134,9 +134,9 @@ const currentSelection = ref<{ start: number; end: number } | null>(null);
 watch(
   [currentSelection, isActiveNode],
   ([newSelection, isActive]) => {
-    console.log('watch-选区/激活变化：', { newSelection, isActive });
+    //console.log('watch-选区/激活变化：', { newSelection, isActive });
     if (isActive && newSelection) {
-      console.log('文本组件内updateGlobalSelection:', newSelection);
+      //console.log('文本组件内updateGlobalSelection:', newSelection);
       store.updateGlobalTextSelection(newSelection); // 激活且有选区时同步
     } else {
       store.updateGlobalTextSelection(null); // 其他情况清空
@@ -286,6 +286,15 @@ const handleDragStart = (e: DragEvent) => {
   padding: 2px 4px;
 }
 
+/* 给编辑器内的br添加样式，让br后有光标位置 */
+.textBox br {
+  display: block; /* 让br成为块级元素，撑起换行 */
+  content: '';
+  margin: 0;
+  padding: 0;
+  line-height: inherit; /* 继承编辑器行高，保证光标高度 */
+}
+
 .textBox.is-editing {
   cursor: text;
   user-select: auto;
@@ -293,6 +302,8 @@ const handleDragStart = (e: DragEvent) => {
   -moz-user-select: auto;
   -ms-user-select: auto;
   pointer-events: auto;
+  white-space: pre-line; /* 保留换行符的视觉效果 */
+  caret-color: inherit; /* 光标颜色正常显示 */
 }
 
 /* 文本选中样式（兼容不同浏览器） */

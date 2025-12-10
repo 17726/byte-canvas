@@ -21,32 +21,74 @@ export class TextService {
     e: Event,
     id: string,
     store: CanvasStore,
-    saveCursorPosition: () => { parent: Node | null; offset: number; textContent: string },
-    restoreCursorPosition: (savedPos: {
-      parent: Node | null;
-      offset: number;
-      textContent: string;
-    }) => void
+    saveCursorPosition: (id: string) => {
+      isCollapsed: boolean; // 是否是光标（折叠选区）
+      startOffset: number; // 选区起始的「文本逻辑索引」（整个文本的第n个字符）
+      endOffset: number; // 选区结束的「文本逻辑索引」
+      nodeText: string; // 光标/选区所在文本节点的内容（用于匹配新DOM）
+    } | null,
+    restoreCursorPosition: (
+      savedData: {
+        isCollapsed: boolean; // 是否是光标（折叠选区）
+        startOffset: number; // 选区起始的「文本逻辑索引」（整个文本的第n个字符）
+        endOffset: number; // 选区结束的「文本逻辑索引」
+        nodeText: string; // 光标/选区所在文本节点的内容（用于匹配新DOM）
+      } | null
+    ) => void
   ) {
     //通过 ID 获取节点，加非空+类型校验
     const node = store.nodes[id] as TextState | undefined;
     if (!node || node.type !== NodeType.TEXT) return; // 仅处理文本节点
 
     const target = e.target as HTMLElement;
+    // 步骤1：临时保存旧光标位置（仅用于参考）
+    const oldSavedCursorPos = saveCursorPosition(id);
     // 保存当前光标位置
-    const savedCursorPos = saveCursorPosition();
+    const savedCursorPos = saveCursorPosition(id);
+    // 递归处理所有层级的节点
+    const getContentWithNewlines = (target: Node) => {
+      // 核心：只遍历 target 的直接子节点，不处理 target 本身
+      const processChildNode = (node: Node): string => {
+        // 1. 处理 <br> 节点（包括嵌套的）
+        if (node.nodeName === 'BR') {
+          return '\n';
+        }
+        // 2. 处理 <div> 节点（包括嵌套的）：div 本身加换行，再递归处理其内部
+        if (node.nodeName === 'DIV') {
+          return '\n' + Array.from(node.childNodes).map(processChildNode).join('');
+        }
+        // 3. 文本节点：直接返回内容
+        if (node.nodeType === Node.TEXT_NODE) {
+          return node.textContent || '';
+        }
+        // 4. 其他元素（如 <span>）：递归遍历其内部子节点（处理嵌套的 <br>/<div>）
+        return Array.from(node.childNodes).map(processChildNode).join('');
+      };
 
-    const newContent = target.textContent || ''; // 兜底空字符串，避免 null
+      // 只处理 target 的直接子节点，不处理 target 本身
+      return Array.from(target.childNodes).map(processChildNode).join('');
+    };
+
+    // 使用时：传入target元素
+    const newContent = getContentWithNewlines(target);
+    console.log('新内容:', JSON.stringify(newContent));
+    const oldContent = node.props.content || '';
+    console.log('旧内容:', JSON.stringify(oldContent));
     // 通过 ID 更新节点内容
     store.updateNode(id, {
       props: { ...node.props, content: newContent },
     });
 
+    // 步骤4：基于新content，重新保存光标位置（核心修复）
+    const newSavedCursorPos = saveCursorPosition(id);
+    console.log('旧光标位置（更新前）:', oldSavedCursorPos);
+    console.log('新光标位置（更新后）:', newSavedCursorPos); // 此时应是7,7
+
     // DOM 重新渲染后，恢复光标位置
     restoreCursorPosition(savedCursorPos);
-
+    console.log('恢复光标位置:', savedCursorPos);
+    console.log('新存储的内容:', JSON.stringify(node.props.content));
     // 同步调整内联样式（传递 id 给内部方法）
-    const oldContent = node.props.content || '';
     if (oldContent && newContent) {
       this.updateInlineStylesOnContentChange(oldContent, newContent, id, store);
     }

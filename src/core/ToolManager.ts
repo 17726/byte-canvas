@@ -586,14 +586,21 @@ export class ToolManager {
     const node = this.store.nodes[id];
     if (!node || node.type !== NodeType.TEXT) return;
 
+    // 保存当前光标位置
+    const savedCursorPos = this.textSelectionHandler.saveFullSelection(id);
+
     // 调用 TextService 时，传递 id 而非 node
     TextService.handleContentChange(
       e,
       id, // 传递节点 ID
       this.store, // Pinia 实例
-      () => this.textSelectionHandler.saveCursorPosition(),
-      (pos) => this.textSelectionHandler.restoreCursorPosition(pos)
+      () => this.textSelectionHandler.saveFullSelection(id),
+      (pos) => this.textSelectionHandler.restoreFullSelection(pos, id)
     );
+
+    this.textSelectionHandler.handleHeightAdaptation(id);
+
+    this.textSelectionHandler.restoreFullSelection(savedCursorPos, id);
   }
 
   /**
@@ -618,6 +625,14 @@ export class ToolManager {
 
     this.textSelectionHandler.handleBlur(id);
   }
+
+  // handleEnterKey(e: KeyboardEvent) {
+  //   if (this.transformHandler.isTransforming) return;
+  //   const id = Array.from(this.store.activeElementIds)[0];
+  //   if (!id) return;
+  //   console.log('触发handleEnterKey');
+  //   this.textSelectionHandler.handleEnterKey(id, e);
+  // }
 
   /**
    * 处理文本节点点击事件（供文本组件调用）
@@ -650,6 +665,10 @@ export class ToolManager {
 
   //处理文本样式
   handleToggleBold(id: string) {
+    console.log(
+      '触发handleToggleBold currentSelection:',
+      JSON.stringify(this.textSelectionHandler.currentSelection)
+    );
     this.textSelectionHandler.updateGlobalStyles(id, this.store, 'fontWeight', 'bold', true);
     this.textSelectionHandler.updatePartialInlineStyle(
       id,

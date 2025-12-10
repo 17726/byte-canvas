@@ -675,9 +675,9 @@ export const useCanvasStore = defineStore('canvas', () => {
   // 新增：更新全局选区（供文本组件调用）
   function updateGlobalTextSelection(selection: { start: number; end: number } | null) {
     // 响应式 ref 需通过 .value 赋值
-    console.log('触发updateGlobalTextSelection', selection);
+    //console.log('触发updateGlobalTextSelection', selection);
     globalTextSelection.value = selection;
-    console.log('Pinia 全局选区更新：', selection); // 调试日志（可选）
+    //console.log('Pinia 全局选区更新：', selection); // 调试日志（可选）
   }
   // ==================== 组合相关状态（只读计算属性）====================
 
