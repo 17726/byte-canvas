@@ -1155,9 +1155,11 @@ const panelOpacity = computed<number>({
 
     // 多选时：对所有选中元素统一设置 opacity
     if (isMultiSelect.value) {
-      store.activeElements.forEach((n) => {
-        if (!n) return;
-        store.updateNode(n.id, { style: { ...n.style, opacity: clampedVal } });
+      store.lockHistory(() => {
+        store.activeElements.forEach((n) => {
+          if (!n) return;
+          store.updateNode(n.id, { style: { ...n.style, opacity: clampedVal } });
+        });
       });
       return;
     }
