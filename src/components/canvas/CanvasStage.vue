@@ -62,6 +62,9 @@
       X: {{ store.viewport.offsetX.toFixed(0) }} <br />
       Y: {{ store.viewport.offsetY.toFixed(0) }}
     </div>
+
+    <!-- 性能测试面板 -->
+    <PerformanceTestPanel v-if="ui.showPerformancePanel" />
   </div>
 </template>
 
@@ -75,6 +78,7 @@ import {
 import { GroupService } from '@/core/services/GroupService';
 import { ToolManager } from '@/core/ToolManager';
 import { useCanvasStore } from '@/store/canvasStore';
+import { useUIStore } from '@/store/uiStore';
 import { useNodeActions } from '@/composables/useNodeActions';
 import { NodeType } from '@/types/state';
 import { computed, onMounted, onUnmounted, provide, ref, watch, type CSSProperties } from 'vue';
@@ -86,12 +90,15 @@ import ImageLayer from './layers/ImageLayer.vue';
 import RectLayer from './layers/RectLayer.vue';
 import TextLayer from './layers/TextLayer.vue';
 import SelectionOverlay from './SelectionOverlay.vue';
+import PerformanceTestPanel from '../performance/PerformanceTestPanel.vue';
 
 const store = useCanvasStore();
+const ui = useUIStore();
 const stageRef = ref<HTMLElement | null>(null);
 
 // 使用 useNodeActions 提供的操作方法（带 UI 反馈）
-const { deleteSelected, copy, cut, paste, groupSelected, ungroupSelected } = useNodeActions();
+const { deleteSelected, copy, cut, paste, groupSelected, ungroupSelected, selectAll } =
+  useNodeActions();
 
 // 空格键状态（迁移自ToolManager，统一在组件内维护）
 const isSpacePressed = ref(false);
@@ -378,6 +385,12 @@ const handleKeyDown = (e: KeyboardEvent) => {
   if (e.key === 'Delete' || e.key === 'Backspace') {
     e.preventDefault();
     deleteSelected();
+    return;
+  }
+  // Ctrl/Cmd + A: 全选（复用 useNodeActions，保持与右键菜单一致）
+  if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+    e.preventDefault();
+    selectAll();
     return;
   }
 };

@@ -86,7 +86,7 @@ export class DomTextRenderer implements INodeRenderer<string> {
 
     // 合并 text-decoration
     if (textDecorations.length > 0) {
-      console.log(`text-decoration:${textDecorations.join(' ')}`);
+      // console.log(`text-decoration:${textDecorations.join(' ')}`);
       cssEntries.push(`text-decoration:${textDecorations.join(' ')}`);
     }
 

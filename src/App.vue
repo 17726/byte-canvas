@@ -7,7 +7,7 @@ import CanvasStage from '@/components/canvas/CanvasStage.vue';
 import CanvasHeader from '@/components/ui/panels/AppHeader.vue';
 import CanvasToolbar from '@/components/ui/panels/ToolPanel.vue';
 import PropertyPanel from '@/components/ui/panels/InspectorPanel.vue';
-import RightClickmenu from '@/components/ui/floating/ContextMenu.vue';
+import ContextMenu from '@/components/ui/floating/ContextMenu.vue';
 
 const store = useCanvasStore();
 const ui = useUIStore();
@@ -66,7 +66,7 @@ const showPopover = computed(() => !ui.isPanelExpanded);
           <component :is="ui.isPanelExpanded ? IconRight : IconLeft" size="16" fill="#333" />
         </div>
 
-        <RightClickmenu />
+        <ContextMenu />
       </a-layout-content>
 
       <!-- 右侧属性面板 (固定宽度) -->
