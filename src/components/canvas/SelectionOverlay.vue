@@ -63,7 +63,7 @@ import { useSelectionStore } from '@/store/selectionStore';
 import type { ToolManager } from '@/core/ToolManager';
 import type { ResizeHandle } from '@/types/editor';
 import { NodeType, type BaseNodeState, type NodeState } from '@/types/state';
-import { computeAbsoluteTransform } from '@/core/utils/geometry';
+import { computeAbsoluteTransform, computeSelectionBounds } from '@/core/utils/geometry';
 
 const store = useCanvasStore();
 const selectionStore = useSelectionStore();
@@ -231,25 +231,18 @@ const getGroupChildrenAABB = (groupId: string) => {
     };
   }
 
-  let minX = Infinity,
-    maxX = -Infinity,
-    minY = Infinity,
-    maxY = -Infinity;
-
-  children.forEach((child: BaseNodeState) => {
-    const bounds = getRotatedBounds(child);
-    minX = Math.min(minX, bounds.minX);
-    maxX = Math.max(maxX, bounds.maxX);
-    minY = Math.min(minY, bounds.minY);
-    maxY = Math.max(maxY, bounds.maxY);
-  });
-
+  // 使用通用的 selection bounds 计算以确保完全包含所有旋转子元素
+  const bounds = computeSelectionBounds(
+    children.map((c) => c.id),
+    store.nodes
+  );
   return {
-    x: minX,
-    y: minY,
-    width: maxX - minX,
-    height: maxY - minY,
-    rotation: group.transform.rotation || 0,
+    x: bounds.x,
+    y: bounds.y,
+    width: bounds.width,
+    height: bounds.height,
+    // AABB 已轴对齐，显示时不再叠加旋转
+    rotation: 0,
   };
 };
 
