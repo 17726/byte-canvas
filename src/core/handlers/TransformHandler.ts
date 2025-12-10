@@ -342,11 +342,36 @@ export class TransformHandler {
       const node = this.store.nodes[id];
       if (!node || node.isLocked) return;
 
+      // 如果存在父级旋转，需要将世界坐标系下的位移转换到父级局部坐标系
+      let localDx = dx;
+      let localDy = dy;
+
+      if (node.parentId) {
+        let parentRotation = 0;
+        let parentId: string | null = node.parentId;
+        while (parentId) {
+          const parentNode = this.store.nodes[parentId];
+          if (!parentNode) break;
+          parentRotation += parentNode.transform.rotation || 0;
+          parentId = parentNode.parentId ?? null;
+        }
+
+        if (parentRotation !== 0) {
+          const rad = (-parentRotation * Math.PI) / 180; // 反向旋转到局部坐标
+          const cos = Math.cos(rad);
+          const sin = Math.sin(rad);
+          const rotatedX = dx * cos - dy * sin;
+          const rotatedY = dx * sin + dy * cos;
+          localDx = rotatedX;
+          localDy = rotatedY;
+        }
+      }
+
       this.store.updateNode(id, {
         transform: {
           ...node.transform,
-          x: startPos.x + dx,
-          y: startPos.y + dy,
+          x: startPos.x + localDx,
+          y: startPos.y + localDy,
         },
       });
     });
