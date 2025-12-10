@@ -100,6 +100,7 @@
             <a-col :span="24">
               <span class="section-title">旋转角度</span>
               <a-slider
+                v-on="continuousSliderListeners"
                 v-model="transformRotation"
                 :min="-180"
                 :max="180"
@@ -145,12 +146,21 @@
           <!-- Opacity -->
           <div class="prop-item">
             <div class="section-title">不透明度</div>
-            <a-slider v-model="opacity" :min="0" :max="1" :step="0.01" show-input size="small" />
+            <a-slider
+              v-on="continuousSliderListeners"
+              v-model="opacity"
+              :min="0"
+              :max="1"
+              :step="0.01"
+              show-input
+              size="small"
+            />
           </div>
           <template v-if="isRect">
             <div class="prop-item">
               <span class="section-title">圆角 (%)</span>
               <a-slider
+                v-on="continuousSliderListeners"
                 v-model="cornerRadius"
                 :min="0"
                 :max="50"
@@ -268,6 +278,7 @@
               <div class="filter-param-item">
                 <div class="filter-param-label">灰度</div>
                 <a-slider
+                  v-on="continuousSliderListeners"
                   v-model="grayscale"
                   :min="0"
                   :max="100"
@@ -282,6 +293,7 @@
               <div class="filter-param-item">
                 <div class="filter-param-label">模糊</div>
                 <a-slider
+                  v-on="continuousSliderListeners"
                   v-model="blur"
                   :min="0"
                   :max="20"
@@ -296,6 +308,7 @@
               <div class="filter-param-item">
                 <div class="filter-param-label">亮度</div>
                 <a-slider
+                  v-on="continuousSliderListeners"
                   v-model="brightness"
                   :min="0"
                   :max="200"
@@ -310,6 +323,7 @@
               <div class="filter-param-item">
                 <div class="filter-param-label">对比度</div>
                 <a-slider
+                  v-on="continuousSliderListeners"
                   v-model="contrast"
                   :min="0"
                   :max="200"
@@ -324,6 +338,7 @@
               <div class="filter-param-item">
                 <div class="filter-param-label">饱和度</div>
                 <a-slider
+                  v-on="continuousSliderListeners"
                   v-model="saturate"
                   :min="0"
                   :max="200"
@@ -338,6 +353,7 @@
               <div class="filter-param-item">
                 <div class="filter-param-label">色相旋转</div>
                 <a-slider
+                  v-on="continuousSliderListeners"
                   v-model="hueRotate"
                   :min="0"
                   :max="360"
@@ -352,6 +368,7 @@
               <div class="filter-param-item">
                 <div class="filter-param-label">滤镜透明度</div>
                 <a-slider
+                  v-on="continuousSliderListeners"
                   v-model="filterOpacity"
                   :min="0"
                   :max="100"
@@ -366,6 +383,7 @@
               <div class="filter-param-item">
                 <div class="filter-param-label">反转</div>
                 <a-slider
+                  v-on="continuousSliderListeners"
                   v-model="invert"
                   :min="0"
                   :max="100"
@@ -380,6 +398,7 @@
               <div class="filter-param-item">
                 <div class="filter-param-label">棕褐色</div>
                 <a-slider
+                  v-on="continuousSliderListeners"
                   v-model="sepia"
                   :min="0"
                   :max="100"
@@ -402,6 +421,7 @@ import { useCanvasStore } from '@/store/canvasStore';
 import { useSelectionStore } from '@/store/selectionStore';
 import { useUIStore } from '@/store/uiStore';
 import { useStyleSync } from '@/composables/useStyleSync';
+import { useContinuousHistory } from '@/composables/useContinuousHistory';
 import {
   NodeType,
   type GroupState,
@@ -415,6 +435,7 @@ import { GroupService } from '@/core/services/GroupService';
 const store = useCanvasStore();
 const selectionStore = useSelectionStore();
 const ui = useUIStore();
+const { sliderListeners: continuousSliderListeners } = useContinuousHistory();
 
 // 使用 useStyleSync 进行属性绑定（基础变换和通用属性）
 const {
