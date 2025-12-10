@@ -89,8 +89,9 @@
           <!-- 字体选择下拉菜单 -->
           <a-select
             size="mini"
-            style="width: 150px"
+            style="width: 75px"
             placeholder="字体"
+            :trigger-props="{ autoFitPopupWidth: false, popupStyle: { width: '150px' } }"
             @change="handleFontFamilyChange"
           >
             <a-option v-for="font in fontList" :key="font.value" :value="font.value">
