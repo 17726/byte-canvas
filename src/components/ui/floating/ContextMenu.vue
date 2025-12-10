@@ -16,12 +16,12 @@
             <span class="label">Ctrl+V</span>
           </a-menu-item>
           <a-menu-item key="undo" v-if="canUndo" @click="undo">
-            <template #icon><icon-paste /></template>
+            <template #icon><icon-undo /></template>
             撤销
             <span class="label">Ctrl+Z</span>
           </a-menu-item>
           <a-menu-item key="redo" v-if="canRedo" @click="redo">
-            <template #icon><icon-paste /></template>
+            <template #icon><icon-redo /></template>
             重做
             <span class="label">Ctrl+Y</span>
           </a-menu-item>
@@ -141,6 +141,8 @@ import { useNodeActions } from '@/composables/useNodeActions';
 import {
   IconCopy,
   IconPaste,
+  IconRedo,
+  IconUndo,
   IconScissor,
   IconDelete,
   IconLayers,
