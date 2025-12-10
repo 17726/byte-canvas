@@ -41,6 +41,8 @@ export class TextService {
     if (!node || node.type !== NodeType.TEXT) return; // 仅处理文本节点
 
     const target = e.target as HTMLElement;
+    // 步骤1：临时保存旧光标位置（仅用于参考）
+    const oldSavedCursorPos = saveCursorPosition(id);
     // 保存当前光标位置
     const savedCursorPos = saveCursorPosition(id);
     // 递归处理所有层级的节点
@@ -76,6 +78,11 @@ export class TextService {
     store.updateNode(id, {
       props: { ...node.props, content: newContent },
     });
+
+    // 步骤4：基于新content，重新保存光标位置（核心修复）
+    const newSavedCursorPos = saveCursorPosition(id);
+    console.log('旧光标位置（更新前）:', oldSavedCursorPos);
+    console.log('新光标位置（更新后）:', newSavedCursorPos); // 此时应是7,7
 
     // DOM 重新渲染后，恢复光标位置
     restoreCursorPosition(savedCursorPos);

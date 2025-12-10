@@ -284,6 +284,15 @@ const handleDragStart = (e: DragEvent) => {
   padding: 2px 4px;
 }
 
+/* 给编辑器内的br添加样式，让br后有光标位置 */
+.textBox br {
+  display: block; /* 让br成为块级元素，撑起换行 */
+  content: '';
+  margin: 0;
+  padding: 0;
+  line-height: inherit; /* 继承编辑器行高，保证光标高度 */
+}
+
 .textBox.is-editing {
   cursor: text;
   user-select: auto;
@@ -291,6 +300,8 @@ const handleDragStart = (e: DragEvent) => {
   -moz-user-select: auto;
   -ms-user-select: auto;
   pointer-events: auto;
+  white-space: pre-line; /* 保留换行符的视觉效果 */
+  caret-color: inherit; /* 光标颜色正常显示 */
 }
 
 /* 文本选中样式（兼容不同浏览器） */
