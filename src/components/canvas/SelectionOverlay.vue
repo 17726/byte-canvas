@@ -168,34 +168,18 @@ const getIndividualStyle = (node: BaseNodeState) => {
 /**
  * 计算旋转后的节点边界框（AABB）
  * 使用绝对坐标，考虑父组合位置
- *
- * 参考 computeSelectionBounds 的实现方式：
- * computeAbsoluteTransform 返回的 x, y 是旋转后的左上角坐标（通过矩阵变换得到）
- * 我们需要计算旋转后的中心，然后旋转四个角来得到 AABB
  */
 const getRotatedBounds = (node: BaseNodeState) => {
   const absTransform = computeAbsoluteTransform(node.id, store.nodes);
-  if (!absTransform) {
-    const { x, y, width, height } = node.transform;
-    return { minX: x, maxX: x + width, minY: y, maxY: y + height };
-  }
-
-  const { x, y, width, height, rotation } = absTransform;
+  const { x, y, width, height, rotation } = absTransform || node.transform;
 
   if (rotation === 0) {
     return { minX: x, maxX: x + width, minY: y, maxY: y + height };
   }
 
-  // 使用与 computeSelectionBounds 相同的计算方法
-  // computeAbsoluteTransform 返回的 x, y 是旋转后的左上角坐标
-  // 我们需要计算旋转后的中心，然后旋转四个角
   const cx = x + width / 2;
   const cy = y + height / 2;
-  const rad = (rotation * Math.PI) / 180;
-  const cos = Math.cos(rad);
-  const sin = Math.sin(rad);
 
-  // 四个角（相对于旋转后的左上角）
   const corners = [
     { x: x, y: y },
     { x: x + width, y: y },
@@ -203,12 +187,15 @@ const getRotatedBounds = (node: BaseNodeState) => {
     { x: x, y: y + height },
   ];
 
+  const rad = (rotation * Math.PI) / 180;
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+
   let minX = Infinity,
     maxX = -Infinity,
     minY = Infinity,
     maxY = -Infinity;
 
-  // 旋转四个角并找到 AABB
   corners.forEach((corner) => {
     const dx = corner.x - cx;
     const dy = corner.y - cy;
@@ -250,18 +237,13 @@ const editingGroupBounds = computed(() => {
     };
   }
 
-  // 关键修复：直接使用 getRotatedBounds 计算每个子元素在世界坐标系中的旋转边界
-  // 因为 getRotatedBounds 已经正确考虑了父组合的旋转（通过 computeAbsoluteTransform）
-  // 这样更简单、更可靠，避免了手动计算组合旋转的复杂逻辑
+  // 计算所有子元素的边界（考虑旋转，使用绝对坐标）
   let minX = Infinity,
     maxX = -Infinity,
     minY = Infinity,
     maxY = -Infinity;
 
   children.forEach((child) => {
-    // getRotatedBounds 使用 computeAbsoluteTransform 计算绝对坐标
-    // computeAbsoluteTransform 已经正确考虑了父组合的旋转
-    // 所以这里直接使用即可
     const bounds = getRotatedBounds(child as BaseNodeState);
     minX = Math.min(minX, bounds.minX);
     maxX = Math.max(maxX, bounds.maxX);
@@ -269,13 +251,15 @@ const editingGroupBounds = computed(() => {
     maxY = Math.max(maxY, bounds.maxY);
   });
 
-  // 组合框始终显示为轴对齐的 AABB（rotation = 0）
+  // 使用组合的旋转角度
+  const rotation = group.transform.rotation || 0;
+
   return {
     x: minX,
     y: minY,
     width: maxX - minX,
     height: maxY - minY,
-    rotation: 0,
+    rotation: rotation,
   };
 });
 
@@ -294,32 +278,15 @@ const selectionBounds = computed(() => {
   // 单选时：返回节点绝对边界（选中框会跟着旋转）
   if (nodes.length === 1) {
     const node = nodes[0];
-
-    // 关键修复：在非组合编辑模式下，选中的应该是顶层节点（没有父级）
-    // 顶层节点直接使用本地 transform，与节点实际渲染方式一致
-    // 节点渲染：left: transform.x, top: transform.y, transform: rotate(rotation)
-    // 选中框：translate(x, y) rotate(rotation)
-    if (!node!.parentId) {
-      // 顶层节点：使用本地 transform
-      return {
-        x: node!.transform.x,
-        y: node!.transform.y,
-        width: node!.transform.width,
-        height: node!.transform.height,
-        rotation: node!.transform.rotation || 0,
-      };
-    } else {
-      // 如果节点有父级（理论上非组合编辑模式下不应该出现，但为了安全处理）
-      const absTransform = computeAbsoluteTransform(node!.id, store.nodes);
-      const transform = absTransform || node!.transform;
-      return {
-        x: transform.x,
-        y: transform.y,
-        width: transform.width,
-        height: transform.height,
-        rotation: transform.rotation || 0,
-      };
-    }
+    const absTransform = computeAbsoluteTransform(node!.id, store.nodes);
+    const transform = absTransform || node!.transform;
+    return {
+      x: transform.x,
+      y: transform.y,
+      width: transform.width,
+      height: transform.height,
+      rotation: node!.transform.rotation || 0, // 单选时，使用节点的实际旋转角度
+    };
   }
 
   // 多选时：计算所有节点旋转后的 AABB 并合并 (rotation 设为 0)
@@ -379,18 +346,12 @@ const operationBounds = computed(() => {
         const absTransform = computeAbsoluteTransform(firstNode.id, store.nodes);
         if (!absTransform) return editingGroupBounds.value;
 
-        // 关键修复：在组合编辑模式下，操作框应该只使用子元素自身的旋转角度
-        // 而不是累加的旋转角度（absTransform.rotation 包含了父组合的旋转）
-        // 因为 absTransform.x 和 absTransform.y 已经是经过所有旋转后的坐标
-        // 如果再用累加的旋转角度，会导致框和元素分离
-        const childRotation = firstNode.transform.rotation || 0;
-
         return {
           x: absTransform.x,
           y: absTransform.y,
           width: absTransform.width,
           height: absTransform.height,
-          rotation: childRotation,
+          rotation: absTransform.rotation || 0,
         };
       }
 
