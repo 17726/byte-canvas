@@ -4,18 +4,40 @@ import type { TextState } from '@/types/state';
 export class DomTextRenderer implements INodeRenderer<string> {
   render(node: TextState): string {
     const { content, inlineStyles = [], ...globalStyles } = node.props;
-    if (!content) return '<span>&nbsp;</span>'; // 空内容返回占位
 
-    // 无行内样式：直接处理全局样式（原有逻辑，已包含CSS转换）
+    // 空内容返回占位（保持原有逻辑）
+    if (!content) return '<span>&nbsp;</span>';
+
+    // 核心：先按\n拆分整个内容为片段数组（空字符串对应连续的\n）
+    const newlineFragments = content.split('\n');
+    let finalHtml = '';
+
+    // 无行内样式：按\n拆分后，每个文本段单独包span，\n转为span外的<br>
     if (inlineStyles.length === 0) {
-      // 全局样式 → CSS 转换（关键步骤）
       const globalStyleStr = this.convertStylesToCss(globalStyles);
-      return globalStyleStr
-        ? `<span style="${globalStyleStr}">${this.escapeHtml(content)}</span>`
-        : this.escapeHtml(content);
+      const spanTemplate = (text: string) =>
+        globalStyleStr ? `<span style="${globalStyleStr}">${text}</span>` : `<span>${text}</span>`; // 无样式也包span，保持结构统一
+
+      newlineFragments.forEach((fragment, index) => {
+        // 处理文本片段（转义HTML）
+        const escapedFragment = fragment ? this.escapeHtml(fragment) : '';
+
+        // 非空片段：包span
+        if (escapedFragment) {
+          finalHtml += spanTemplate(escapedFragment);
+        }
+
+        // 不是最后一个片段：添加span外的<br>（对应\n）
+        if (index < newlineFragments.length - 1) {
+          finalHtml += '<br>';
+        }
+      });
+
+      return finalHtml;
     }
 
-    // 有行内样式：先分组行内样式
+    // 有行内样式：先按\n拆分，再对每个文本段应用行内样式，\n转为span外的<br>
+    // 1. 预处理行内样式：分组+获取拆分点
     const groupedStyles = this.groupStylesByRange(inlineStyles);
     const splitPoints = new Set<number>([0, content.length]);
     groupedStyles.forEach((style) => {
@@ -24,77 +46,90 @@ export class DomTextRenderer implements INodeRenderer<string> {
     });
     const sortedSplitPoints = Array.from(splitPoints).sort((a, b) => a - b);
 
-    let html = '';
-    for (let i = 0; i < sortedSplitPoints.length - 1; i++) {
-      const start = sortedSplitPoints[i];
-      const end = sortedSplitPoints[i + 1];
-      if (start! >= end!) continue;
+    // 2. 遍历按\n拆分的片段，逐个处理
+    let contentCursor = 0; // 记录当前处理到content的位置
+    newlineFragments.forEach((newlineFragment, fragIndex) => {
+      const fragLength = newlineFragment.length;
+      const fragEnd = contentCursor + fragLength;
 
-      const textFragment = this.escapeHtml(content.slice(start, end));
-      const matchedStyles = groupedStyles.filter((style) => {
-        return style.start! <= start! && style.end! >= end!;
-      });
+      // 处理当前\n分隔的文本段（可能包含行内样式拆分点）
+      if (fragLength > 0) {
+        let segmentHtml = '';
+        // 遍历行内样式拆分点，处理当前文本段内的样式
+        for (let i = 0; i < sortedSplitPoints.length - 1; i++) {
+          const start = sortedSplitPoints[i];
+          const end = sortedSplitPoints[i + 1];
+          if (start! >= end!) continue;
 
-      // 步骤1：以全局样式为基础（JS对象）
-      const baseStyle = { ...globalStyles };
-      // 步骤2：合并行内样式（行内覆盖全局）
-      const finalStyleObj = matchedStyles.reduce((acc, cur) => {
-        return { ...acc, ...cur.combinedStyles };
-      }, baseStyle);
+          const overlapStart = Math.max(start!, contentCursor);
+          const overlapEnd = Math.min(end!, fragEnd);
+          if (overlapStart >= overlapEnd) continue;
 
-      // 步骤3：核心！将「全局+行内」的合并样式对象 → 转换为CSS字符串
-      const finalStyleStr = this.convertStylesToCss(finalStyleObj);
+          // 提取当前子片段的文本
+          const textSubFragment = content.slice(overlapStart, overlapEnd);
+          const escapedSubFragment = this.escapeHtml(textSubFragment);
 
-      // 步骤4：拼接带CSS样式的span
-      html += `<span style="${finalStyleStr}">${textFragment}</span>`;
-    }
+          // 匹配当前子片段的样式（全局+行内）
+          const matchedStyles = groupedStyles.filter((style) => {
+            return style.start! <= overlapStart && style.end! >= overlapEnd;
+          });
+          const baseStyle = { ...globalStyles };
+          const finalStyleObj = matchedStyles.reduce((acc, cur) => {
+            return { ...acc, ...cur.combinedStyles };
+          }, baseStyle);
+          const finalStyleStr = this.convertStylesToCss(finalStyleObj);
 
-    return html;
+          // 拼接带样式的span
+          segmentHtml += `<span style="${finalStyleStr}">${escapedSubFragment}</span>`;
+        }
+        finalHtml += segmentHtml;
+      }
+
+      // 3. 不是最后一个\n片段：添加span外的<br>
+      if (fragIndex < newlineFragments.length - 1) {
+        finalHtml += '<br>';
+      }
+
+      // 更新游标到下一个\n片段的起始位置
+      contentCursor = fragEnd + 1; // +1 跳过当前的\n
+    });
+
+    return finalHtml;
   }
 
-  // 核心修改：显式处理颜色属性，添加合法性校验
+  // 保留原有convertStylesToCss（仅补充注释，逻辑不变）
   private convertStylesToCss(styles: Record<string, unknown>): string {
     const cssEntries: string[] = [];
     const textDecorations: string[] = [];
 
     Object.entries(styles).forEach(([key, value]) => {
-      // 跳过无效值（undefined/null/false/空字符串）
       if (value === undefined || value === null || value === false || value === '') return;
 
       switch (key) {
-        // 显式处理颜色属性（确保不被遗漏）
         case 'color':
           cssEntries.push(`color:${value}`);
           break;
-        //显式处理字号
         case 'fontSize':
           cssEntries.push(`font-size:${value}px`);
           break;
-        // 下划线、删除线处理
         case 'textDecoration':
           if (value) textDecorations.push(value as string);
-          //console.log('!!!!!!!!push了 textDecorations=', textDecorations);
           break;
-        // 其他样式（保持驼峰转连字符）
         default:
           const cssKey = key.replace(/[A-Z]/g, (letter) => `-${letter.toLowerCase()}`);
           cssEntries.push(`${cssKey}:${value}`);
-          //console.log('push了', cssKey, ':', value);
           break;
       }
     });
 
-    // 合并 text-decoration
     if (textDecorations.length > 0) {
-      // console.log(`text-decoration:${textDecorations.join(' ')}`);
       cssEntries.push(`text-decoration:${textDecorations.join(' ')}`);
     }
 
-    // 避免空 style 属性
     return cssEntries.join('; ') || 'visibility: inherit';
   }
 
-  // 重点修复：合并同一范围的textDecoration多值，而非覆盖
+  // 保留原有groupStylesByRange（逻辑不变）
   groupStylesByRange = (
     styles: Array<{
       start: number;
@@ -106,27 +141,20 @@ export class DomTextRenderer implements INodeRenderer<string> {
     styles.forEach((style) => {
       const key = `${style.start}-${style.end}`;
       const existingStyles = rangeMap.get(key) || {};
-      // 新：合并样式（特殊处理textDecoration）
       const mergedStyles = { ...existingStyles };
 
-      // 遍历当前样式的每一个属性
       Object.entries(style.styles).forEach(([prop, value]) => {
         if (prop === 'textDecoration' && value) {
-          // 1. 处理textDecoration：合并多值（去重）
           const existingValue = existingStyles.textDecoration as string | undefined;
-          // 拆分已有值和当前值为数组，去重后合并
           const existingValues = existingValue ? existingValue.split(/\s+/) : [];
           const currentValues = (value as string).split(/\s+/);
-          // 合并并去重（避免重复值，如多次添加underline）
           const combinedValues = Array.from(new Set([...existingValues, ...currentValues]));
           mergedStyles.textDecoration = combinedValues.join(' ');
         } else {
-          // 2. 其他样式：保持覆盖逻辑（后添加的优先级更高）
           mergedStyles[prop] = value;
         }
       });
 
-      // 更新map：存入合并后的样式
       rangeMap.set(key, mergedStyles);
     });
 
@@ -136,6 +164,7 @@ export class DomTextRenderer implements INodeRenderer<string> {
     });
   };
 
+  // 保留原有escapeHtml（逻辑不变）
   escapeHtml = (str: string) => {
     return str
       .replace(/&/g, '&amp;')

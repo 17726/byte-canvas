@@ -49,6 +49,14 @@
             >
           </div>
         </div>
+        <a-divider style="margin: 12px 0" />
+        <div class="panel-section">
+          <div class="section-title">性能工具</div>
+          <a-button type="outline" size="small" long @click="openPerformancePanel"
+            >性能测试</a-button
+          >
+          <div class="helper-text">点击后在左侧弹出性能测试工具</div>
+        </div>
       </div>
     </div>
     <!-- Node Property Mode -->
@@ -391,6 +399,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
+import { useSelectionStore } from '@/store/selectionStore';
 import { useUIStore } from '@/store/uiStore';
 import { useStyleSync } from '@/composables/useStyleSync';
 import {
@@ -401,8 +410,10 @@ import {
   type TextState,
 } from '@/types/state';
 import { DEFAULT_CANVAS_THEMES, DEFAULT_IMAGE_FILTERS, DEFAULT_IMAGE_URL } from '@/config/defaults';
+import { GroupService } from '@/core/services/GroupService';
 
 const store = useCanvasStore();
+const selectionStore = useSelectionStore();
 const ui = useUIStore();
 
 // 使用 useStyleSync 进行属性绑定（基础变换和通用属性）
@@ -446,6 +457,12 @@ function applyPreset(theme: {
   store.viewport.gridDotColor = theme.gridColor;
   store.viewport.gridSize = theme.gridSize;
 }
+
+const openPerformancePanel = () => {
+  ui.setPanelExpanded(true);
+  ui.setActivePanel('canvas');
+  ui.setPerformancePanelVisible(true);
+};
 
 // --- Helpers ---
 // isShape, isText, isImage, isGroup 已从 useStyleSync 导入
@@ -663,9 +680,15 @@ const applyFillColor = (newColor?: unknown) => {
   const color = extractColorValue(newColor, fillColorTemp.value);
   fillColorTemp.value = color;
   if (activeNode.value.style.backgroundColor === color) return;
-  store.updateNode(activeNode.value.id, {
-    style: { ...activeNode.value.style, backgroundColor: color },
-  });
+
+  // 判断是否为 Group 节点
+  if (activeNode.value.type === NodeType.GROUP) {
+    GroupService.updateGroupStyle(store, activeNode.value.id, { backgroundColor: color });
+  } else {
+    store.updateNode(activeNode.value.id, {
+      style: { ...activeNode.value.style, backgroundColor: color },
+    });
+  }
 };
 
 const applyStrokeStyle = (options?: { color?: unknown; width?: number }) => {
@@ -692,13 +715,21 @@ const applyStrokeStyle = (options?: { color?: unknown; width?: number }) => {
 
   if (!colorChanged && !widthChanged) return;
 
-  store.updateNode(activeNode.value.id, {
-    style: {
-      ...activeNode.value.style,
+  // 判断是否为 Group 节点
+  if (activeNode.value.type === NodeType.GROUP) {
+    GroupService.updateGroupStyle(store, activeNode.value.id, {
       borderColor: nextColor,
       borderWidth: nextWidth,
-    },
-  });
+    });
+  } else {
+    store.updateNode(activeNode.value.id, {
+      style: {
+        ...activeNode.value.style,
+        borderColor: nextColor,
+        borderWidth: nextWidth,
+      },
+    });
+  }
 };
 
 const handleStrokeColorChange = (value: unknown) => {
@@ -911,7 +942,7 @@ const selectFilter = (filterType: string) => {
 };
 
 const grayscaleFilter = () => {
-  store.activeElements.forEach((element) => {
+  selectionStore.activeElements.forEach((element) => {
     if (element && element.id && element.type === 'image') {
       store.updateNode(element.id, {
         props: {
@@ -928,7 +959,7 @@ const grayscaleFilter = () => {
 };
 
 const blurFilter = () => {
-  store.activeElements.forEach((element) => {
+  selectionStore.activeElements.forEach((element) => {
     if (element && element.id && element.type === 'image') {
       store.updateNode(element.id, {
         props: {
@@ -945,7 +976,7 @@ const blurFilter = () => {
 };
 
 const vintageFilter = () => {
-  store.activeElements.forEach((element) => {
+  selectionStore.activeElements.forEach((element) => {
     if (element && element.id && element.type === 'image') {
       store.updateNode(element.id, {
         props: {
@@ -964,7 +995,7 @@ const vintageFilter = () => {
 };
 
 const resetFilter = () => {
-  store.activeElements.forEach((element) => {
+  selectionStore.activeElements.forEach((element) => {
     if (element && element.id && element.type === 'image') {
       store.updateNode(element.id, {
         props: {
@@ -1015,6 +1046,12 @@ const resetFilter = () => {
   color: var(--color-text-3);
   margin-bottom: 8px;
   text-transform: uppercase;
+}
+
+.helper-text {
+  font-size: 12px;
+  color: var(--color-text-3);
+  margin-top: 6px;
 }
 
 .prop-row {

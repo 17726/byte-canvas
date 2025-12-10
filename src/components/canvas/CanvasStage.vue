@@ -62,6 +62,9 @@
       X: {{ store.viewport.offsetX.toFixed(0) }} <br />
       Y: {{ store.viewport.offsetY.toFixed(0) }}
     </div>
+
+    <!-- 性能测试面板 -->
+    <PerformanceTestPanel v-if="ui.showPerformancePanel" />
   </div>
 </template>
 
@@ -75,6 +78,9 @@ import {
 import { GroupService } from '@/core/services/GroupService';
 import { ToolManager } from '@/core/ToolManager';
 import { useCanvasStore } from '@/store/canvasStore';
+import { useHistoryStore } from '@/store/historyStore';
+import { useSelectionStore } from '@/store/selectionStore';
+import { useUIStore } from '@/store/uiStore';
 import { useNodeActions } from '@/composables/useNodeActions';
 import { NodeType } from '@/types/state';
 import { computed, onMounted, onUnmounted, provide, ref, watch, type CSSProperties } from 'vue';
@@ -86,12 +92,17 @@ import ImageLayer from './layers/ImageLayer.vue';
 import RectLayer from './layers/RectLayer.vue';
 import TextLayer from './layers/TextLayer.vue';
 import SelectionOverlay from './SelectionOverlay.vue';
+import PerformanceTestPanel from '../performance/PerformanceTestPanel.vue';
 
 const store = useCanvasStore();
+const historyStore = useHistoryStore();
+const selectionStore = useSelectionStore();
+const ui = useUIStore();
 const stageRef = ref<HTMLElement | null>(null);
 
 // 使用 useNodeActions 提供的操作方法（带 UI 反馈）
-const { deleteSelected, copy, cut, paste, groupSelected, ungroupSelected } = useNodeActions();
+const { deleteSelected, copy, cut, paste, groupSelected, ungroupSelected, selectAll } =
+  useNodeActions();
 
 // 空格键状态（迁移自ToolManager，统一在组件内维护）
 const isSpacePressed = ref(false);
@@ -260,8 +271,8 @@ const handleContextMenu = (e: MouseEvent) => {
 
   // 如果没有选中任何节点，则取消选中
   const nodeLayer = (e.target as Element).closest('.node-layer');
-  if (!nodeLayer || !store.activeElementIds.has(nodeLayer.id)) {
-    store.setActive([]);
+  if (!nodeLayer || !selectionStore.activeElementIds.has(nodeLayer.id)) {
+    selectionStore.clearSelection();
   }
 
   // 转发到ToolManager处理
@@ -276,8 +287,8 @@ const handleNodeContextMenu = (e: MouseEvent, id: string) => {
   e.stopPropagation(); // 阻止事件冒泡到画布
 
   // 如果节点未被选中，将其设为唯一选中项
-  if (!store.activeElementIds.has(id)) {
-    store.setActive([id]);
+  if (!selectionStore.activeElementIds.has(id)) {
+    selectionStore.setActive([id]);
   }
 
   // 转发到ToolManager处理
@@ -291,9 +302,13 @@ const handleNodeContextMenu = (e: MouseEvent, id: string) => {
 
 // 键盘事件处理（整合所有键盘逻辑：快捷键 + 空格键）
 const handleKeyDown = (e: KeyboardEvent) => {
-  // 忽略输入框内的键盘事件
+  // 输入框内的键盘事件
   const target = e.target as HTMLElement;
   if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+    if (e.key === 'Enter' && toolManagerRef.value) {
+      console.log('文本输入框内按键，交给 ToolManager 处理：', e.key);
+      //toolManagerRef.value.handleEnterKey(e);
+    }
     return;
   }
 
@@ -313,8 +328,8 @@ const handleKeyDown = (e: KeyboardEvent) => {
       return;
     }
     // 其次处理组合编辑模式
-    if (store.editingGroupId) {
-      GroupService.exitGroupEdit(store);
+    if (selectionStore.editingGroupId) {
+      GroupService.exitGroupEdit();
       return;
     }
   }
@@ -357,20 +372,20 @@ const handleKeyDown = (e: KeyboardEvent) => {
   // Ctrl/Cmd + Z: 撤销
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'z') {
     e.preventDefault();
-    store.undo();
+    historyStore.undo();
     return;
   }
 
   // Ctrl/Cmd + Y: 重做
   if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === 'y') {
     e.preventDefault();
-    store.redo();
+    historyStore.redo();
     return;
   }
   // Ctrl/Cmd + Shift + Z: 重做
   if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'z') {
     e.preventDefault();
-    store.redo();
+    historyStore.redo();
     return;
   }
 
@@ -378,6 +393,12 @@ const handleKeyDown = (e: KeyboardEvent) => {
   if (e.key === 'Delete' || e.key === 'Backspace') {
     e.preventDefault();
     deleteSelected();
+    return;
+  }
+  // Ctrl/Cmd + A: 全选（复用 useNodeActions，保持与右键菜单一致）
+  if ((e.ctrlKey || e.metaKey) && e.key === 'a') {
+    e.preventDefault();
+    selectAll();
     return;
   }
 };

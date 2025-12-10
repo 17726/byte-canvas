@@ -35,6 +35,9 @@ export const useUIStore = defineStore('ui', () => {
   // 面板是否展开
   const isPanelExpanded = ref(false);
 
+  // 性能测试面板显示状态（仅本地会话）
+  const showPerformancePanel = ref(false);
+
   /**
    * 设置当前激活的面板模式
    *
@@ -53,10 +56,21 @@ export const useUIStore = defineStore('ui', () => {
     isPanelExpanded.value = expanded;
   }
 
+  /**
+   * 控制性能测试面板显示/隐藏
+   *
+   * @param visible - true 表示显示，false 表示隐藏
+   */
+  function setPerformancePanelVisible(visible: boolean) {
+    showPerformancePanel.value = visible;
+  }
+
   return {
     activePanel,
     isPanelExpanded,
+    showPerformancePanel,
     setActivePanel,
     setPanelExpanded,
+    setPerformancePanelVisible,
   };
 });

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { watch, computed, onMounted } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
+import { useSelectionStore } from '@/store/selectionStore';
 import { useUIStore } from '@/store/uiStore';
 import { Left as IconLeft, Right as IconRight } from '@icon-park/vue-next';
 import CanvasStage from '@/components/canvas/CanvasStage.vue';
@@ -10,6 +11,7 @@ import PropertyPanel from '@/components/ui/panels/InspectorPanel.vue';
 import ContextMenu from '@/components/ui/floating/ContextMenu.vue';
 
 const store = useCanvasStore();
+const selectionStore = useSelectionStore();
 const ui = useUIStore();
 
 // 应用启动时从 localStorage 恢复画布状态
@@ -19,7 +21,7 @@ onMounted(() => {
 
 // 监听选中状态，自动展开/折叠
 watch(
-  () => store.activeElementIds.size,
+  () => selectionStore.activeElementIds.size,
   (newSize) => {
     if (newSize > 0) {
       ui.setPanelExpanded(true);
