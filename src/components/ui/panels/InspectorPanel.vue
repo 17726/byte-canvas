@@ -59,11 +59,141 @@
         </div>
       </div>
     </div>
-    <!-- Node Property Mode -->
+
     <div v-else>
-      <div v-if="!activeNode" class="empty-state">
+      <div v-if="isMultiSelection" class="panel-content">
+        <div class="panel-header">
+          <span class="node-type">多选元素</span>
+          <span class="node-id">{{ multiSelectionCount }} 个对象</span>
+        </div>
+
+        <div class="panel-section">
+          <div class="section-title">变换 (整体)</div>
+          <a-row :gutter="8" class="prop-row">
+            <a-col :span="12">
+              <a-input-number v-model="multiX" size="small" :precision="2">
+                <template #prefix>X</template>
+              </a-input-number>
+            </a-col>
+            <a-col :span="12">
+              <a-input-number v-model="multiY" size="small" :precision="2">
+                <template #prefix>Y</template>
+              </a-input-number>
+            </a-col>
+          </a-row>
+          <a-row :gutter="8" class="prop-row">
+            <a-col :span="12">
+              <a-input-number
+                v-model="multiW"
+                size="small"
+                :min="1"
+                :precision="2"
+                placeholder="混合"
+              >
+                <template #prefix>W</template>
+              </a-input-number>
+            </a-col>
+            <a-col :span="12">
+              <a-input-number
+                v-model="multiH"
+                size="small"
+                :min="1"
+                :precision="2"
+                placeholder="混合"
+              >
+                <template #prefix>H</template>
+              </a-input-number>
+            </a-col>
+          </a-row>
+          <a-row :gutter="8" class="prop-row">
+            <a-col :span="24">
+              <span class="section-title">统一旋转角度</span>
+              <a-slider
+                v-model="multiRotation"
+                :min="-180"
+                :max="180"
+                :step="0.1"
+                show-input
+                size="small"
+              />
+            </a-col>
+          </a-row>
+        </div>
+        <a-divider style="margin: 12px 0" />
+
+        <div class="panel-section">
+          <div class="label">外观</div>
+
+          <div class="prop-item" v-if="multiHasShape">
+            <span class="section-title">填充 (统一)</span>
+            <div class="flex-row">
+              <a-color-picker v-model="multiFill" size="small" />
+            </div>
+          </div>
+
+          <div class="prop-item" v-if="multiHasShape">
+            <span class="section-title">描边 (统一)</span>
+            <div class="flex-row">
+              <a-color-picker v-model="multiStrokeColor" size="small" />
+              <a-input-number v-model="multiStrokeWidth" size="small" style="width: 80px" :min="0">
+                <template #suffix>px</template>
+              </a-input-number>
+            </div>
+          </div>
+
+          <div class="prop-item">
+            <div class="section-title">不透明度</div>
+            <a-slider
+              v-model="multiOpacity"
+              :min="0"
+              :max="1"
+              :step="0.01"
+              show-input
+              size="small"
+            />
+          </div>
+        </div>
+        <a-divider style="margin: 12px 0" />
+
+        <div class="panel-section">
+          <div class="label">属性</div>
+          <div class="common">
+            <span class="section-title">z-Index</span>
+            <a-input-number
+              v-model="multiZIndex"
+              size="small"
+              :min="1"
+              mode="button"
+              style="margin-top: 8px"
+            />
+          </div>
+
+          <template v-if="multiHasText">
+            <a-divider style="margin: 12px 0" />
+            <div class="label">文字样式</div>
+            <div class="prop-item">
+              <div class="section-title">字号</div>
+              <a-input-number v-model="multiFontSize" size="small" :min="1" />
+            </div>
+            <div class="prop-item">
+              <div class="section-title">字重</div>
+              <a-select v-model="multiFontWeight" size="small">
+                <a-option :value="400">Normal</a-option>
+                <a-option :value="700">Bold</a-option>
+              </a-select>
+            </div>
+            <div class="prop-item">
+              <div class="section-title">颜色</div>
+              <a-color-picker v-model="multiTextColor" show-text size="small" />
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <div v-else-if="!activeNode" class="empty-state">
         <a-empty description="未选中元素" />
       </div>
+      <!-- Node Property Mode -->
       <div v-else class="panel-content">
         <div class="panel-header">
           <span class="node-type">{{ activeNode?.type?.toUpperCase() }}</span>
@@ -1006,9 +1136,344 @@ const resetFilter = () => {
     }
   });
 };
+
+// --- 新增：多选相关逻辑 ---
+const isMultiSelection = computed(() => selectionStore.activeElements.length > 1);
+const multiSelectionCount = computed(() => selectionStore.activeElements.length);
+
+/**
+ * 封装批量更新逻辑（上锁/解锁），用于支持撤销/重做
+ * @param action 执行更新的回调函数
+ */
+const executeBatchUpdate = (action: () => void) => {
+  // 假设 store 提供了 startBatch 和 endBatch (或类似 snapshot/lock 机制)
+  // 如果没有暴露这些方法，请确保在 store 中实现或替换为实际的 lock/unlock 方法
+  if (store.startBatch) {
+    store.startBatch();
+  }
+  try {
+    action();
+  } finally {
+    if (store.endBatch) {
+      store.endBatch();
+    }
+  }
+};
+
+/**
+ * 获取多选元素的包围盒（Bounding Box）
+ */
+const getMultiSelectionBounds = () => {
+  const elements = selectionStore.activeElements;
+  if (elements.length === 0) return { x: 0, y: 0, width: 0, height: 0 };
+
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+
+  elements.forEach((el) => {
+    minX = Math.min(minX, el.transform.x);
+    minY = Math.min(minY, el.transform.y);
+    maxX = Math.max(maxX, el.transform.x + el.transform.width);
+    maxY = Math.max(maxY, el.transform.y + el.transform.height);
+  });
+
+  return {
+    x: minX,
+    y: minY,
+    width: maxX - minX,
+    height: maxY - minY,
+  };
+};
+
+// 1. 变换 (Transform)
+// X/Y: 获取左上角最小值；设置时移动所有元素（保持相对位置）
+const multiX = computed({
+  get: () => {
+    return getMultiSelectionBounds().x;
+  },
+  set: (val: number) => {
+    executeBatchUpdate(() => {
+      const currentMinX = getMultiSelectionBounds().x;
+      const delta = val - currentMinX;
+      selectionStore.activeElements.forEach((el) => {
+        store.updateNode(el.id, { transform: { ...el.transform, x: el.transform.x + delta } });
+      });
+    });
+  },
+});
+
+const multiY = computed({
+  get: () => {
+    return getMultiSelectionBounds().y;
+  },
+  set: (val: number) => {
+    executeBatchUpdate(() => {
+      const currentMinY = getMultiSelectionBounds().y;
+      const delta = val - currentMinY;
+      selectionStore.activeElements.forEach((el) => {
+        store.updateNode(el.id, { transform: { ...el.transform, y: el.transform.y + delta } });
+      });
+    });
+  },
+});
+
+// W/H: 显示为框选包围框的宽高；设置时按照比例缩放所有子元素
+const multiW = computed({
+  get: () => {
+    return getMultiSelectionBounds().width;
+  },
+  set: (val: number | undefined) => {
+    if (val === undefined || val <= 0) return;
+    executeBatchUpdate(() => {
+      const bounds = getMultiSelectionBounds();
+      const scale = val / bounds.width;
+
+      selectionStore.activeElements.forEach((el) => {
+        // 计算元素相对于包围盒左边缘的偏移，并应用缩放
+        const relativeX = el.transform.x - bounds.x;
+        const newX = bounds.x + relativeX * scale;
+        const newWidth = el.transform.width * scale;
+
+        store.updateNode(el.id, {
+          transform: {
+            ...el.transform,
+            x: newX,
+            width: newWidth,
+          },
+        });
+      });
+    });
+  },
+});
+
+const multiH = computed({
+  get: () => {
+    return getMultiSelectionBounds().height;
+  },
+  set: (val: number | undefined) => {
+    if (val === undefined || val <= 0) return;
+    executeBatchUpdate(() => {
+      const bounds = getMultiSelectionBounds();
+      const scale = val / bounds.height;
+
+      selectionStore.activeElements.forEach((el) => {
+        // 计算元素相对于包围盒上边缘的偏移，并应用缩放
+        const relativeY = el.transform.y - bounds.y;
+        const newY = bounds.y + relativeY * scale;
+        const newHeight = el.transform.height * scale;
+
+        store.updateNode(el.id, {
+          transform: {
+            ...el.transform,
+            y: newY,
+            height: newHeight,
+          },
+        });
+      });
+    });
+  },
+});
+
+const multiRotation = computed({
+  get: () => {
+    const elements = selectionStore.activeElements;
+    if (elements.length === 0) return 0;
+    if (!elements[0]) return 0;
+    const firstR = elements[0].transform.rotation;
+    return elements.every((el) => el.transform.rotation === firstR) ? firstR : 0;
+  },
+  set: (val: number) => {
+    executeBatchUpdate(() => {
+      selectionStore.activeElements.forEach((el) => {
+        store.updateNode(el.id, { transform: { ...el.transform, rotation: val } });
+      });
+    });
+  },
+});
+
+// 2. 外观 (Appearance)
+const multiHasShape = computed(() => {
+  return selectionStore.activeElements.some(
+    (el) => el.type === NodeType.RECT || el.type === NodeType.CIRCLE || el.type === NodeType.GROUP
+  );
+});
+
+const multiFill = computed({
+  get: () => {
+    const elements = selectionStore.activeElements.filter(
+      (el) => el.type === NodeType.RECT || el.type === NodeType.CIRCLE || el.type === NodeType.GROUP
+    );
+    if (elements.length === 0) return '';
+    if (!elements[0]) return;
+    const firstColor = elements[0].style.backgroundColor;
+    // 如果颜色都一样返回颜色，否则返回 undefined (ColorPicker 会显示混合或默认)
+    return elements.every((el) => el.style.backgroundColor === firstColor) ? firstColor : undefined;
+  },
+  set: (val: any) => {
+    executeBatchUpdate(() => {
+      const color = extractColorValue(val, '');
+      selectionStore.activeElements.forEach((el) => {
+        if (el.type === NodeType.RECT || el.type === NodeType.CIRCLE) {
+          store.updateNode(el.id, { style: { ...el.style, backgroundColor: color } });
+        } else if (el.type === NodeType.GROUP) {
+          GroupService.updateGroupStyle(store, el.id, { backgroundColor: color });
+        }
+      });
+    });
+  },
+});
+
+const multiStrokeColor = computed({
+  get: () => {
+    const elements = selectionStore.activeElements.filter(
+      (el) => el.type === NodeType.RECT || el.type === NodeType.CIRCLE || el.type === NodeType.GROUP
+    );
+    if (elements.length === 0) return '';
+    if (!elements[0]) return;
+    const firstColor = elements[0].style.borderColor;
+    return elements.every((el) => el.style.borderColor === firstColor) ? firstColor : undefined;
+  },
+  set: (val: any) => {
+    executeBatchUpdate(() => {
+      const color = extractColorValue(val, '');
+      selectionStore.activeElements.forEach((el) => {
+        if (el.type === NodeType.RECT || el.type === NodeType.CIRCLE) {
+          store.updateNode(el.id, { style: { ...el.style, borderColor: color } });
+        } else if (el.type === NodeType.GROUP) {
+          GroupService.updateGroupStyle(store, el.id, { borderColor: color });
+        }
+      });
+    });
+  },
+});
+
+const multiStrokeWidth = computed({
+  get: () => {
+    const elements = selectionStore.activeElements.filter(
+      (el) => el.type === NodeType.RECT || el.type === NodeType.CIRCLE || el.type === NodeType.GROUP
+    );
+    if (elements.length === 0) return 0;
+    if (!elements[0]) return;
+    const firstW = elements[0].style.borderWidth;
+    return elements.every((el) => el.style.borderWidth === firstW) ? firstW : undefined;
+  },
+  set: (val: number | undefined) => {
+    if (val === undefined) return;
+    executeBatchUpdate(() => {
+      selectionStore.activeElements.forEach((el) => {
+        if (el.type === NodeType.RECT || el.type === NodeType.CIRCLE) {
+          store.updateNode(el.id, { style: { ...el.style, borderWidth: val } });
+        } else if (el.type === NodeType.GROUP) {
+          GroupService.updateGroupStyle(store, el.id, { borderWidth: val });
+        }
+      });
+    });
+  },
+});
+
+const multiOpacity = computed({
+  get: () => {
+    const elements = selectionStore.activeElements;
+    if (elements.length === 0) return 1;
+    if (!elements[0]) return;
+    const firstOp = elements[0].style.opacity ?? 1;
+    return elements.every((el) => (el.style.opacity ?? 1) === firstOp) ? firstOp : 1;
+  },
+  set: (val: number) => {
+    executeBatchUpdate(() => {
+      selectionStore.activeElements.forEach((el) => {
+        store.updateNode(el.id, { style: { ...el.style, opacity: val } });
+      });
+    });
+  },
+});
+
+const multiZIndex = computed({
+  get: () => {
+    const elements = selectionStore.activeElements;
+    if (elements.length === 0) return 1;
+    if (!elements[0]) return;
+    const firstZ = elements[0].style.zIndex ?? 1;
+    return elements.every((el) => (el.style.zIndex ?? 1) === firstZ) ? firstZ : undefined;
+  },
+  set: (val: number | undefined) => {
+    if (val === undefined) return;
+    executeBatchUpdate(() => {
+      selectionStore.activeElements.forEach((el) => {
+        store.updateNode(el.id, { style: { ...el.style, zIndex: val } });
+      });
+    });
+  },
+});
+
+// 3. 文字 (Text)
+const multiHasText = computed(() => {
+  return selectionStore.activeElements.some((el) => el.type === NodeType.TEXT);
+});
+
+const multiTextNodes = computed(() => {
+  return selectionStore.activeElements.filter((el): el is TextState => el.type === NodeType.TEXT);
+});
+
+const multiFontSize = computed({
+  get: () => {
+    const texts = multiTextNodes.value;
+    if (texts.length === 0) return 12;
+    if (!texts[0]) return;
+    const firstS = texts[0].props.fontSize;
+    return texts.every((t) => t.props.fontSize === firstS) ? firstS : undefined;
+  },
+  set: (val: number | undefined) => {
+    if (val === undefined) return;
+    executeBatchUpdate(() => {
+      multiTextNodes.value.forEach((t) => {
+        store.updateNode(t.id, { props: { ...t.props, fontSize: val } } as Partial<TextState>);
+      });
+    });
+  },
+});
+
+const multiFontWeight = computed({
+  get: () => {
+    const texts = multiTextNodes.value;
+    if (texts.length === 0) return 400;
+    if (!texts[0]) return;
+    const firstW = texts[0].props.fontWeight;
+    return texts.every((t) => t.props.fontWeight === firstW) ? firstW : undefined;
+  },
+  set: (val: number | undefined) => {
+    if (val === undefined) return;
+    executeBatchUpdate(() => {
+      multiTextNodes.value.forEach((t) => {
+        store.updateNode(t.id, { props: { ...t.props, fontWeight: val } } as Partial<TextState>);
+      });
+    });
+  },
+});
+
+const multiTextColor = computed({
+  get: () => {
+    const texts = multiTextNodes.value;
+    if (texts.length === 0) return '#000000';
+    if (!texts[0]) return;
+    const firstC = texts[0].props.color;
+    return texts.every((t) => t.props.color === firstC) ? firstC : undefined;
+  },
+  set: (val: any) => {
+    executeBatchUpdate(() => {
+      const color = extractColorValue(val, '');
+      multiTextNodes.value.forEach((t) => {
+        store.updateNode(t.id, { props: { ...t.props, color: color } } as Partial<TextState>);
+      });
+    });
+  },
+});
 </script>
 
 <style scoped>
+/* 原有样式保持不变 */
 .property-panel {
   height: 100%;
   background-color: var(--color-bg-2);
