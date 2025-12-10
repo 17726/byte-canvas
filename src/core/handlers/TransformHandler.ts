@@ -583,8 +583,12 @@ export class TransformHandler {
           const scale = Math.abs(scaleX) > Math.abs(scaleY) ? scaleX : scaleY;
 
           // 计算等比目标尺寸（最小尺寸保护）
-          const targetWidth = Math.max(Math.abs(scale) * startWidth, MIN_SIZE);
-          const targetHeight = Math.max(targetWidth / startRatio, MIN_SIZE);
+          let targetWidth = Math.max(Math.abs(scale) * startWidth, MIN_SIZE);
+          let targetHeight = Math.max(targetWidth / startRatio, MIN_SIZE);
+          // Re-adjust width to maintain ratio if height was clamped
+          if (targetHeight === MIN_SIZE && targetWidth / startRatio < MIN_SIZE) {
+            targetWidth = MIN_SIZE * startRatio;
+          }
 
           // 基于中心对称计算 fixed/movable
           fixedX = centerX - targetWidth / 2;
