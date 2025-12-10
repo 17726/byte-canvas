@@ -691,7 +691,6 @@ export const useCanvasStore = defineStore('canvas', () => {
       .map((id) => nodes.value[id])
       .filter((node) => node && node.parentId === null);
   });
-
   return {
     nodes,
     nodeOrder,
