@@ -66,7 +66,6 @@ import { TextSelectionHandler } from './handlers/TextSelectionHandler';
 import { TransformHandler } from './handlers/TransformHandler';
 import { ViewportHandler } from './handlers/ViewportHandler';
 import { GroupService } from './services/GroupService';
-import { TextService } from './services/TextService';
 
 /**
  * 工具管理器类
@@ -590,7 +589,7 @@ export class ToolManager {
     const savedCursorPos = this.textSelectionHandler.saveFullSelection(id);
 
     // 调用 TextService 时，传递 id 而非 node
-    TextService.handleContentChange(
+    this.textSelectionHandler.handleContentChange(
       e,
       id, // 传递节点 ID
       this.store, // Pinia 实例

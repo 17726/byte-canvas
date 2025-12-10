@@ -12,7 +12,6 @@ import {
   type TextState,
 } from '@/types/state';
 import { nextTick } from 'vue';
-import { TextService } from '../services/TextService';
 import type { TransformHandler } from './TransformHandler';
 import type { ViewportHandler } from './ViewportHandler';
 //import { TextService } from '../services/TextService';
@@ -529,7 +528,7 @@ export class TextSelectionHandler {
           this.fallbackToTextEnd(editor, selection);
         }
       } catch (e) {
-        // console.log('恢复选区失败，降级到文本末尾', e);
+        console.log('恢复选区失败，降级到文本末尾', e);
         this.fallbackToTextEnd(editor, selection);
       }
     });
@@ -1486,7 +1485,7 @@ export class TextSelectionHandler {
 
       // 后续逻辑不变
       setTimeout(() => {
-        TextService.handleContentChange(
+        this.handleContentChange(
           e,
           id,
           this.store,
@@ -1507,122 +1506,6 @@ export class TextSelectionHandler {
     }
     console.log('保留默认行为');
     // 非末尾换行：保留浏览器默认行为（只插一个 <br>，无需处理）
-  };
-
-  /**
-   * 辅助：判断光标是否在文本末尾（兼容空白节点/空文本/BR）
-   */
-  private isCursorAtTextEnd = (id: string, range: Range): boolean => {
-    const editor = this.editors[id];
-    if (!editor || !range) return false;
-
-    // 步骤1：创建编辑器末尾的range（原始）
-    const endRange = document.createRange();
-    endRange.selectNodeContents(editor);
-    endRange.collapse(false);
-
-    // 步骤2：处理“视觉末尾”≠“DOM末尾”的情况：忽略末尾的空白节点
-    const isVisualEnd = this.isRangeAtVisualEnd(editor, range);
-
-    // 调试日志：打印关键参数，定位问题
-    console.log({
-      编辑器DOM: editor.innerHTML,
-      当前range位置: {
-        container: range.endContainer.nodeName,
-        offset: range.endOffset,
-        text: range.endContainer.textContent,
-      },
-      endRange位置: {
-        container: endRange.endContainer.nodeName,
-        offset: endRange.endOffset,
-        text: endRange.endContainer.textContent,
-      },
-      API对比结果: range.compareBoundaryPoints(Range.END_TO_END, endRange),
-      视觉末尾判定: isVisualEnd,
-    });
-
-    // 优先用视觉末尾判定，兜底用API对比
-    return isVisualEnd || range.compareBoundaryPoints(Range.END_TO_END, endRange) === 0;
-  };
-
-  /**
-   * 辅助：判断range是否在“视觉文本末尾”（忽略空白节点）
-   */
-  private isRangeAtVisualEnd = (editor: HTMLElement, range: Range): boolean => {
-    // 遍历编辑器所有节点，找到最后一个“有效节点”（非空文本/非BR）
-    let lastValidNode: Node | null = null;
-    const traverse = (node: Node) => {
-      if (node.nodeType === Node.TEXT_NODE) {
-        const text = node.textContent?.trim() || '';
-        if (text) lastValidNode = node; // 非空文本节点才是有效节点
-      } else if (node.nodeType === Node.ELEMENT_NODE) {
-        const el = node as HTMLElement;
-        // BR不是有效节点，跳过
-        if (el.nodeName !== 'BR') {
-          Array.from(el.childNodes).forEach(traverse);
-        }
-      }
-    };
-    traverse(editor);
-
-    // 无有效节点（编辑器为空）→ 视为在末尾
-    if (!lastValidNode) return true;
-
-    // 情况1：光标在最后一个有效文本节点的末尾
-    if (range.endContainer === lastValidNode) {
-      const textLength = ((lastValidNode as Node).textContent || '').length;
-      return range.endOffset === textLength;
-    }
-
-    // 情况2：光标在最后一个有效节点后的空白节点（BR/空文本）
-    const nextNodes = this.getNodesAfter(lastValidNode);
-    return nextNodes.some(
-      (node) =>
-        range.endContainer === node &&
-        (node.nodeName === 'BR' || (node.nodeType === Node.TEXT_NODE && !node.textContent?.trim()))
-    );
-  };
-
-  /**
-   * 辅助：获取某个节点之后的所有节点
-   */
-  private getNodesAfter = (targetNode: Node): Node[] => {
-    const nodes: Node[] = [];
-    let currentNode = targetNode.nextSibling;
-    while (currentNode) {
-      nodes.push(currentNode);
-      // 递归获取子节点（比如BR内无节点，空文本也无子节点）
-      Array.from(currentNode.childNodes).forEach((child) =>
-        nodes.push(...this.getNodesAfter(child))
-      );
-      currentNode = currentNode.nextSibling;
-    }
-    return nodes;
-  };
-
-  /**
-   * 辅助：清理末尾多余的 <br>（只保留一个）
-   */
-  private cleanExtraBrAtEnd = (id: string) => {
-    const editor = this.editors[id];
-    if (!editor) return;
-    const childNodes = Array.from(editor.childNodes);
-    // 从后往前找连续的 <br>
-    let brCount = 0;
-    for (let i = childNodes.length - 1; i >= 0; i--) {
-      const node = childNodes[i];
-      if (!node) continue;
-      if (node.nodeName === 'BR') {
-        brCount++;
-        // 超过1个则删除
-        if (brCount > 1) {
-          editor.removeChild(node as Node);
-        }
-      } else {
-        // 遇到非 <br> 节点，终止遍历
-        break;
-      }
-    }
   };
 
   handleHeightAdaptation(id: string) {
@@ -1663,6 +1546,179 @@ export class TextSelectionHandler {
           });
         }
       });
+    });
+  }
+  /**
+   * 处理文本内容变化（入参改为 id）
+   * @param e 事件对象
+   * @param id 文本节点 ID
+   * @param store Pinia 实例（由调用方传递）
+   * @param saveCursorPosition 回调函数——保存当前光标位置（防止DOM更新后光标丢失）
+   * @param restoreCursorPosition 回调函数——恢复光标位置（DOM更新后让光标回到原来的地方）
+   */
+  public handleContentChange(
+    e: Event,
+    id: string,
+    store: CanvasStore,
+    saveCursorPosition: (id: string) => {
+      isCollapsed: boolean; // 是否是光标（折叠选区）
+      startOffset: number; // 选区起始的「文本逻辑索引」（整个文本的第n个字符）
+      endOffset: number; // 选区结束的「文本逻辑索引」
+      nodeText: string; // 光标/选区所在文本节点的内容（用于匹配新DOM）
+    } | null,
+    restoreCursorPosition: (
+      savedData: {
+        isCollapsed: boolean; // 是否是光标（折叠选区）
+        startOffset: number; // 选区起始的「文本逻辑索引」（整个文本的第n个字符）
+        endOffset: number; // 选区结束的「文本逻辑索引」
+        nodeText: string; // 光标/选区所在文本节点的内容（用于匹配新DOM）
+      } | null
+    ) => void
+  ) {
+    //通过 ID 获取节点，加非空+类型校验
+    const node = store.nodes[id] as TextState | undefined;
+    if (!node || node.type !== NodeType.TEXT) return; // 仅处理文本节点
+
+    const target = e.target as HTMLElement;
+    // 保存当前光标位置
+    const savedCursorPos = saveCursorPosition(id);
+    // 递归处理所有层级的节点
+    const getContentWithNewlines = (target: Node) => {
+      // 核心：只遍历 target 的直接子节点，不处理 target 本身
+      const processChildNode = (node: Node): string => {
+        // 1. 处理 <br> 节点（包括嵌套的）
+        if (node.nodeName === 'BR') {
+          return '\n';
+        }
+        // 2. 处理 <div> 节点（包括嵌套的）：div 本身加换行，再递归处理其内部
+        if (node.nodeName === 'DIV') {
+          return '\n' + Array.from(node.childNodes).map(processChildNode).join('');
+        }
+        // 3. 文本节点：直接返回内容
+        if (node.nodeType === Node.TEXT_NODE) {
+          return node.textContent || '';
+        }
+        // 4. 其他元素（如 <span>）：递归遍历其内部子节点（处理嵌套的 <br>/<div>）
+        return Array.from(node.childNodes).map(processChildNode).join('');
+      };
+
+      // 只处理 target 的直接子节点，不处理 target 本身
+      return Array.from(target.childNodes).map(processChildNode).join('');
+    };
+
+    // 使用时：传入target元素
+    const newContent = getContentWithNewlines(target);
+
+    const oldContent = node.props.content || '';
+    console.log('旧内容:', JSON.stringify(oldContent));
+    console.log('新内容:', JSON.stringify(newContent));
+    // 通过 ID 更新节点内容
+    store.updateNode(id, {
+      props: { ...node.props, content: newContent },
+    });
+
+    // DOM 重新渲染后，恢复光标位置
+    restoreCursorPosition(savedCursorPos);
+    // console.log('恢复光标位置:', savedCursorPos);
+    // console.log('新存储的内容:', JSON.stringify(node.props.content));
+    // 同步调整内联样式（传递 id 给内部方法）
+    if (oldContent && newContent) {
+      this.updateInlineStylesOnContentChange(oldContent, newContent, id, store);
+    }
+  }
+
+  /**
+   * 文本变化时，同步调整 inlineStyles 的 start/end 索引，更新内联样式（富文本样式）的范围
+   * @param oldContent 旧内容（比如 "你好"）
+   * @param newContent 新内容（比如 "你好世界"）
+   * @param id 文本节点 ID（定位要修改的节点）
+   * @param store Pinia 实例（由调用方传递）（用来获取和更新节点数据）
+   */
+  private updateInlineStylesOnContentChange(
+    oldContent: string,
+    newContent: string,
+    id: string, // 精准定位文本节点
+    store: CanvasStore
+  ) {
+    // 1. 安全校验：通过ID从store获取文本节点，只处理「有效文本节点」
+    const node = store.nodes[id] as TextState | undefined;
+    if (!node || node.type !== NodeType.TEXT) return; // 非文本节点/节点不存在，直接退出
+
+    // 2. 计算文本长度变化（核心依据）
+    const oldLength = oldContent.length; // 旧长度（比如 "你好" → 2）
+    const newLength = newContent.length; // 新长度（比如 "你好世界" → 4）
+    const lengthDiff = newLength - oldLength; // 长度差（+2 表示插入，-1 表示删除）
+
+    // 3. 无长度变化（比如只修改文字但长度不变："你好"→"哈喽"），无需调整样式
+    if (lengthDiff === 0) return;
+
+    // 4. 准备数据：获取旧的富文本样式，以及当前光标/选区位置
+    const oldInlineStyles = node.props.inlineStyles || []; // 旧样式（比如 [{start:1, end:2, fontWeight:'bold'}] → "好"加粗）
+    const selection = window.getSelection(); // 浏览器选区（获取光标位置）
+    if (!selection || !selection.rangeCount) return; // 无光标/选区，无法判断调整位置
+
+    // 5. 关键：获取「内容修改时的光标结束位置」（样式调整的基准）
+    const editor = this.editors[id];
+    if (!editor) return;
+
+    const range = selection.getRangeAt(0);
+    const cursorTargetNode = range.startContainer;
+    const cursorBaseOffset = this.getTextOffset(cursorTargetNode, editor);
+    let cursorLocalOffset = 0;
+
+    // 处理startOffset
+    if (cursorTargetNode.nodeType === Node.TEXT_NODE) {
+      // 文本节点：offset本身就是字符数，直接用
+      cursorLocalOffset = range.startOffset;
+    } else if (cursorTargetNode.nodeType === Node.ELEMENT_NODE) {
+      // 元素节点：递归计算插入索引对应的字符数
+      cursorLocalOffset = this.calculateInsertOffsetToChars(cursorTargetNode, range.startOffset);
+    }
+
+    const cursorPos = cursorBaseOffset + cursorLocalOffset - 1; // 光标的全局字符索引位置
+
+    // 6. 核心逻辑：根据长度变化，调整每个样式的范围索引
+    const newInlineStyles = oldInlineStyles
+      .map((style) => {
+        let { start, end } = style; // 每个样式的原范围（比如 start:1, end:2 → 对应旧文本第1-2个字符）
+
+        // 场景1：文本「插入」（长度增加，lengthDiff>0）—— 光标后的样式范围向后偏移
+        if (lengthDiff > 0 && end > cursorPos) {
+          // 比如：旧文本 "你好"（长度2），在光标Pos=2插入"世界"（长度+2）
+          // 原样式 start:1, end:2 → 光标后，所以 start 不变（1），end +2 → 4
+          // 新样式范围 start:1, end:4 → 依然对应 "好"（新文本第1-2个字符，插入后"世界"在后面，不影响）
+          if (cursorPos < start) {
+            start += lengthDiff;
+          }
+          if (cursorPos < end) {
+            end += lengthDiff;
+          }
+          // 如果换行符位于样式范围内，确保不扩展样式范围
+          console.log('newContent: ', newContent);
+          console.log('光标位置：', cursorPos);
+          console.log('插入字符：', JSON.stringify(newContent[cursorPos]));
+          // if (newContent[cursorPos-1] === '\n') {
+          //   end -= 1; // 或其他逻辑，确保换行符不被包含
+          // }
+        }
+
+        // 场景2：文本「删除」（长度减少，lengthDiff<0）—— 光标后的样式范围向前偏移
+        if (lengthDiff < 0 && end > cursorPos) {
+          const offset = Math.abs(lengthDiff); // 删除的字符数（比如删除1个字符，offset=1）
+          // 比如：旧文本 "你好世界"（长度4），光标Pos=2，删除"世界"（长度-2）
+          // 原样式 start:2, end:4 → 光标后，所以 start= max(0, 2-2)=0，end= max(0,4-2)=2
+          // 新样式范围 start:0, end:2 → 对应删除后的"你好"，样式不丢失
+          start = start > cursorPos ? Math.max(0, start - offset) : start;
+          end = Math.max(start, end - offset); // 避免 end < start（无效样式范围）
+        }
+
+        return { ...style, start, end }; // 返回调整后的样式
+      })
+      .filter((style) => style.start < style.end); // 过滤无效样式（start≥end的空范围）
+
+    // 7. 最终：更新节点的内联样式（同步到store，视图自动刷新）
+    store.updateNode(id, {
+      props: { ...node.props, inlineStyles: newInlineStyles },
     });
   }
 }
