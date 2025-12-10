@@ -87,7 +87,13 @@
         <div class="divider"></div>
         <div class="tool-item">
           <!-- 字体选择下拉菜单 -->
-          <a-select style="width: 180px" placeholder="选择字体" @change="handleFontFamilyChange">
+          <a-select
+            size="mini"
+            style="width: 75px"
+            placeholder="字体"
+            :trigger-props="{ autoFitPopupWidth: false, popupStyle: { width: '150px' } }"
+            @change="handleFontFamilyChange"
+          >
             <a-option v-for="font in fontList" :key="font.value" :value="font.value">
               {{ font.label }}
             </a-option>
@@ -529,7 +535,7 @@ const handleDelete = () => {
   border-radius: 8px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
   gap: 8px;
-
+  height: 50px;
   /* 关键：确保鼠标事件有效，并防止文本选择 */
   pointer-events: auto;
   user-select: none;
