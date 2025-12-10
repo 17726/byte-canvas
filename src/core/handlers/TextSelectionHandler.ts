@@ -1578,4 +1578,45 @@ export class TextSelectionHandler {
       }
     }
   };
+
+  handleHeightAdaptation(id: string) {
+    // 延迟调整文本框高度，确保 TextService 的光标恢复已完成
+    nextTick(() => {
+      nextTick(() => {
+        const editorEl = this.editors[id];
+        if (!editorEl) return;
+
+        const node = this.store.nodes[id] as TextState | undefined;
+        if (!node) return;
+
+        const fontSize = node.props.fontSize || 16;
+        const lineHeight = node.props.lineHeight || 1.6;
+        const minHeight = fontSize * lineHeight;
+        const currentHeight = node.transform.height;
+
+        // 临时设置高度为 auto，获取准确的内容高度
+        const originalHeight = editorEl.style.height;
+        const originalOverflow = editorEl.style.overflow;
+        editorEl.style.height = 'auto';
+        editorEl.style.overflow = 'hidden';
+
+        // 获取实际内容高度
+        const scrollHeight = editorEl.scrollHeight;
+
+        // 恢复原始样式
+        editorEl.style.height = originalHeight;
+        editorEl.style.overflow = originalOverflow;
+
+        const newHeight = Math.max(scrollHeight, minHeight);
+
+        // 只有当新高度大于当前高度时才更新（避免高度缩小）
+        // 允许1px的误差，避免因为计算精度问题导致的频繁更新
+        if (newHeight > currentHeight + 1) {
+          this.store.updateNode(id, {
+            transform: { ...node.transform, height: newHeight },
+          });
+        }
+      });
+    });
+  }
 }

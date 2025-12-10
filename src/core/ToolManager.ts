@@ -583,6 +583,9 @@ export class ToolManager {
     const node = this.store.nodes[id];
     if (!node || node.type !== NodeType.TEXT) return;
 
+    // 保存当前光标位置
+    const savedCursorPos = this.textSelectionHandler.saveFullSelection(id);
+
     // 调用 TextService 时，传递 id 而非 node
     TextService.handleContentChange(
       e,
@@ -591,6 +594,10 @@ export class ToolManager {
       () => this.textSelectionHandler.saveFullSelection(id),
       (pos) => this.textSelectionHandler.restoreFullSelection(pos, id)
     );
+
+    this.textSelectionHandler.handleHeightAdaptation(id);
+
+    this.textSelectionHandler.restoreFullSelection(savedCursorPos, id);
   }
 
   /**
