@@ -59,11 +59,14 @@
 <script setup lang="ts">
 import { computed, inject, type Ref } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
+import { useSelectionStore } from '@/store/selectionStore';
 import type { ToolManager } from '@/core/ToolManager';
 import type { ResizeHandle } from '@/types/editor';
 import { NodeType, type BaseNodeState, type NodeState } from '@/types/state';
+import { computeAbsoluteTransform } from '@/core/utils/geometry';
 
 const store = useCanvasStore();
+const selectionStore = useSelectionStore();
 const toolManagerRef = inject<Ref<ToolManager | null>>('toolManager');
 
 if (!toolManagerRef) {
@@ -114,21 +117,23 @@ const normalizeAngle = (angle: number): number => {
 // =========================================================================================
 
 // 是否处于组合编辑模式
-const isEditingGroup = computed(() => !!store.editingGroupId);
+const isEditingGroup = computed(() => !!selectionStore.editingGroupId);
 
 // 可见性判断：有选中节点或处于组合编辑模式时显示
-const hasSelectedNodes = computed(() => store.activeElements.length > 0 || !!store.editingGroupId);
+const hasSelectedNodes = computed(
+  () => selectionStore.activeElements.length > 0 || !!selectionStore.editingGroupId
+);
 
 // 当前用于计算"大框"的目标节点
 const overlayNodes = computed<BaseNodeState[]>(() => {
-  const editingId = store.editingGroupId;
+  const editingId = selectionStore.editingGroupId;
   if (editingId) {
     const node = store.nodes[editingId];
     if (node) {
       return [node as BaseNodeState];
     }
   }
-  return store.activeElements as BaseNodeState[];
+  return selectionStore.activeElements as BaseNodeState[];
 });
 
 const allNodesLocked = computed(() =>
@@ -138,19 +143,19 @@ const allNodesLocked = computed(() =>
 // 选中的节点列表（用于绘制每个子元素的单独虚线框）
 // 在组合编辑模式下，只显示组合内的选中子元素
 const selectedNodes = computed(() => {
-  const editingId = store.editingGroupId;
+  const editingId = selectionStore.editingGroupId;
   if (editingId) {
     // 组合编辑模式下，只返回组合内的选中子元素
-    return store.activeElements.filter((node) => {
+    return selectionStore.activeElements.filter((node) => {
       return node && node.parentId === editingId;
     }) as BaseNodeState[];
   }
-  return store.activeElements as BaseNodeState[];
+  return selectionStore.activeElements as BaseNodeState[];
 });
 
 // 单个元素选中框样式（使用绝对坐标）
 const getIndividualStyle = (node: BaseNodeState) => {
-  const absTransform = store.getAbsoluteTransform(node.id);
+  const absTransform = computeAbsoluteTransform(node.id, store.nodes);
   const { x, y, width, height, rotation } = absTransform || node.transform;
   return {
     transform: `translate(${x}px, ${y}px) rotate(${rotation}deg)`,
@@ -165,7 +170,7 @@ const getIndividualStyle = (node: BaseNodeState) => {
  * 使用绝对坐标，考虑父组合位置
  */
 const getRotatedBounds = (node: BaseNodeState) => {
-  const absTransform = store.getAbsoluteTransform(node.id);
+  const absTransform = computeAbsoluteTransform(node.id, store.nodes);
   const { x, y, width, height, rotation } = absTransform || node.transform;
 
   if (rotation === 0) {
@@ -208,7 +213,7 @@ const getRotatedBounds = (node: BaseNodeState) => {
 // 组合编辑模式下：实时计算组合的整体边界框（基于所有子元素）
 // 子元素的选中框通过 selectedNodes 单独显示
 const editingGroupBounds = computed(() => {
-  const editingId = store.editingGroupId;
+  const editingId = selectionStore.editingGroupId;
   if (!editingId) return null;
 
   const group = store.nodes[editingId];
@@ -221,7 +226,7 @@ const editingGroupBounds = computed(() => {
 
   if (children.length === 0) {
     // 如果没有子元素，使用组合的 transform
-    const absTransform = store.getAbsoluteTransform(editingId);
+    const absTransform = computeAbsoluteTransform(editingId, store.nodes);
     if (!absTransform) return null;
     return {
       x: absTransform.x,
@@ -273,7 +278,7 @@ const selectionBounds = computed(() => {
   // 单选时：返回节点绝对边界（选中框会跟着旋转）
   if (nodes.length === 1) {
     const node = nodes[0];
-    const absTransform = store.getAbsoluteTransform(node!.id);
+    const absTransform = computeAbsoluteTransform(node!.id, store.nodes);
     const transform = absTransform || node!.transform;
     return {
       x: transform.x,
@@ -310,10 +315,10 @@ const selectionBounds = computed(() => {
 // 计算用于缩放和旋转操作的边界框
 // 在组合编辑模式下，如果有选中的子元素，使用选中子元素的边界框；否则使用组合的边界框
 const operationBounds = computed(() => {
-  const editingId = store.editingGroupId;
+  const editingId = selectionStore.editingGroupId;
   if (editingId) {
     // 组合编辑模式下，检查是否有选中的子元素
-    const activeIds = Array.from(store.activeElementIds);
+    const activeIds = Array.from(selectionStore.activeElementIds);
     const hasActiveChildren = activeIds.some((id) => {
       const node = store.nodes[id];
       return node && node.parentId === editingId;
@@ -338,7 +343,7 @@ const operationBounds = computed(() => {
         const firstNode = nodesToCalculate[0];
         if (!firstNode) return editingGroupBounds.value;
 
-        const absTransform = store.getAbsoluteTransform(firstNode.id);
+        const absTransform = computeAbsoluteTransform(firstNode.id, store.nodes);
         if (!absTransform) return editingGroupBounds.value;
 
         return {
@@ -398,7 +403,7 @@ const overlayStyle = computed(() => {
 
 // 操作框的样式（选中子元素的边界框，带控制点）
 const operationOverlayStyle = computed(() => {
-  const editingId = store.editingGroupId;
+  const editingId = selectionStore.editingGroupId;
   if (!editingId) {
     // 非组合编辑模式下，使用 operationBounds（与 selectionBounds 相同）
     const bounds = operationBounds.value;
@@ -414,7 +419,7 @@ const operationOverlayStyle = computed(() => {
   }
 
   // 组合编辑模式下，只有选中子元素时才显示操作框
-  const activeIds = Array.from(store.activeElementIds);
+  const activeIds = Array.from(selectionStore.activeElementIds);
   const hasActiveChildren = activeIds.some((id) => {
     const node = store.nodes[id];
     return node && node.parentId === editingId;
@@ -503,15 +508,15 @@ const onHandleDown = (e: MouseEvent, handle: ResizeHandle) => {
 
   // 在组合编辑模式下，如果没有选中子元素，不允许缩放
   // 在非组合编辑模式下，必须有选中的元素
-  const isEditingGroup = !!store.editingGroupId;
-  const hasActiveElements = store.activeElements.length > 0;
+  const isEditingGroup = !!selectionStore.editingGroupId;
+  const hasActiveElements = selectionStore.activeElements.length > 0;
 
   if (isEditingGroup) {
     // 组合编辑模式下，必须选中组合内的子元素才能缩放
-    const activeIds = Array.from(store.activeElementIds);
+    const activeIds = Array.from(selectionStore.activeElementIds);
     const hasActiveChildren = activeIds.some((id) => {
       const node = store.nodes[id];
-      return node && node.parentId === store.editingGroupId;
+      return node && node.parentId === selectionStore.editingGroupId;
     });
     if (!hasActiveChildren) return;
   } else {
@@ -526,13 +531,13 @@ const onHandleDown = (e: MouseEvent, handle: ResizeHandle) => {
   // 在组合编辑模式下，只使用组合内的子元素
   let nodeIds: string[];
   if (isEditingGroup) {
-    const activeIds = Array.from(store.activeElementIds);
+    const activeIds = Array.from(selectionStore.activeElementIds);
     nodeIds = activeIds.filter((id) => {
       const node = store.nodes[id];
-      return node && node.parentId === store.editingGroupId;
+      return node && node.parentId === selectionStore.editingGroupId;
     });
   } else {
-    nodeIds = store.activeElements.map((node) => (node as BaseNodeState).id);
+    nodeIds = selectionStore.activeElements.map((node) => (node as BaseNodeState).id);
   }
 
   if (nodeIds.length === 0) return;
@@ -582,15 +587,15 @@ const onRotateHandleDown = (e: MouseEvent) => {
 
   // 在组合编辑模式下，如果没有选中子元素，不允许旋转
   // 在非组合编辑模式下，必须有选中的元素
-  const isEditingGroup = !!store.editingGroupId;
-  const hasActiveElements = store.activeElements.length > 0;
+  const isEditingGroup = !!selectionStore.editingGroupId;
+  const hasActiveElements = selectionStore.activeElements.length > 0;
 
   if (isEditingGroup) {
     // 组合编辑模式下，必须选中组合内的子元素才能旋转
-    const activeIds = Array.from(store.activeElementIds);
+    const activeIds = Array.from(selectionStore.activeElementIds);
     const hasActiveChildren = activeIds.some((id) => {
       const node = store.nodes[id];
-      return node && node.parentId === store.editingGroupId;
+      return node && node.parentId === selectionStore.editingGroupId;
     });
     if (!hasActiveChildren) return;
   } else {

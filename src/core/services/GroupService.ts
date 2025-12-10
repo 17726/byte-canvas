@@ -29,8 +29,13 @@
 import { v4 as uuidv4 } from 'uuid';
 import { NodeType, type GroupState, type NodeState } from '@/types/state';
 import type { useCanvasStore } from '@/store/canvasStore';
+import { useSelectionStore } from '@/store/selectionStore';
+import { useHistoryStore } from '@/store/historyStore';
+import { computeAbsoluteTransform, computeSelectionBounds } from '@/core/utils/geometry';
 
 type CanvasStore = ReturnType<typeof useCanvasStore>;
+const getSelectionStore = () => useSelectionStore();
+const getHistoryStore = () => useHistoryStore();
 
 /**
  * 组合管理服务类
@@ -48,7 +53,8 @@ export class GroupService {
    * @returns 新创建的组合 ID，失败时返回 null
    */
   static groupSelected(store: CanvasStore): string | null {
-    const selectedIds = Array.from(store.activeElementIds);
+    const selectionStore = getSelectionStore();
+    const selectedIds = Array.from(selectionStore.activeElementIds);
     if (selectedIds.length < 2) {
       console.log('[Group] 需要至少选中2个元素才能组合');
       return null;
@@ -62,18 +68,18 @@ export class GroupService {
     }
 
     // 组合编辑模式下完全禁止创建新的组合
-    const editingGroupId = store.editingGroupId;
+    const editingGroupId = selectionStore.editingGroupId;
     if (editingGroupId) {
       console.warn('[Group] 组合编辑模式下禁止创建新的组合，请先退出组合编辑');
       return null;
     }
 
     // 计算组合的边界框（使用绝对坐标）
-    const bounds = store.getSelectionBounds(validIds);
+    const bounds = computeSelectionBounds(validIds, store.nodes);
 
     // 锁定历史记录，避免在更新子节点时重复记录快照
     // 这样整个组合操作只会记录一次快照，撤销时一次性恢复到组合前的状态
-    const unlockHistory = store.lockHistory();
+    const unlockHistory = getHistoryStore().lockHistory();
 
     // 创建新的组合节点
     const groupId = uuidv4();
@@ -107,7 +113,7 @@ export class GroupService {
       const node = store.nodes[id];
       if (node) {
         // 获取节点的绝对坐标
-        const absTransform = store.getAbsoluteTransform(id);
+        const absTransform = computeAbsoluteTransform(id, store.nodes);
         const absX = absTransform ? absTransform.x : node.transform.x;
         const absY = absTransform ? absTransform.y : node.transform.y;
 
@@ -135,7 +141,7 @@ export class GroupService {
     store.nodeOrder.splice(insertIndex, 0, groupId);
 
     // 选中新创建的组合
-    store.setActive([groupId]);
+    selectionStore.setActive([groupId]);
 
     store.version++;
 
@@ -156,7 +162,8 @@ export class GroupService {
    * @returns 解组合后的子节点 ID 列表
    */
   static ungroupSelected(store: CanvasStore): string[] {
-    const selectedIds = Array.from(store.activeElementIds);
+    const selectionStore = getSelectionStore();
+    const selectedIds = Array.from(selectionStore.activeElementIds);
     const ungroupedIds: string[] = [];
 
     selectedIds.forEach((id) => {
@@ -214,7 +221,7 @@ export class GroupService {
 
     if (ungroupedIds.length > 0) {
       // 选中解组合后的所有子节点
-      store.setActive(ungroupedIds);
+      selectionStore.setActive(ungroupedIds);
       store.version++;
       console.log(`[Ungroup] 解组合完成，释放 ${ungroupedIds.length} 个元素`);
     }
@@ -232,14 +239,15 @@ export class GroupService {
    * @returns true 表示成功进入，false 表示节点不存在或不是组合
    */
   static enterGroupEdit(store: CanvasStore, groupId: string): boolean {
+    const selectionStore = getSelectionStore();
     const node = store.nodes[groupId];
     if (!node || node.type !== NodeType.GROUP) {
       console.warn('[Group] 无法进入编辑模式：节点不存在或不是组合');
       return false;
     }
 
-    store.editingGroupId = groupId;
-    store.setActive([]); // 清空选中状态
+    selectionStore.setEditingGroup(groupId);
+    selectionStore.clearSelection(); // 清空选中状态
     console.log(`[Group] 进入组合编辑模式: ${groupId}`);
     return true;
   }
@@ -247,16 +255,17 @@ export class GroupService {
   /**
    * 退出组合编辑模式
    *
-   * 退出后会自动选中当前编辑的组合节点。
-   *
-   * @param store - Canvas Store 实例
+   * 退出后会自动选中当前编辑的组合节点并清理编辑状态。
    */
-  static exitGroupEdit(store: CanvasStore): void {
-    if (store.editingGroupId) {
-      console.log(`[Group] 退出组合编辑模式: ${store.editingGroupId}`);
+  static exitGroupEdit(): void {
+    const selectionStore = getSelectionStore();
+    if (selectionStore.editingGroupId) {
+      console.log(`[Group] 退出组合编辑模式: ${selectionStore.editingGroupId}`);
       // 选中当前编辑的组合
-      store.setActive([store.editingGroupId]);
-      store.editingGroupId = null;
+      selectionStore.setActive(
+        selectionStore.editingGroupId ? [selectionStore.editingGroupId] : []
+      );
+      selectionStore.setEditingGroup(null);
     }
   }
 
@@ -269,7 +278,8 @@ export class GroupService {
    * @param store - Canvas Store 实例
    */
   static expandGroupToFitChildren(store: CanvasStore): void {
-    const editingGroupId = store.editingGroupId;
+    const selectionStore = getSelectionStore();
+    const editingGroupId = selectionStore.editingGroupId;
     if (!editingGroupId) return;
 
     const groupNode = store.nodes[editingGroupId] as GroupState;
@@ -371,7 +381,7 @@ export class GroupService {
     // 锁定历史记录但不记录快照，避免在调整组合边界时记录快照
     // 这个操作是自动的边界调整，不应该作为独立的操作记录到历史中
     // 交互开始时的快照已经记录了初始状态，这个自动调整不应该创建新的快照
-    const unlockHistory = store.lockHistoryWithoutSnapshot();
+    const unlockHistory = getHistoryStore().lockHistoryWithoutSnapshot();
 
     // 批量提交所有更新（原子化操作，只触发一次响应式更新）
     store.batchUpdateNodes(updates);
@@ -391,13 +401,14 @@ export class GroupService {
    * @returns true 表示可以组合，false 表示不可以
    */
   static canGroup(store: CanvasStore): boolean {
-    const ids = Array.from(store.activeElementIds);
+    const selectionStore = getSelectionStore();
+    const ids = Array.from(selectionStore.activeElementIds);
     if (ids.length < 2) return false;
     const nodesExist = ids.every((id) => store.nodes[id]);
     if (!nodesExist) return false;
 
     // 组合编辑模式下不允许进行新的组合
-    if (store.editingGroupId) return false;
+    if (selectionStore.editingGroupId) return false;
 
     return true;
   }
@@ -411,7 +422,8 @@ export class GroupService {
    * @returns true 表示可以解组合，false 表示不可以
    */
   static canUngroup(store: CanvasStore): boolean {
-    const ids = Array.from(store.activeElementIds);
+    const selectionStore = getSelectionStore();
+    const ids = Array.from(selectionStore.activeElementIds);
     return ids.some((id) => {
       const node = store.nodes[id];
       return node && node.type === NodeType.GROUP;
@@ -435,11 +447,12 @@ export class GroupService {
     groupId: string,
     transformPatch: Partial<GroupState['transform']>
   ): void {
+    const selectionStore = getSelectionStore();
     const groupNode = store.nodes[groupId] as GroupState;
     if (!groupNode || groupNode.type !== NodeType.GROUP) return;
 
     // 如果处于编辑模式，不触发级联更新
-    if (store.editingGroupId === groupId) {
+    if (selectionStore.editingGroupId === groupId) {
       store.updateNode(groupId, {
         transform: { ...groupNode.transform, ...transformPatch },
       });
@@ -515,11 +528,12 @@ export class GroupService {
     groupId: string,
     stylePatch: Partial<GroupState['style']>
   ): void {
+    const selectionStore = getSelectionStore();
     const groupNode = store.nodes[groupId] as GroupState;
     if (!groupNode || groupNode.type !== NodeType.GROUP) return;
 
     // 如果处于编辑模式，不触发级联更新
-    if (store.editingGroupId === groupId) {
+    if (selectionStore.editingGroupId === groupId) {
       store.updateNode(groupId, {
         style: { ...groupNode.style, ...stylePatch },
       });

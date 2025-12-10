@@ -17,6 +17,7 @@
 
 import type { useCanvasStore } from '@/store/canvasStore';
 import type { CanvasToolType } from '@/types/editor';
+import { useSelectionStore } from '@/store/selectionStore';
 import { NodeFactory } from '../services/NodeFactory';
 import { eventToWorld } from '../utils/geometry';
 import type { NodeState } from '@/types/state';
@@ -37,6 +38,7 @@ import { NodeType } from '@/types/state';
  */
 export class CreationHandler {
   private store: ReturnType<typeof useCanvasStore>;
+  private selectionStore = useSelectionStore();
   private stageEl: HTMLElement | null;
 
   // 拖拽状态
@@ -291,7 +293,7 @@ export class CreationHandler {
 
     // 提交到画布
     this.store.addNode(finalNode);
-    this.store.setActive([finalNode.id]);
+    this.selectionStore.setActive([finalNode.id]);
 
     // 【修复】重置交互状态
     this.store.isInteracting = false;

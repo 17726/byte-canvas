@@ -7,14 +7,14 @@
 <script setup lang="ts">
 import { computed, type CSSProperties } from 'vue';
 import type { ShapeState } from '@/types/state';
-import { useCanvasStore } from '@/store/canvasStore';
+import { useSelectionStore } from '@/store/selectionStore';
 import { getDomStyle } from '@/core/renderers/dom';
 
 const props = defineProps<{
   node: ShapeState;
 }>();
 
-const store = useCanvasStore();
+const selectionStore = useSelectionStore();
 
 // 获取样式 (使用策略模式分离的渲染器)
 const style = computed(() => {
@@ -32,7 +32,7 @@ const style = computed(() => {
 });
 
 // 选中状态
-const isSelected = computed(() => store.activeElementIds.has(props.node.id));
+const isSelected = computed(() => selectionStore.activeElementIds.has(props.node.id));
 </script>
 
 <style scoped>
