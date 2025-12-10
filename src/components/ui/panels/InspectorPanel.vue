@@ -707,7 +707,7 @@ const groupTextNodes = computed(() =>
   groupDescendants.value.filter((node): node is TextState => node!.type === NodeType.TEXT)
 );
 
-const canEditShapeStyle = computed(() => isShape.value || isGroup.value);
+const canEditShapeStyle = computed(() => isShape.value || isGroup.value || isMultiSelect.value);
 
 const textTargets = computed<TextState[]>(() => {
   if (isText.value && activeNode.value?.type === NodeType.TEXT) {
