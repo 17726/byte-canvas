@@ -384,6 +384,9 @@ export class GroupService {
     const groupNode = store.nodes[editingGroupId] as GroupState;
     if (!groupNode || groupNode.type !== NodeType.GROUP) return;
 
+    // 如果组合本身有旋转，暂不调整边界，避免旋转下的边界重算导致子元素跳动
+    if (groupNode.transform.rotation) return;
+
     const children = groupNode.children
       .map((id: string) => store.nodes[id])
       .filter((node): node is NodeState => Boolean(node));

@@ -210,6 +210,49 @@ const getRotatedBounds = (node: BaseNodeState) => {
   return { minX, maxX, minY, maxY };
 };
 
+// 计算组合子元素的世界 AABB（考虑旋转），用于显示组合框
+const getGroupChildrenAABB = (groupId: string) => {
+  const group = store.nodes[groupId];
+  if (!group || group.type !== NodeType.GROUP) return null;
+
+  const children = (group as NodeState & { children?: string[] }).children
+    ?.map((id: string) => store.nodes[id])
+    .filter((node): node is NodeState => Boolean(node));
+
+  if (!children || children.length === 0) {
+    const absTransform = computeAbsoluteTransform(groupId, store.nodes);
+    if (!absTransform) return null;
+    return {
+      x: absTransform.x,
+      y: absTransform.y,
+      width: absTransform.width,
+      height: absTransform.height,
+      rotation: absTransform.rotation || 0,
+    };
+  }
+
+  let minX = Infinity,
+    maxX = -Infinity,
+    minY = Infinity,
+    maxY = -Infinity;
+
+  children.forEach((child: BaseNodeState) => {
+    const bounds = getRotatedBounds(child);
+    minX = Math.min(minX, bounds.minX);
+    maxX = Math.max(maxX, bounds.maxX);
+    minY = Math.min(minY, bounds.minY);
+    maxY = Math.max(maxY, bounds.maxY);
+  });
+
+  return {
+    x: minX,
+    y: minY,
+    width: maxX - minX,
+    height: maxY - minY,
+    rotation: group.transform.rotation || 0,
+  };
+};
+
 // 组合编辑模式下：使用组合的 transform 作为组合框
 // 与非组合编辑模式下选中组合时的计算方式一致
 // 子元素的选中框通过 selectedNodes 单独显示
@@ -220,17 +263,7 @@ const editingGroupBounds = computed(() => {
   const group = store.nodes[editingId];
   if (!group || group.type !== NodeType.GROUP) return null;
 
-  // 直接复用组合自身的绝对变换（与非编辑模式一致）
-  const absTransform = computeAbsoluteTransform(editingId, store.nodes);
-  if (!absTransform) return null;
-
-  return {
-    x: absTransform.x,
-    y: absTransform.y,
-    width: absTransform.width,
-    height: absTransform.height,
-    rotation: absTransform.rotation || 0,
-  };
+  return getGroupChildrenAABB(editingId);
 });
 
 // 计算用于显示大框的包围盒
@@ -248,6 +281,9 @@ const selectionBounds = computed(() => {
   // 单选时：返回节点绝对边界（选中框会跟着旋转）
   if (nodes.length === 1) {
     const node = nodes[0];
+    if (node?.type === NodeType.GROUP) {
+      return getGroupChildrenAABB(node.id);
+    }
     const absTransform = computeAbsoluteTransform(node!.id, store.nodes);
     const transform = absTransform || node!.transform;
     return {
