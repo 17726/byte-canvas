@@ -160,91 +160,6 @@ export class GroupService {
    * @param nodeId - 节点 ID
    * @returns 绝对坐标和旋转角度 { x, y, rotation }
    */
-  private static getAbsoluteTransformWithRotation(
-    store: CanvasStore,
-    nodeId: string
-  ): { x: number; y: number; rotation: number } | null {
-    const node = store.nodes[nodeId];
-    if (!node) return null;
-
-    // 收集所有父组合（从直接父组合到最外层）
-    const parentChain: GroupState[] = [];
-    let currentNode: NodeState | undefined = node;
-
-    while (currentNode?.parentId) {
-      const parentNode = store.nodes[currentNode.parentId];
-      if (!parentNode || parentNode.type !== NodeType.GROUP) break;
-      const parent = parentNode as GroupState;
-      parentChain.push(parent);
-      currentNode = parent;
-    }
-
-    // 保存子元素的尺寸（在整个转换过程中不变）
-    const childWidth = node.transform.width;
-    const childHeight = node.transform.height;
-
-    // 从子节点开始，逐层向上应用变换
-    // 初始坐标是相对于直接父组合的（子元素左上角）
-    let x = node.transform.x;
-    let y = node.transform.y;
-    // 初始旋转角度是子元素自身的旋转角度
-    let rotation = node.transform.rotation || 0;
-
-    // 从内到外遍历父链，累加所有父组合的旋转角度
-    for (const parent of parentChain) {
-      const parentRotation = parent.transform.rotation || 0;
-      rotation += parentRotation; // 累加父组合的旋转角度
-
-      const parentX = parent.transform.x;
-      const parentY = parent.transform.y;
-      const parentWidth = parent.transform.width;
-      const parentHeight = parent.transform.height;
-      const parentCenterX = parentWidth / 2;
-      const parentCenterY = parentHeight / 2;
-
-      if (parentRotation === 0) {
-        // 无旋转：直接累加平移
-        x += parentX;
-        y += parentY;
-      } else {
-        // 有旋转：旋转中心是父组合的中心点
-        // 当前 x, y 是子元素左上角相对于父组合左上角的坐标
-        // 计算子元素中心点相对于父组合左上角的坐标
-        const childCenterLocalX = x + childWidth / 2;
-        const childCenterLocalY = y + childHeight / 2;
-
-        // 转换为相对于父组合中心的坐标
-        const relativeX = childCenterLocalX - parentCenterX;
-        const relativeY = childCenterLocalY - parentCenterY;
-
-        // 应用旋转矩阵
-        const rad = (parentRotation * Math.PI) / 180;
-        const cos = Math.cos(rad);
-        const sin = Math.sin(rad);
-
-        const rotatedX = relativeX * cos - relativeY * sin;
-        const rotatedY = relativeX * sin + relativeY * cos;
-
-        // 计算子元素中心在世界坐标系中的位置（或相对于更上层父组合的坐标）
-        const childCenterWorldX = parentX + parentCenterX + rotatedX;
-        const childCenterWorldY = parentY + parentCenterY + rotatedY;
-
-        // 从中心反算左上角坐标
-        x = childCenterWorldX - childWidth / 2;
-        y = childCenterWorldY - childHeight / 2;
-      }
-    }
-
-    // 归一化旋转角度到 -180 ~ +180° 范围
-    rotation = rotation % 360;
-    if (rotation > 180) {
-      rotation -= 360;
-    } else if (rotation < -180) {
-      rotation += 360;
-    }
-
-    return { x, y, rotation };
-  }
 
   /**
    * 解散选中的组合节点
@@ -274,8 +189,13 @@ export class GroupService {
         const child = store.nodes[childId];
         if (child) {
           // 计算子元素的绝对坐标和旋转角度（考虑所有父组合的旋转）
-          const absoluteTransform = this.getAbsoluteTransformWithRotation(store, childId);
+          const absoluteTransform = computeAbsoluteTransform(childId, store.nodes);
           if (absoluteTransform) {
+            // 归一化旋转角度到 -180 ~ +180
+            let rotation = absoluteTransform.rotation;
+            if (rotation > 180) rotation -= 360;
+            else if (rotation < -180) rotation += 360;
+
             // 使用 updateNode 确保响应式更新
             store.updateNode(childId, {
               parentId: groupNode.parentId,
@@ -283,7 +203,7 @@ export class GroupService {
                 ...child.transform,
                 x: absoluteTransform.x,
                 y: absoluteTransform.y,
-                rotation: absoluteTransform.rotation,
+                rotation,
               },
             });
           }
