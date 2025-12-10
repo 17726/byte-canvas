@@ -307,7 +307,7 @@ const handleKeyDown = (e: KeyboardEvent) => {
   if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
     if (e.key === 'Enter' && toolManagerRef.value) {
       console.log('文本输入框内按键，交给 ToolManager 处理：', e.key);
-      //toolManagerRef.value.handleEnterKey(e);
+      toolManagerRef.value.handleEnterKey(e);
     }
     return;
   }

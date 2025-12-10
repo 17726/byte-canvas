@@ -41,8 +41,6 @@ export class TextService {
     if (!node || node.type !== NodeType.TEXT) return; // 仅处理文本节点
 
     const target = e.target as HTMLElement;
-    // 步骤1：临时保存旧光标位置（仅用于参考）
-    const oldSavedCursorPos = saveCursorPosition(id);
     // 保存当前光标位置
     const savedCursorPos = saveCursorPosition(id);
     // 递归处理所有层级的节点
@@ -71,23 +69,19 @@ export class TextService {
 
     // 使用时：传入target元素
     const newContent = getContentWithNewlines(target);
-    console.log('新内容:', JSON.stringify(newContent));
+
     const oldContent = node.props.content || '';
     console.log('旧内容:', JSON.stringify(oldContent));
+    console.log('新内容:', JSON.stringify(newContent));
     // 通过 ID 更新节点内容
     store.updateNode(id, {
       props: { ...node.props, content: newContent },
     });
 
-    // 步骤4：基于新content，重新保存光标位置（核心修复）
-    const newSavedCursorPos = saveCursorPosition(id);
-    console.log('旧光标位置（更新前）:', oldSavedCursorPos);
-    console.log('新光标位置（更新后）:', newSavedCursorPos); // 此时应是7,7
-
     // DOM 重新渲染后，恢复光标位置
     restoreCursorPosition(savedCursorPos);
-    console.log('恢复光标位置:', savedCursorPos);
-    console.log('新存储的内容:', JSON.stringify(node.props.content));
+    // console.log('恢复光标位置:', savedCursorPos);
+    // console.log('新存储的内容:', JSON.stringify(node.props.content));
     // 同步调整内联样式（传递 id 给内部方法）
     if (oldContent && newContent) {
       this.updateInlineStylesOnContentChange(oldContent, newContent, id, store);

@@ -262,7 +262,7 @@ export class ToolManager {
 
       // 文本处理器：点击空白处结束编辑态
       if (this.textSelectionHandler.isEditing) {
-        console.log('结束编辑态');
+        // console.log('结束编辑态');
         this.textSelectionHandler.exitEditing();
       }
 
@@ -601,7 +601,7 @@ export class ToolManager {
     this.textSelectionHandler.handleHeightAdaptation(id);
 
     this.textSelectionHandler.restoreFullSelection(savedCursorPos, id);
-    console.log('触发handleHeightAdaptation');
+    // console.log('触发handleHeightAdaptation');
   }
 
   handleFontSizeChange(id: string) {
@@ -627,7 +627,7 @@ export class ToolManager {
     const node = this.store.nodes[id];
     if (!node || node.type !== NodeType.TEXT) return;
     this.textSelectionHandler.handleSelectionChange(id);
-    console.log('触发handleTextSelectionChange');
+    // console.log('触发handleTextSelectionChange');
   }
 
   /**
@@ -641,13 +641,13 @@ export class ToolManager {
     this.textSelectionHandler.handleBlur(id);
   }
 
-  // handleEnterKey(e: KeyboardEvent) {
-  //   if (this.transformHandler.isTransforming) return;
-  //   const id = Array.from(this.store.activeElementIds)[0];
-  //   if (!id) return;
-  //   console.log('触发handleEnterKey');
-  //   this.textSelectionHandler.handleEnterKey(id, e);
-  // }
+  handleEnterKey(e: KeyboardEvent) {
+    if (this.transformHandler.isTransforming) return;
+    const id = Array.from(this.selectionStore.activeElementIds)[0];
+    if (!id) return;
+    console.log('触发handleEnterKey');
+    this.textSelectionHandler.handleEnterKey(id, e);
+  }
 
   /**
    * 处理文本节点点击事件（供文本组件调用）
@@ -680,10 +680,6 @@ export class ToolManager {
 
   //处理文本样式
   handleToggleBold(id: string) {
-    console.log(
-      '触发handleToggleBold currentSelection:',
-      JSON.stringify(this.textSelectionHandler.currentSelection)
-    );
     this.textSelectionHandler.updateGlobalStyles(id, this.store, 'fontWeight', 'bold', true);
     this.textSelectionHandler.updatePartialInlineStyle(
       id,
@@ -692,7 +688,6 @@ export class ToolManager {
       'bold', // 样式值（支持 'bold' 或 700）
       true // toggle：有则移除，无则添加
     );
-    //console.log('真的设置粗体完毕');
   }
 
   handleToggleItalic(id: string) {
@@ -776,7 +771,7 @@ export class ToolManager {
     const node = this.store.nodes[id];
     if (!node || node.type !== NodeType.TEXT) return;
     this.textSelectionHandler.handleMouseUpAndSelection(e, id);
-    console.log('触发handleTextMouseUp');
+    // console.log('触发handleTextMouseUp');
   }
 
   getTextEditingState(): boolean {
