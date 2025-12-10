@@ -548,7 +548,7 @@ export class TextSelectionHandler {
 
       // 2. 文本节点：累加字符数（保留原有规则，排除空文本更严谨）
       if (node.nodeType === Node.TEXT_NODE) {
-        const textLength = node.textContent?.trim() === '' ? 0 : node.textContent?.length || 0;
+        const textLength = node.textContent?.length || 0;
         totalOffset += textLength;
         return false;
       }
