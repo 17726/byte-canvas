@@ -1180,9 +1180,11 @@ const displayZIndex = computed({
   set: (val) => {
     const newZ = val as number;
     if (isMultiSelect.value) {
-      store.activeElements.forEach((node) => {
-        if (!node) return;
-        store.updateNode(node.id, { style: { ...node.style, zIndex: newZ } });
+      store.lockHistory(() => {
+        store.activeElements.forEach((node) => {
+          if (!node) return;
+          store.updateNode(node.id, { style: { ...node.style, zIndex: newZ } });
+        });
       });
       return;
     }
