@@ -59,9 +59,10 @@ export class DomTextRenderer implements INodeRenderer<string> {
         for (let i = 0; i < sortedSplitPoints.length - 1; i++) {
           const start = sortedSplitPoints[i];
           const end = sortedSplitPoints[i + 1];
-          if (start >= end) continue;
+          if (start && end && start >= end) continue;
 
           // 只处理当前\n片段范围内的拆分点
+          if (!start || !end) continue;
           const overlapStart = Math.max(start, contentCursor);
           const overlapEnd = Math.min(end, fragEnd);
           if (overlapStart >= overlapEnd) continue;

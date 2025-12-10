@@ -13,7 +13,7 @@ import {
 import { nextTick } from 'vue';
 import type { TransformHandler } from './TransformHandler';
 import type { ViewportHandler } from './ViewportHandler';
-import { TextService } from '../services/TextService';
+//import { TextService } from '../services/TextService';
 type CanvasStore = ReturnType<typeof useCanvasStore>;
 type TextGlobalStyleProps = Partial<
   Pick<
@@ -378,6 +378,7 @@ export class TextSelectionHandler {
     // 遍历到插入索引前的所有子节点（递归计算字符数）
     for (let i = 0; i < insertIndex; i++) {
       const child = childNodes[i];
+      if (!child) continue;
       // 1. 文本节点：直接累加字符数（排除空文本）
       if (child.nodeType === Node.TEXT_NODE) {
         const textLength = child.textContent?.trim() === '' ? 0 : child.textContent?.length || 0;
@@ -420,14 +421,14 @@ export class TextSelectionHandler {
 
     const range = selection.getRangeAt(0);
 
-    console.log('===== Range 关键信息 =====');
-    console.log(
-      'startContainer节点类型：',
-      range.startContainer.nodeType === 3 ? '文本节点' : '元素节点'
-    );
-    console.log('startContainer节点名称：', range.startContainer.nodeName);
-    console.log('startOffset：', range.startOffset);
-    console.log('是否是光标（collapsed）：', range.collapsed);
+    // console.log('===== Range 关键信息 =====');
+    // console.log(
+    //   'startContainer节点类型：',
+    //   range.startContainer.nodeType === 3 ? '文本节点' : '元素节点'
+    // );
+    // console.log('startContainer节点名称：', range.startContainer.nodeName);
+    // console.log('startOffset：', range.startOffset);
+    // console.log('是否是光标（collapsed）：', range.collapsed);
 
     // 1. 先修正getTextOffset的传参（直接传节点，而非content+parent，保证精准）
     const startTargetNode = range.startContainer;
@@ -462,14 +463,14 @@ export class TextSelectionHandler {
     const endTextOffset = endBaseOffset + endLocalOffset;
 
     // 4. 调试日志（保留并优化）
-    console.log('===== 偏移计算详情 =====');
-    console.log('startBaseOffset（目标节点前累计字符数）=', startBaseOffset);
-    console.log('startLocalOffset（节点内字符数偏移）=', startLocalOffset);
-    console.log('range.startOffset（原始offset）=', range.startOffset);
-    console.log('endBaseOffset（目标节点前累计字符数）=', endBaseOffset);
-    console.log('endLocalOffset（节点内字符数偏移）=', endLocalOffset);
-    console.log('range.endOffset（原始offset）=', range.endOffset);
-    console.log('最终保存的光标位置：', Math.max(0, startTextOffset), Math.max(0, endTextOffset));
+    // console.log('===== 偏移计算详情 =====');
+    // console.log('startBaseOffset（目标节点前累计字符数）=', startBaseOffset);
+    // console.log('startLocalOffset（节点内字符数偏移）=', startLocalOffset);
+    // console.log('range.startOffset（原始offset）=', range.startOffset);
+    // console.log('endBaseOffset（目标节点前累计字符数）=', endBaseOffset);
+    // console.log('endLocalOffset（节点内字符数偏移）=', endLocalOffset);
+    // console.log('range.endOffset（原始offset）=', range.endOffset);
+    // console.log('最终保存的光标位置：', Math.max(0, startTextOffset), Math.max(0, endTextOffset));
     return {
       isCollapsed: range.collapsed, // 是否是光标（折叠）
       startOffset: Math.max(0, startTextOffset),
@@ -656,11 +657,24 @@ export class TextSelectionHandler {
         if (el.nodeName === 'BR') {
           // 起始位置落在当前 <br>
           if (!startPos && currentOffset + 1 >= startOffset) {
-            startPos = { node, offset: 0 };
+            // 不定位到BR本身，而是定位到BR的父节点 + BR的索引+1
+            const brParent = el.parentElement;
+            if (!brParent) return;
+            const brIndex = Array.from(brParent.childNodes).indexOf(el);
+            startPos = {
+              node: brParent, // 父节点（根DIV）
+              offset: brIndex + 1, // BR索引+1 → BR后面的位置
+            };
           }
           // 结束位置落在当前 <br>
           if (!endPos && currentOffset + 1 >= endOffset) {
-            endPos = { node, offset: 0 };
+            const brParent = el.parentElement;
+            if (!brParent) return;
+            const brIndex = Array.from(brParent.childNodes).indexOf(el);
+            endPos = {
+              node: brParent,
+              offset: brIndex + 1,
+            };
           }
           currentOffset += 1; // 偏移量+1
           console.log('BR节点：累计偏移：', currentOffset); // 调试日志
@@ -1386,68 +1400,68 @@ export class TextSelectionHandler {
    * @param editor 编辑器根节点
    * @param e 键盘事件对象
    */
-  handleEnterKey = (id: string, e: KeyboardEvent) => {
-    console.log('handleEnterKey触发');
-    console.log('=========到这里了==========');
-    const editor = this.editors[id];
-    if (e.key !== 'Enter' || !editor) return;
+  // handleEnterKey = (id: string, e: KeyboardEvent) => {
+  //   console.log('handleEnterKey触发');
+  //   console.log('=========到这里了==========');
+  //   const editor = this.editors[id];
+  //   if (e.key !== 'Enter' || !editor) return;
 
-    const selection = window.getSelection();
-    if (!selection || selection.rangeCount === 0) return;
+  //   const selection = window.getSelection();
+  //   if (!selection || selection.rangeCount === 0) return;
 
-    let range = selection.getRangeAt(0);
-    // 步骤1：判断是否在文本末尾（核心：光标在最后一个节点的末尾）
-    const isAtEnd = this.isCursorAtTextEnd(id, range);
-    console.log('isAtEnd:', isAtEnd);
-    if (isAtEnd) {
-      e.preventDefault();
+  //   let range = selection.getRangeAt(0);
+  //   // 步骤1：判断是否在文本末尾（核心：光标在最后一个节点的末尾）
+  //   const isAtEnd = this.isCursorAtTextEnd(id, range);
+  //   console.log('isAtEnd:', isAtEnd);
+  //   if (isAtEnd) {
+  //     e.preventDefault();
 
-      const editor = this.editors[id];
-      if (!editor) return;
+  //     const editor = this.editors[id];
+  //     if (!editor) return;
 
-      // 步骤1：将range移到span外部
-      const spanNode = range.startContainer.parentElement;
-      if (spanNode && spanNode.nodeName === 'SPAN') {
-        const outerRange = document.createRange();
-        outerRange.setStartAfter(spanNode);
-        outerRange.collapse(true);
-        range = outerRange;
-      }
+  //     // 步骤1：将range移到span外部
+  //     const spanNode = range.startContainer.parentElement;
+  //     if (spanNode && spanNode.nodeName === 'SPAN') {
+  //       const outerRange = document.createRange();
+  //       outerRange.setStartAfter(spanNode);
+  //       outerRange.collapse(true);
+  //       range = outerRange;
+  //     }
 
-      // 步骤2：插入BR（仅保留BR，删除空文本节点相关）
-      const br = document.createElement('br');
-      range.insertNode(br);
+  //     // 步骤2：插入BR（仅保留BR，删除空文本节点相关）
+  //     const br = document.createElement('br');
+  //     range.insertNode(br);
 
-      // 步骤3：将光标定位到BR后面（无需空文本节点）
-      const newRange = document.createRange();
-      newRange.setStartAfter(br); // 直接定位到BR后
-      newRange.collapse(true);
-      selection.removeAllRanges();
-      selection.addRange(newRange);
+  //     // 步骤3：将光标定位到BR后面（无需空文本节点）
+  //     const newRange = document.createRange();
+  //     newRange.setStartAfter(br); // 直接定位到BR后
+  //     newRange.collapse(true);
+  //     selection.removeAllRanges();
+  //     selection.addRange(newRange);
 
-      // 后续逻辑不变
-      setTimeout(() => {
-        TextService.handleContentChange(
-          e,
-          id,
-          this.store,
-          () => this.saveFullSelection(id),
-          (pos) => this.restoreFullSelection(pos, id)
-        );
-        this.cleanExtraBrAtEnd(id);
-      }, 0);
+  //     // 后续逻辑不变
+  //     setTimeout(() => {
+  //       TextService.handleContentChange(
+  //         e,
+  //         id,
+  //         this.store,
+  //         () => this.saveFullSelection(id),
+  //         (pos) => this.restoreFullSelection(pos, id)
+  //       );
+  //       this.cleanExtraBrAtEnd(id);
+  //     }, 0);
 
-      // 验证日志（此时只有SPAN+BR，共2个节点）
-      console.log('===== 编辑器根节点所有子节点 =====');
-      Array.from(editor.childNodes).forEach((node, index) => {
-        console.log(`第${index}个节点：`);
-        console.log('  节点类型：', node.nodeType === 3 ? '文本节点' : '元素节点');
-        console.log('  节点名称：', node.nodeName);
-        console.log('  节点内容：', node.textContent ? `"${node.textContent}"` : '空');
-      });
-    }
-    // 非末尾换行：保留浏览器默认行为（只插一个 <br>，无需处理）
-  };
+  //     // 验证日志（此时只有SPAN+BR，共2个节点）
+  //     console.log('===== 编辑器根节点所有子节点 =====');
+  //     Array.from(editor.childNodes).forEach((node, index) => {
+  //       console.log(`第${index}个节点：`);
+  //       console.log('  节点类型：', node.nodeType === 3 ? '文本节点' : '元素节点');
+  //       console.log('  节点名称：', node.nodeName);
+  //       console.log('  节点内容：', node.textContent ? `"${node.textContent}"` : '空');
+  //     });
+  //   }
+  //   // 非末尾换行：保留浏览器默认行为（只插一个 <br>，无需处理）
+  // };
 
   /**
    * 辅助：判断光标是否在文本末尾（兼容空白节点/空文本/BR）

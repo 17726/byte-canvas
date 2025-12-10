@@ -46,9 +46,9 @@ export class TextService {
     // 保存当前光标位置
     const savedCursorPos = saveCursorPosition(id);
     // 递归处理所有层级的节点
-    const getContentWithNewlines = (target) => {
+    const getContentWithNewlines = (target: Node) => {
       // 核心：只遍历 target 的直接子节点，不处理 target 本身
-      const processChildNode = (node) => {
+      const processChildNode = (node: Node): string => {
         // 1. 处理 <br> 节点（包括嵌套的）
         if (node.nodeName === 'BR') {
           return '\n';

@@ -300,14 +300,10 @@ const handleNodeContextMenu = (e: MouseEvent, id: string) => {
 const handleKeyDown = (e: KeyboardEvent) => {
   // 输入框内的键盘事件
   const target = e.target as HTMLElement;
-  if (
-    target.isContentEditable &&
-    toolManagerRef.value &&
-    (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)
-  ) {
-    if (e.key === 'Enter') {
+  if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+    if (e.key === 'Enter' && toolManagerRef.value) {
       console.log('文本输入框内按键，交给 ToolManager 处理：', e.key);
-      toolManagerRef.value.handleEnterKey(e);
+      //toolManagerRef.value.handleEnterKey(e);
     }
     return;
   }

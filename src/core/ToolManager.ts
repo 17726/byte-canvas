@@ -616,13 +616,13 @@ export class ToolManager {
     this.textSelectionHandler.handleBlur(id);
   }
 
-  handleEnterKey(e: KeyboardEvent) {
-    if (this.transformHandler.isTransforming) return;
-    const id = Array.from(this.store.activeElementIds)[0];
-    if (!id) return;
-    console.log('触发handleEnterKey');
-    this.textSelectionHandler.handleEnterKey(id, e);
-  }
+  // handleEnterKey(e: KeyboardEvent) {
+  //   if (this.transformHandler.isTransforming) return;
+  //   const id = Array.from(this.store.activeElementIds)[0];
+  //   if (!id) return;
+  //   console.log('触发handleEnterKey');
+  //   this.textSelectionHandler.handleEnterKey(id, e);
+  // }
 
   /**
    * 处理文本节点点击事件（供文本组件调用）
