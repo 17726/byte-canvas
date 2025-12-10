@@ -665,6 +665,10 @@ export class ToolManager {
 
   //处理文本样式
   handleToggleBold(id: string) {
+    console.log(
+      '触发handleToggleBold currentSelection:',
+      JSON.stringify(this.textSelectionHandler.currentSelection)
+    );
     this.textSelectionHandler.updateGlobalStyles(id, this.store, 'fontWeight', 'bold', true);
     this.textSelectionHandler.updatePartialInlineStyle(
       id,
