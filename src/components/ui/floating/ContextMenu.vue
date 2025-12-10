@@ -15,6 +15,16 @@
             粘贴
             <span class="label">Ctrl+V</span>
           </a-menu-item>
+          <a-menu-item key="undo" v-if="canUndo" @click="undo">
+            <template #icon><icon-paste /></template>
+            撤销
+            <span class="label">Ctrl+Z</span>
+          </a-menu-item>
+          <a-menu-item key="redo" v-if="canRedo" @click="redo">
+            <template #icon><icon-paste /></template>
+            重做
+            <span class="label">Ctrl+Y</span>
+          </a-menu-item>
           <a-menu-item key="selectAll" @click="handleAction(selectAll)">
             <template #icon><FullSelection /></template>
             全选
@@ -125,6 +135,7 @@
 </template>
 
 <script setup lang="ts">
+import { storeToRefs } from 'pinia';
 import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue';
 import { useNodeActions } from '@/composables/useNodeActions';
 import {
@@ -143,6 +154,7 @@ import {
   FullSelection,
 } from '@icon-park/vue-next';
 import { loadClipboard } from '@/store/persistence.ts';
+import { useHistoryStore } from '@/store/historyStore.ts';
 
 const {
   hasSelection,
@@ -157,6 +169,9 @@ const {
   selectAll,
   clearCanvas,
 } = useNodeActions();
+
+const { canUndo, canRedo } = storeToRefs(useHistoryStore());
+const { undo, redo } = useHistoryStore();
 
 // 监听来自 ToolManager 的右键菜单事件
 function handleShowContextMenu(e: CustomEvent) {
