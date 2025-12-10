@@ -107,8 +107,7 @@ const applyTranslate = (m: Matrix, tx: number, ty: number): Matrix => ({
   e: m.e + m.a * tx + m.c * ty,
   f: m.f + m.b * tx + m.d * ty,
 });
-
-const applyRotate = (m: Matrix, rad: number): Matrix => {
+/*const applyRotate = (m: Matrix, rad: number): Matrix => {
   const cos = Math.cos(rad);
   const sin = Math.sin(rad);
   return {
@@ -119,10 +118,9 @@ const applyRotate = (m: Matrix, rad: number): Matrix => {
     e: m.e,
     f: m.f,
   };
-};
-
+};*/
 /**
- * 计算节点的绝对变换（包含父级旋转），返回世界坐标系下的变换数据
+ * 计算节点的绝对变换（累加父级平移，不包括旋转），返回世界坐标系下的变换数据
  */
 export function computeAbsoluteTransform(
   nodeId: string,
@@ -140,15 +138,10 @@ export function computeAbsoluteTransform(
   }
 
   let matrix = identityMatrix();
-  let rotationSum = 0;
 
   chain.forEach((segment) => {
-    const { x, y, rotation } = segment.transform;
+    const { x, y } = segment.transform;
     matrix = applyTranslate(matrix, x, y);
-    if (rotation) {
-      matrix = applyRotate(matrix, (rotation * Math.PI) / 180);
-      rotationSum += rotation;
-    }
   });
 
   return {
@@ -156,7 +149,7 @@ export function computeAbsoluteTransform(
     y: matrix.f,
     width: node.transform.width,
     height: node.transform.height,
-    rotation: rotationSum,
+    rotation: node.transform.rotation,
   };
 }
 
