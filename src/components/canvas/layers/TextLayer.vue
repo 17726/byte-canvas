@@ -47,8 +47,6 @@ import type { ToolManager } from '@/core/ToolManager';
 import { useCanvasStore } from '@/store/canvasStore';
 import { useSelectionStore } from '@/store/selectionStore';
 import { getCurrentInstance } from 'vue';
-import { useStyleSync } from '@/composables/useStyleSync';
-const { fontSize } = useStyleSync();
 
 const props = defineProps<{
   node: TextState;
@@ -294,13 +292,11 @@ const handleDragStart = (e: DragEvent) => {
   box-shadow: none !important;
   padding: 2px 4px;
   line-height: 1.6;
-  font-size: v-bind('fontSize + "px"');
+  font-size: v-bind('props.node.props.fontSize + "px"');
 }
 
 .textBox > div,
-.textBox > p,
-.textBox > span,
-.textBox > br {
+.textBox > p {
   /* 强制继承父元素行高，覆盖默认值 */
   line-height: inherit !important;
   /* 清除默认边距，避免行间距变大 */
@@ -313,7 +309,6 @@ const handleDragStart = (e: DragEvent) => {
 
 /* 给编辑器内的br添加样式，让br后有光标位置 */
 .textBox br {
-  min-height: calc(1em * 1.6);
   display: block; /* 让br成为块级元素，撑起换行 */
   content: '';
   margin: 0;
@@ -330,7 +325,6 @@ const handleDragStart = (e: DragEvent) => {
   pointer-events: auto;
   white-space: pre-line; /* 保留换行符的视觉效果 */
   caret-color: inherit; /* 光标颜色正常显示 */
-  line-height: 1.6;
 }
 
 /* 文本选中样式（兼容不同浏览器） */
