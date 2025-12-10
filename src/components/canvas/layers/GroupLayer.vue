@@ -25,6 +25,7 @@
 <script setup lang="ts">
 import { computed, inject, defineAsyncComponent, type Ref } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
+import { useSelectionStore } from '@/store/selectionStore';
 import { NodeType, type GroupState, type NodeState } from '@/types/state';
 import type { ToolManager } from '@/core/ToolManager';
 import { GroupService } from '@/core/services/GroupService';
@@ -42,6 +43,7 @@ interface Props {
 
 const props = defineProps<Props>();
 const store = useCanvasStore();
+const selectionStore = useSelectionStore();
 const toolManagerRef = inject<Ref<ToolManager | null>>('toolManager');
 
 // 获取组合内的所有子节点
@@ -66,7 +68,7 @@ const groupStyle = computed(() => {
 });
 
 // 是否正在编辑此组合
-const isEditing = computed(() => store.editingGroupId === props.node.id);
+const isEditing = computed(() => selectionStore.editingGroupId === props.node.id);
 
 // 组件映射
 const getComponentType = (type: NodeType) => {
@@ -92,7 +94,7 @@ const isSelectable = computed(() => {
   // 顶层组合总是可选
   if (props.node.parentId === null) return true;
   // 嵌套组合只有在其父组合正在编辑时才可选
-  return store.editingGroupId === props.node.parentId;
+  return selectionStore.editingGroupId === props.node.parentId;
 });
 
 // 处理组合的鼠标按下事件

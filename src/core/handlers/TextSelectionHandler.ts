@@ -3,13 +3,14 @@
    处理文本选区相关的交互细节，维护编辑状态和选区状态，响应连续 DOM 事件流。
  */
 
-import { useCanvasStore } from '@/store/canvasStore';
 import {
   NodeType,
   type InlineStyleProps,
   type TextDecorationValue,
   type TextState,
 } from '@/types/state';
+import { useCanvasStore } from '@/store/canvasStore';
+import { useSelectionStore } from '@/store/selectionStore';
 import { nextTick } from 'vue';
 import type { TransformHandler } from './TransformHandler';
 import type { ViewportHandler } from './ViewportHandler';
@@ -32,6 +33,7 @@ type TextGlobalStyleProps = Partial<
 export class TextSelectionHandler {
   // 私有属性：存储构造函数传入的依赖（供内部方法使用）
   private store: CanvasStore;
+  private selectionStore: ReturnType<typeof useSelectionStore>;
   private transformHandler: TransformHandler; // 用于互斥判断（拖拽/缩放状态）
   private viewportHandler: ViewportHandler; // 用于互斥判断（平移状态）
 
@@ -55,10 +57,12 @@ export class TextSelectionHandler {
   constructor(
     store: CanvasStore,
     transformHandler: TransformHandler,
-    viewportHandler: ViewportHandler
+    viewportHandler: ViewportHandler,
+    selectionStore?: ReturnType<typeof useSelectionStore>
   ) {
     // 赋值依赖到私有属性（供内部方法使用）
     this.store = store;
+    this.selectionStore = selectionStore || useSelectionStore();
     this.transformHandler = transformHandler;
     this.viewportHandler = viewportHandler;
 
@@ -98,8 +102,8 @@ export class TextSelectionHandler {
     if (!node || node.type !== NodeType.TEXT) return;
 
     event.stopPropagation();
-    const isSelected = this.store.activeElementIds.has(id);
-    if (!isSelected) this.store.setActive([id]);
+    const isSelected = this.selectionStore.activeElementIds.has(id);
+    if (!isSelected) this.selectionStore.setActive([id]);
 
     this.isEditing = true;
 
@@ -245,7 +249,7 @@ export class TextSelectionHandler {
     }
 
     // 同步选区到全局状态：让其他功能（比如设置字体样式）能获取当前选区
-    const isActive = this.store.activeElements[0]?.id === id || this.isEditing;
+    const isActive = this.selectionStore.activeElements[0]?.id === id || this.isEditing;
     if (isActive && this.currentSelection) {
       //console.log('handler中updateGlobalSelection：', this.currentSelection);
       this.updateGlobalSelection(this.currentSelection);
@@ -267,8 +271,8 @@ export class TextSelectionHandler {
       //e.preventDefault();
 
       // 执行选中逻辑（单击的核心需求）
-      const isSelected = this.store.activeElementIds.has(id);
-      if (!isSelected) this.store.setActive([id]);
+      const isSelected = this.selectionStore.activeElementIds.has(id);
+      if (!isSelected) this.selectionStore.setActive([id]);
       // 强制让文本框失焦（兜底，避免意外聚焦）
       editor?.blur();
     } else {
@@ -362,7 +366,7 @@ export class TextSelectionHandler {
     const parentId = node.parentId;
     if (!parentId) return true;
 
-    return this.store.editingGroupId === parentId;
+    return this.selectionStore.editingGroupId === parentId;
   };
 
   /**
@@ -815,7 +819,7 @@ export class TextSelectionHandler {
       editor.focus();
     } else {
       this.isEditing = false;
-      if (!this.store.activeElementIds.has(id)) {
+      if (!this.selectionStore.activeElementIds.has(id)) {
         this.updateGlobalSelection(null);
       }
     }
@@ -828,7 +832,7 @@ export class TextSelectionHandler {
    */
   isActiveNode(id: string): boolean {
     const node = this.store.nodes[id];
-    const activeNode = this.store.activeElements[0];
+    const activeNode = this.selectionStore.activeElements[0];
     const baseActive = activeNode?.id === node!.id;
     // 编辑态时，强制返回true（锁定激活状态）
     return this.isEditing ? true : baseActive;

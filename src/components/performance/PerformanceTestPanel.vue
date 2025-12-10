@@ -82,10 +82,12 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
+import { useSelectionStore } from '@/store/selectionStore';
 import { useUIStore } from '@/store/uiStore';
 import { NodeFactory } from '@/core/services/NodeFactory';
 
 const store = useCanvasStore();
+const selectionStore = useSelectionStore();
 const uiStore = useUIStore();
 
 // 面板状态
@@ -189,7 +191,7 @@ const create100Elements = async () => {
     }
 
     // 选中所有元素
-    store.setActive(nodeIds);
+    selectionStore.setActive(nodeIds);
     console.log(`✅ 成功创建 ${nodeIds.length} 个元素`);
   } catch (error) {
     console.error('创建元素失败:', error);
@@ -216,7 +218,7 @@ const animateElements = () => {
   }
 
   const elapsed = (now - animationStartTime) * animationSpeed.value * 0.001;
-  const nodes = store.activeElements;
+  const nodes = selectionStore.activeElements;
 
   if (nodes.length === 0) {
     animationFrameId = requestAnimationFrame(animateElements);
@@ -279,9 +281,9 @@ const animateElements = () => {
 
 // 开始自动动画
 const startAutoAnimation = () => {
-  if (store.activeElements.length === 0) {
+  if (selectionStore.activeElements.length === 0) {
     // 如果没有选中元素，选中所有元素
-    store.setActive([...store.nodeOrder]);
+    selectionStore.setActive([...store.nodeOrder]);
   }
 
   // 设置交互状态，避免频繁触发历史记录快照

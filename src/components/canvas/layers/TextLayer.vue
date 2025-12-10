@@ -45,6 +45,7 @@ import type { TextState } from '@/types/state';
 import { getDomStyle } from '@/core/renderers/dom';
 import type { ToolManager } from '@/core/ToolManager';
 import { useCanvasStore } from '@/store/canvasStore';
+import { useSelectionStore } from '@/store/selectionStore';
 import { getCurrentInstance } from 'vue';
 
 const props = defineProps<{
@@ -55,6 +56,7 @@ const props = defineProps<{
 const toolManagerRef = inject<Ref<ToolManager | null>>('toolManager');
 
 const store = useCanvasStore();
+const selectionStore = useSelectionStore();
 // 每个组件实例的editorRefs，只存当前节点的DOM（对象里只有一个键）
 const editorRefs = ref<Record<string, HTMLElement | null>>({});
 const isComposing = ref(false);
@@ -120,7 +122,7 @@ const isEditing = computed(() => {
 
 // 激活节点状态（从 Store 直接获取，不依赖 Handler）
 const isActiveNode = computed(() => {
-  return store.activeElementIds.has(props.node.id);
+  return selectionStore.activeElementIds.has(props.node.id);
 });
 
 // 监听activeElementIds变化，强制保留编辑态节点激活（通过 Store 操作，不依赖 Handler）
@@ -147,7 +149,7 @@ watch(
 const isSettingActive = ref(false);
 
 watch(
-  () => store.activeElementIds,
+  () => selectionStore.activeElementIds,
   async (newActiveSet) => {
     // 加锁：如果正在设置，直接返回
     if (isSettingActive.value) return;
@@ -163,7 +165,7 @@ watch(
         try {
           // 延迟执行，避免和响应式更新竞态
           await nextTick();
-          store.setActive(targetId);
+          selectionStore.setActive(targetId);
         } finally {
           // 解锁
           isSettingActive.value = false;
@@ -210,7 +212,7 @@ const handleMouseDown = (e: MouseEvent, id: string) => {
 
   // 1. 文本是组合子节点 && 父组合当前不在“编辑组合模式”
   //    → 单击时行为应当是：选中父组合，不进入文本编辑，也不出现光标
-  if (parentId && store.editingGroupId !== parentId) {
+  if (parentId && selectionStore.editingGroupId !== parentId) {
     // 阻止 contenteditable 的默认聚焦/光标行为
     e.preventDefault();
     // 把这次按下事件交给父组合节点，模仿圆形/矩形那种“选中组合”的效果

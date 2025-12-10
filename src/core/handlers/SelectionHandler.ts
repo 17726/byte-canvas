@@ -25,9 +25,15 @@
  * - reset: 重置所有框选状态
  */
 
-import { isNodeHitRectSAT, containerToWorld, eventToContainer } from '@/core/utils/geometry';
+import {
+  isNodeHitRectSAT,
+  containerToWorld,
+  eventToContainer,
+  computeAbsoluteTransform,
+} from '@/core/utils/geometry';
 import type { ViewportState, BaseNodeState } from '@/types/state';
 import type { useCanvasStore } from '@/store/canvasStore';
+import { useSelectionStore } from '@/store/selectionStore';
 
 type CanvasStore = ReturnType<typeof useCanvasStore>;
 
@@ -38,6 +44,7 @@ type CanvasStore = ReturnType<typeof useCanvasStore>;
  */
 export class SelectionHandler {
   private store: CanvasStore;
+  private selectionStore: ReturnType<typeof useSelectionStore>;
   private stageEl: HTMLElement | null;
 
   // 框选状态
@@ -51,8 +58,13 @@ export class SelectionHandler {
    * @param store - Canvas Store 实例
    * @param stageEl - 画布根 DOM 元素，用于坐标转换
    */
-  constructor(store: CanvasStore, stageEl: HTMLElement | null) {
+  constructor(
+    store: CanvasStore,
+    stageEl: HTMLElement | null,
+    selectionStore?: ReturnType<typeof useSelectionStore>
+  ) {
     this.store = store;
+    this.selectionStore = selectionStore || useSelectionStore();
     this.stageEl = stageEl;
   }
 
@@ -119,7 +131,7 @@ export class SelectionHandler {
     const boxArea = (maxContainerX - minContainerX) * (maxContainerY - minContainerY);
     if (boxArea < 4) {
       // 点击空白处：取消所有选中
-      this.store.setActive([]);
+      this.selectionStore.clearSelection();
       this.isBoxSelecting = false;
       return;
     }
@@ -131,7 +143,7 @@ export class SelectionHandler {
 
     // 计算被选中的节点
     const selectedIds: string[] = [];
-    const editingGroupId = this.store.editingGroupId;
+    const editingGroupId = this.selectionStore.editingGroupId;
 
     Object.entries(this.store.nodes).forEach(([id, node]) => {
       const baseNode = node as BaseNodeState;
@@ -151,7 +163,7 @@ export class SelectionHandler {
       }
 
       // 使用绝对坐标进行碰撞检测
-      const absTransform = this.store.getAbsoluteTransform(id);
+      const absTransform = computeAbsoluteTransform(id, this.store.nodes);
       if (!absTransform) return;
 
       // 创建一个使用绝对坐标的虚拟节点进行检测
@@ -166,7 +178,7 @@ export class SelectionHandler {
     });
 
     // 更新选中状态
-    this.store.setActive(selectedIds);
+    this.selectionStore.setActive(selectedIds);
 
     // 重置框选状态
     this.isBoxSelecting = false;
@@ -200,7 +212,7 @@ export class SelectionHandler {
    * @returns 包围盒信息（x, y, width, height），无选中节点时返回 null
    */
   getSelectedNodesBounds(): { x: number; y: number; width: number; height: number } | null {
-    const activeIds = Array.from(this.store.activeElementIds);
+    const activeIds = Array.from(this.selectionStore.activeElementIds);
     if (activeIds.length === 0) return null;
 
     let minX = Infinity,
@@ -258,7 +270,7 @@ export class SelectionHandler {
     }
 
     // 2. 判断是否不在任何选中节点上
-    const activeIds = Array.from(this.store.activeElementIds);
+    const activeIds = Array.from(this.selectionStore.activeElementIds);
     for (const id of activeIds) {
       const node = this.store.nodes[id] as BaseNodeState;
       if (!node) continue;
