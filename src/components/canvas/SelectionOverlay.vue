@@ -552,6 +552,8 @@ const onHandleDown = (e: MouseEvent, handle: ResizeHandle) => {
   }
 };
 
+const ROTATE_HANDLE_OFFSET = 32; // 旋转手柄与选框的固定像素间距（缩放后保持视觉距离）
+
 // 旋转样式计算
 const rotateHandleStyle = computed(() => {
   const bounds = operationBounds.value;
@@ -565,12 +567,16 @@ const rotateHandleStyle = computed(() => {
       ? selectedNodes.value[0].transform.rotation
       : 0;
 
-  const quarterHeight = bounds.height / 4;
+  // 仅在非交互态下，根据旋转角度调节手柄间距（旋转结束后再判断，避免交互跳动）
+  const normalizedRotation = ((rotation % 360) + 360) % 360;
+  const isHandleNearTop =
+    !store.isInteracting && normalizedRotation > 140 && normalizedRotation < 220;
+  const offset = ROTATE_HANDLE_OFFSET * (isHandleNearTop ? 3 : 1);
 
   return {
     // 旋转 handle 元素本身，使其图标始终正向朝上
     transform: `translateX(-50%) rotate(${-rotation}deg) scale(${scale})`,
-    bottom: `${-1.5 * quarterHeight}px`,
+    bottom: `${-offset * scale}px`,
     left: '50%',
   };
 });

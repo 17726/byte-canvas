@@ -98,8 +98,29 @@ export interface BoundsRect {
 export type NodeTransform = TransformState;
 export type Bounds = BoundsRect;
 
+type Matrix = { a: number; b: number; c: number; d: number; e: number; f: number };
+
+const identityMatrix = (): Matrix => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 });
+
+const applyTranslate = (m: Matrix, tx: number, ty: number): Matrix => ({
+  ...m,
+  e: m.e + m.a * tx + m.c * ty,
+  f: m.f + m.b * tx + m.d * ty,
+});
+/*const applyRotate = (m: Matrix, rad: number): Matrix => {
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  return {
+    a: m.a * cos - m.c * sin,
+    b: m.b * cos - m.d * sin,
+    c: m.a * sin + m.c * cos,
+    d: m.b * sin + m.d * cos,
+    e: m.e,
+    f: m.f,
+  };
+};*/
 /**
- * 计算节点的绝对变换（包含父级旋转），返回世界坐标系下的变换数据
+ * 计算节点的绝对变换（累加父级平移，不包括旋转），返回世界坐标系下的变换数据
  */
 export function computeAbsoluteTransform(
   nodeId: string,
