@@ -98,29 +98,6 @@ export interface BoundsRect {
 export type NodeTransform = TransformState;
 export type Bounds = BoundsRect;
 
-type Matrix = { a: number; b: number; c: number; d: number; e: number; f: number };
-
-const identityMatrix = (): Matrix => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 });
-
-const applyTranslate = (m: Matrix, tx: number, ty: number): Matrix => ({
-  ...m,
-  e: m.e + m.a * tx + m.c * ty,
-  f: m.f + m.b * tx + m.d * ty,
-});
-
-const applyRotate = (m: Matrix, rad: number): Matrix => {
-  const cos = Math.cos(rad);
-  const sin = Math.sin(rad);
-  return {
-    a: m.a * cos - m.c * sin,
-    b: m.b * cos - m.d * sin,
-    c: m.a * sin + m.c * cos,
-    d: m.b * sin + m.d * cos,
-    e: m.e,
-    f: m.f,
-  };
-};
-
 /**
  * 计算节点的绝对变换（包含父级旋转），返回世界坐标系下的变换数据
  */
@@ -131,32 +108,69 @@ export function computeAbsoluteTransform(
   const node = nodes[nodeId];
   if (!node) return null;
 
-  // 自下而上收集祖先链，再自上而下累乘矩阵
-  const chain: NodeState[] = [];
+  // 收集祖先链，从子到父
+  const parentChain: NodeState[] = [];
   let current: NodeState | undefined = node;
-  while (current) {
-    chain.unshift(current);
-    current = current.parentId ? nodes[current.parentId] : undefined;
+  while (current?.parentId) {
+    const parentNode: NodeState | undefined = nodes[current.parentId];
+    if (!parentNode) break;
+    parentChain.push(parentNode);
+    current = parentNode;
   }
 
-  let matrix = identityMatrix();
-  let rotationSum = 0;
+  // 子节点的局部信息
+  const width = node.transform.width;
+  const height = node.transform.height;
+  let x = node.transform.x;
+  let y = node.transform.y;
+  let rotation = node.transform.rotation || 0;
 
-  chain.forEach((segment) => {
-    const { x, y, rotation } = segment.transform;
-    matrix = applyTranslate(matrix, x, y);
-    if (rotation) {
-      matrix = applyRotate(matrix, (rotation * Math.PI) / 180);
-      rotationSum += rotation;
+  // 从内到外应用父级旋转和平移（旋转围绕父元素中心）
+  for (const parent of parentChain) {
+    const parentRot = parent.transform.rotation || 0;
+    const parentX = parent.transform.x;
+    const parentY = parent.transform.y;
+    const parentW = parent.transform.width;
+    const parentH = parent.transform.height;
+    const parentCX = parentW / 2;
+    const parentCY = parentH / 2;
+
+    if (parentRot === 0) {
+      x += parentX;
+      y += parentY;
+    } else {
+      // 子元素中心相对父元素中心
+      const childCenterLocalX = x + width / 2;
+      const childCenterLocalY = y + height / 2;
+      const relX = childCenterLocalX - parentCX;
+      const relY = childCenterLocalY - parentCY;
+
+      const rad = (parentRot * Math.PI) / 180;
+      const cos = Math.cos(rad);
+      const sin = Math.sin(rad);
+
+      const rotatedX = relX * cos - relY * sin;
+      const rotatedY = relX * sin + relY * cos;
+
+      const childCenterWorldX = parentX + parentCX + rotatedX;
+      const childCenterWorldY = parentY + parentCY + rotatedY;
+
+      x = childCenterWorldX - width / 2;
+      y = childCenterWorldY - height / 2;
     }
-  });
+
+    rotation += parentRot;
+  }
+
+  // 规范化角度到 0-360
+  rotation = ((rotation % 360) + 360) % 360;
 
   return {
-    x: matrix.e,
-    y: matrix.f,
-    width: node.transform.width,
-    height: node.transform.height,
-    rotation: rotationSum,
+    x,
+    y,
+    width,
+    height,
+    rotation,
   };
 }
 

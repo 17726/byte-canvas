@@ -220,47 +220,16 @@ const editingGroupBounds = computed(() => {
   const group = store.nodes[editingId];
   if (!group || group.type !== NodeType.GROUP) return null;
 
-  // 实时计算所有子元素的边界框（使用绝对坐标）
-  const children = group.children
-    .map((id) => store.nodes[id])
-    .filter((node): node is NodeState => Boolean(node));
-
-  if (children.length === 0) {
-    // 如果没有子元素，使用组合的 transform
-    const absTransform = computeAbsoluteTransform(editingId, store.nodes);
-    if (!absTransform) return null;
-    return {
-      x: absTransform.x,
-      y: absTransform.y,
-      width: absTransform.width,
-      height: absTransform.height,
-      rotation: absTransform.rotation || 0,
-    };
-  }
-
-  // 计算所有子元素的边界（考虑旋转，使用绝对坐标）
-  let minX = Infinity,
-    maxX = -Infinity,
-    minY = Infinity,
-    maxY = -Infinity;
-
-  children.forEach((child) => {
-    const bounds = getRotatedBounds(child as BaseNodeState);
-    minX = Math.min(minX, bounds.minX);
-    maxX = Math.max(maxX, bounds.maxX);
-    minY = Math.min(minY, bounds.minY);
-    maxY = Math.max(maxY, bounds.maxY);
-  });
-
-  // 使用组合的旋转角度
-  const rotation = group.transform.rotation || 0;
+  // 直接复用组合自身的绝对变换（与非编辑模式一致）
+  const absTransform = computeAbsoluteTransform(editingId, store.nodes);
+  if (!absTransform) return null;
 
   return {
-    x: minX,
-    y: minY,
-    width: maxX - minX,
-    height: maxY - minY,
-    rotation,
+    x: absTransform.x,
+    y: absTransform.y,
+    width: absTransform.width,
+    height: absTransform.height,
+    rotation: absTransform.rotation || 0,
   };
 });
 
@@ -339,14 +308,14 @@ const operationBounds = computed(() => {
         return editingGroupBounds.value;
       }
 
-      // 单选时：使用元素的实际尺寸和旋转角度，不计算 AABB
+      // 单选时：直接使用子元素的绝对位置作为操作框
       if (nodesToCalculate.length === 1) {
         const firstNode = nodesToCalculate[0];
         if (!firstNode) return editingGroupBounds.value;
 
-        // 使用能正确处理旋转的绝对坐标计算方法
-        const absTransform = computeAbsoluteTransform(firstNode.id, store.nodes);
-        if (!absTransform) return editingGroupBounds.value;
+        // 直接取子元素的绝对变换（若失败则用自身 transform）
+        const absTransform =
+          computeAbsoluteTransform(firstNode.id, store.nodes) || firstNode.transform;
 
         return {
           x: absTransform.x,
