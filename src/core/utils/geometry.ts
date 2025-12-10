@@ -81,7 +81,7 @@
  *    ```
  */
 
-import type { BaseNodeState, ViewportState } from '@/types/state';
+import type { BaseNodeState, NodeState, TransformState, ViewportState } from '@/types/state';
 import type { ResizeHandle } from '@/types/editor';
 import { MIN_NODE_SIZE } from '@/config/defaults';
 
@@ -93,6 +93,130 @@ export interface BoundsRect {
   y: number;
   width: number;
   height: number;
+}
+
+export type NodeTransform = TransformState;
+export type Bounds = BoundsRect;
+
+type Matrix = { a: number; b: number; c: number; d: number; e: number; f: number };
+
+const identityMatrix = (): Matrix => ({ a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 });
+
+const applyTranslate = (m: Matrix, tx: number, ty: number): Matrix => ({
+  ...m,
+  e: m.e + m.a * tx + m.c * ty,
+  f: m.f + m.b * tx + m.d * ty,
+});
+
+const applyRotate = (m: Matrix, rad: number): Matrix => {
+  const cos = Math.cos(rad);
+  const sin = Math.sin(rad);
+  return {
+    a: m.a * cos - m.c * sin,
+    b: m.b * cos - m.d * sin,
+    c: m.a * sin + m.c * cos,
+    d: m.b * sin + m.d * cos,
+    e: m.e,
+    f: m.f,
+  };
+};
+
+/**
+ * 计算节点的绝对变换（包含父级旋转），返回世界坐标系下的变换数据
+ */
+export function computeAbsoluteTransform(
+  nodeId: string,
+  nodes: Record<string, NodeState>
+): NodeTransform | null {
+  const node = nodes[nodeId];
+  if (!node) return null;
+
+  // 自下而上收集祖先链，再自上而下累乘矩阵
+  const chain: NodeState[] = [];
+  let current: NodeState | undefined = node;
+  while (current) {
+    chain.unshift(current);
+    current = current.parentId ? nodes[current.parentId] : undefined;
+  }
+
+  let matrix = identityMatrix();
+  let rotationSum = 0;
+
+  chain.forEach((segment) => {
+    const { x, y, rotation } = segment.transform;
+    matrix = applyTranslate(matrix, x, y);
+    if (rotation) {
+      matrix = applyRotate(matrix, (rotation * Math.PI) / 180);
+      rotationSum += rotation;
+    }
+  });
+
+  return {
+    x: matrix.e,
+    y: matrix.f,
+    width: node.transform.width,
+    height: node.transform.height,
+    rotation: rotationSum,
+  };
+}
+
+/**
+ * 计算一组节点在世界坐标系下的包围盒（考虑层级旋转）
+ */
+export function computeSelectionBounds(
+  nodeIds: string[],
+  nodes: Record<string, NodeState>
+): Bounds {
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+
+  nodeIds.forEach((id) => {
+    const abs = computeAbsoluteTransform(id, nodes);
+    if (!abs) return;
+
+    const { x, y, width, height, rotation } = abs;
+    const cx = x + width / 2;
+    const cy = y + height / 2;
+    const rad = (rotation * Math.PI) / 180;
+    const cos = Math.cos(rad);
+    const sin = Math.sin(rad);
+
+    const corners = [
+      { x: x, y: y },
+      { x: x + width, y: y },
+      { x: x + width, y: y + height },
+      { x: x, y: y + height },
+    ];
+
+    corners.forEach((corner) => {
+      const dx = corner.x - cx;
+      const dy = corner.y - cy;
+      const rx = cx + dx * cos - dy * sin;
+      const ry = cy + dx * sin + dy * cos;
+      minX = Math.min(minX, rx);
+      maxX = Math.max(maxX, rx);
+      minY = Math.min(minY, ry);
+      maxY = Math.max(maxY, ry);
+    });
+  });
+
+  if (
+    !Number.isFinite(minX) ||
+    !Number.isFinite(minY) ||
+    !Number.isFinite(maxX) ||
+    !Number.isFinite(maxY)
+  ) {
+    return { x: 0, y: 0, width: 0, height: 0 };
+  }
+
+  return {
+    x: minX,
+    y: minY,
+    width: maxX - minX,
+    height: maxY - minY,
+  };
 }
 
 /**

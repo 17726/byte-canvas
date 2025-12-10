@@ -28,28 +28,25 @@
 
 import { computed, type WritableComputedRef } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
+import { useSelectionStore } from '@/store/selectionStore';
 import { NodeType, type NodeState, type ShapeState, type TextState } from '@/types/state';
 import { GroupService } from '@/core/services/GroupService';
 
 export function useStyleSync() {
   const store = useCanvasStore();
+  const selectionStore = useSelectionStore();
 
   // ==================== 核心状态 ====================
 
   /**
    * 当前选中的单个节点（仅在单选时返回）
    */
-  const activeNode = computed<NodeState | null>(() => {
-    const ids = Array.from(store.activeElementIds);
-    if (ids.length !== 1) return null;
-    const id = ids[0]!;
-    return store.nodes[id] || null;
-  });
+  const activeNode = computed<NodeState | null>(() => selectionStore.activeNode);
 
   /**
    * 是否为单选状态
    */
-  const isSingleSelection = computed(() => store.activeElementIds.size === 1);
+  const isSingleSelection = computed(() => selectionStore.isSingleSelection);
 
   // ==================== 节点类型判断 ====================
 

@@ -33,16 +33,18 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
-import { worldToClient } from '@/core/utils/geometry';
+import { useSelectionStore } from '@/store/selectionStore';
+import { worldToClient, computeSelectionBounds } from '@/core/utils/geometry';
 import { Group as IconGroup, Ungroup as IconUngroup } from '@icon-park/vue-next';
 import { useNodeActions } from '@/composables/useNodeActions';
 
 const store = useCanvasStore();
+const selectionStore = useSelectionStore();
 const { canGroup, canUngroup, groupSelected, ungroupSelected } = useNodeActions();
 
 // 显示条件：选中多个元素时显示组合按钮，选中组合时显示解组合按钮
 const hasChildSelection = computed(() => {
-  const ids = Array.from(store.activeElementIds);
+  const ids = Array.from(selectionStore.activeElementIds);
   return ids.some((id) => {
     const node = store.nodes[id];
     return node && node.parentId !== null;
@@ -57,11 +59,11 @@ const isVisible = computed(() => {
 
 // 计算工具栏位置：在选中区域的上方中央
 const positionStyle = computed(() => {
-  const ids = Array.from(store.activeElementIds);
+  const ids = Array.from(selectionStore.activeElementIds);
   if (ids.length === 0) return {};
 
   // 计算所有选中节点的边界框
-  const bounds = store.getSelectionBounds(ids);
+  const bounds = computeSelectionBounds(ids, store.nodes);
 
   // 计算边界框顶部中心点的屏幕坐标
   const worldPos = {
