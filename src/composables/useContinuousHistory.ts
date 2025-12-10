@@ -17,7 +17,7 @@ export function useContinuousHistory() {
   };
 
   const handleEnd = () => {
-    // 只在一次拖动流程结束时解锁并记录快照
+    // 结束时仅解锁，不再落终点快照
     if (!unlockHistory) {
       removeEndListeners();
       return;
@@ -26,11 +26,12 @@ export function useContinuousHistory() {
     unlockHistory = null;
     removeEndListeners();
     unlock();
-    history.pushSnapshot();
   };
 
   const handleStart = () => {
     if (unlockHistory) return; // 已在拖动中
+    // 按下时立即记录一条快照
+    history.pushSnapshotData(history.captureSnapshot());
     unlockHistory = history.lockHistoryWithoutSnapshot();
     window.addEventListener('mouseup', handleEnd, { once: true });
     window.addEventListener('touchend', handleEnd, { once: true });
@@ -45,15 +46,9 @@ export function useContinuousHistory() {
     }
   });
 
-  // 可直接用于 v-on 绑定
-  const sliderListeners = {
-    mousedown: handleStart,
-    touchstart: handleStart,
-  };
-
   return {
     handleStart,
     handleEnd,
-    sliderListeners,
+    startContinuousHistory: handleStart,
   };
 }

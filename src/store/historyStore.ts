@@ -56,6 +56,18 @@ export const useHistoryStore = defineStore('history', () => {
     };
   };
 
+  const captureSnapshot = (): CanvasSnapshot => createSnapshot();
+
+  const pushSnapshotData = (snapshot: CanvasSnapshot) => {
+    if (isRestoring.value || isLocked.value) return;
+    // 深拷贝防止外部引用被修改
+    historyStack.value.push(cloneDeep(snapshot));
+    if (historyStack.value.length > MAX_HISTORY) {
+      historyStack.value.shift();
+    }
+    redoStack.value = [];
+  };
+
   const pushSnapshot = () => {
     if (isRestoring.value || isLocked.value) return;
     historyStack.value.push(createSnapshot());
@@ -139,6 +151,8 @@ export const useHistoryStore = defineStore('history', () => {
     isLocked,
     canUndo,
     canRedo,
+    captureSnapshot,
+    pushSnapshotData,
     pushSnapshot,
     undo,
     redo,

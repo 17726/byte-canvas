@@ -17,7 +17,13 @@
           </div>
           <div class="prop-item">
             <span class="label">网格颜色</span>
-            <a-color-picker v-model="store.viewport.gridDotColor" size="small" show-text />
+            <a-color-picker
+              v-model="store.viewport.gridDotColor"
+              size="small"
+              show-text
+              @mousedown="startContinuousHistory"
+              @touchstart.prevent="startContinuousHistory"
+            />
           </div>
           <div class="prop-item">
             <span class="label">间距</span>
@@ -34,7 +40,13 @@
         <div class="section-title">背景与主题</div>
         <div class="prop-item">
           <span class="label">背景色</span>
-          <a-color-picker v-model="store.viewport.backgroundColor" size="small" show-text />
+          <a-color-picker
+            v-model="store.viewport.backgroundColor"
+            size="small"
+            show-text
+            @mousedown="startContinuousHistory"
+            @touchstart.prevent="startContinuousHistory"
+          />
         </div>
         <div class="prop-item">
           <span class="label">主题</span>
@@ -100,7 +112,8 @@
             <a-col :span="24">
               <span class="section-title">旋转角度</span>
               <a-slider
-                v-on="continuousSliderListeners"
+                @mousedown="startContinuousHistory"
+                @touchstart.prevent="startContinuousHistory"
                 v-model="transformRotation"
                 :min="-180"
                 :max="180"
@@ -120,7 +133,13 @@
           <div class="prop-item" v-if="canEditShapeStyle && !isImage">
             <span class="section-title">填充</span>
             <div class="flex-row">
-              <a-color-picker v-model="fillColorTemp" size="small" @change="applyFillColor" />
+              <a-color-picker
+                v-model="fillColorTemp"
+                size="small"
+                @mousedown="startContinuousHistory"
+                @touchstart.prevent="startContinuousHistory"
+                @change="applyFillColor"
+              />
             </div>
           </div>
           <!-- Stroke -->
@@ -130,6 +149,8 @@
               <a-color-picker
                 v-model="strokeColorTemp"
                 size="small"
+                @mousedown="startContinuousHistory"
+                @touchstart.prevent="startContinuousHistory"
                 @change="handleStrokeColorChange"
               />
               <a-input-number
@@ -147,7 +168,8 @@
           <div class="prop-item">
             <div class="section-title">不透明度</div>
             <a-slider
-              v-on="continuousSliderListeners"
+              @mousedown="startContinuousHistory"
+              @touchstart.prevent="startContinuousHistory"
               v-model="opacity"
               :min="0"
               :max="1"
@@ -160,7 +182,8 @@
             <div class="prop-item">
               <span class="section-title">圆角 (%)</span>
               <a-slider
-                v-on="continuousSliderListeners"
+                @mousedown="startContinuousHistory"
+                @touchstart.prevent="startContinuousHistory"
                 v-model="cornerRadius"
                 :min="0"
                 :max="50"
@@ -205,7 +228,13 @@
             </div>
             <div class="prop-item">
               <div class="section-title">颜色</div>
-              <a-color-picker :value="textColor" show-text size="small" />
+              <a-color-picker
+                :value="textColor"
+                show-text
+                size="small"
+                @mousedown="startContinuousHistory"
+                @touchstart.prevent="startContinuousHistory"
+              />
             </div>
           </template>
           <!-- Image Specific -->
@@ -278,7 +307,8 @@
               <div class="filter-param-item">
                 <div class="filter-param-label">灰度</div>
                 <a-slider
-                  v-on="continuousSliderListeners"
+                  @mousedown="startContinuousHistory"
+                  @touchstart.prevent="startContinuousHistory"
                   v-model="grayscale"
                   :min="0"
                   :max="100"
@@ -293,7 +323,8 @@
               <div class="filter-param-item">
                 <div class="filter-param-label">模糊</div>
                 <a-slider
-                  v-on="continuousSliderListeners"
+                  @mousedown="startContinuousHistory"
+                  @touchstart.prevent="startContinuousHistory"
                   v-model="blur"
                   :min="0"
                   :max="20"
@@ -308,7 +339,8 @@
               <div class="filter-param-item">
                 <div class="filter-param-label">亮度</div>
                 <a-slider
-                  v-on="continuousSliderListeners"
+                  @mousedown="startContinuousHistory"
+                  @touchstart.prevent="startContinuousHistory"
                   v-model="brightness"
                   :min="0"
                   :max="200"
@@ -323,7 +355,8 @@
               <div class="filter-param-item">
                 <div class="filter-param-label">对比度</div>
                 <a-slider
-                  v-on="continuousSliderListeners"
+                  @mousedown="startContinuousHistory"
+                  @touchstart.prevent="startContinuousHistory"
                   v-model="contrast"
                   :min="0"
                   :max="200"
@@ -338,7 +371,8 @@
               <div class="filter-param-item">
                 <div class="filter-param-label">饱和度</div>
                 <a-slider
-                  v-on="continuousSliderListeners"
+                  @mousedown="startContinuousHistory"
+                  @touchstart.prevent="startContinuousHistory"
                   v-model="saturate"
                   :min="0"
                   :max="200"
@@ -353,7 +387,8 @@
               <div class="filter-param-item">
                 <div class="filter-param-label">色相旋转</div>
                 <a-slider
-                  v-on="continuousSliderListeners"
+                  @mousedown="startContinuousHistory"
+                  @touchstart.prevent="startContinuousHistory"
                   v-model="hueRotate"
                   :min="0"
                   :max="360"
@@ -368,7 +403,8 @@
               <div class="filter-param-item">
                 <div class="filter-param-label">滤镜透明度</div>
                 <a-slider
-                  v-on="continuousSliderListeners"
+                  @mousedown="startContinuousHistory"
+                  @touchstart.prevent="startContinuousHistory"
                   v-model="filterOpacity"
                   :min="0"
                   :max="100"
@@ -383,7 +419,8 @@
               <div class="filter-param-item">
                 <div class="filter-param-label">反转</div>
                 <a-slider
-                  v-on="continuousSliderListeners"
+                  @mousedown="startContinuousHistory"
+                  @touchstart.prevent="startContinuousHistory"
                   v-model="invert"
                   :min="0"
                   :max="100"
@@ -398,7 +435,8 @@
               <div class="filter-param-item">
                 <div class="filter-param-label">棕褐色</div>
                 <a-slider
-                  v-on="continuousSliderListeners"
+                  @mousedown="startContinuousHistory"
+                  @touchstart.prevent="startContinuousHistory"
                   v-model="sepia"
                   :min="0"
                   :max="100"
@@ -435,7 +473,7 @@ import { GroupService } from '@/core/services/GroupService';
 const store = useCanvasStore();
 const selectionStore = useSelectionStore();
 const ui = useUIStore();
-const { sliderListeners: continuousSliderListeners } = useContinuousHistory();
+const { startContinuousHistory } = useContinuousHistory();
 
 // 使用 useStyleSync 进行属性绑定（基础变换和通用属性）
 const {
