@@ -85,7 +85,6 @@ const style = computed((): CSSProperties => {
   const { transform, style: nodeStyle } = text;
   const { x = 0, y = 0, width = 200, height = 80, rotation = 0 } = transform;
   const {
-    backgroundColor = 'transparent',
     borderWidth = 0,
     borderStyle = 'none',
     borderColor = 'transparent',
@@ -102,7 +101,7 @@ const style = computed((): CSSProperties => {
     transform: `rotate(${rotation}deg)`,
     transformOrigin: 'center center',
     boxSizing: 'border-box',
-    backgroundColor,
+    backgroundColor: '#ffffff00',
     borderWidth: `${borderWidth}px`,
     borderStyle,
     borderColor,
@@ -150,6 +149,18 @@ watch(
     if (toolManagerRef?.value) toolManagerRef?.value.handleFontSizeChange(props.node.id);
   },
   { deep: true }
+);
+
+watch(
+  () => isActiveNode.value,
+  () => {
+    console.log('文本内容变化检测：', JSON.stringify(props.node.props.content));
+    console.log('当前编辑态：', isEditing.value);
+    console.log('当前激活态：', isActiveNode.value);
+    if (props.node.props.content === '\n' && !isActiveNode.value && !isEditing.value)
+      store.deleteNode(props.node.id);
+  },
+  { deep: true, flush: 'post' }
 );
 
 // 组件内定义执行锁
@@ -281,7 +292,6 @@ const handleDragStart = (e: DragEvent) => {
   height: 100%;
   width: 100%;
   margin: 0;
-  background: transparent;
   cursor: move;
   user-select: none;
   -webkit-user-select: none;
@@ -293,6 +303,8 @@ const handleDragStart = (e: DragEvent) => {
   padding: 2px 4px;
   line-height: 1.6;
   font-size: v-bind('props.node.props.fontSize + "px"');
+  background-color: v-bind('props.node.style.backgroundColor || "transparent"') !important;
+  overflow: hidden;
 }
 
 .textBox > div,
