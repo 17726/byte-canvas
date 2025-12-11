@@ -292,6 +292,7 @@ const handleDragStart = (e: DragEvent) => {
   line-height: 1.6;
   font-size: v-bind('props.node.props.fontSize + "px"');
   background-color: v-bind('props.node.style.backgroundColor || "transparent"') !important;
+  overflow: hidden;
 }
 
 .textBox > div,

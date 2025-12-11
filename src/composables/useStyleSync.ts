@@ -172,8 +172,12 @@ export function useStyleSync() {
 
   const strokeColor = createBinding<string>(
     (node) => {
-      if (node.type === NodeType.RECT || node.type === NodeType.CIRCLE) {
-        return (node as ShapeState).style.borderColor || '#000000';
+      if (
+        node.type === NodeType.RECT ||
+        node.type === NodeType.CIRCLE ||
+        node.type === NodeType.TEXT
+      ) {
+        return (node as NodeState).style.borderColor || '#000000';
       }
       return '#000000';
     },
@@ -183,8 +187,12 @@ export function useStyleSync() {
 
   const strokeWidth = createBinding<number>(
     (node) => {
-      if (node.type === NodeType.RECT || node.type === NodeType.CIRCLE) {
-        return (node as ShapeState).style.borderWidth || 0;
+      if (
+        node.type === NodeType.RECT ||
+        node.type === NodeType.CIRCLE ||
+        node.type === NodeType.TEXT
+      ) {
+        return (node as NodeState).style.borderWidth || 0;
       }
       return 0;
     },
