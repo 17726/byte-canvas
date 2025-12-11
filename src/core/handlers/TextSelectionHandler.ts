@@ -890,9 +890,12 @@ export class TextSelectionHandler {
    * @param id 文本节点 ID
    */
   public handleBlur(id: string) {
-    const node = this.store.nodes[id];
+    const node = this.store.nodes[id] as TextState | undefined;
     const editor = this.editors[id];
     if (!node || !editor) return;
+
+    // 特殊处理：内容仅为换行符时，删除该节点
+    if (node.props.content === '\n') this.store.deleteNode(id);
 
     if (this.isClickingToolbar) {
       editor.focus();
