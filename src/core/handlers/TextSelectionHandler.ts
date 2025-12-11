@@ -1021,7 +1021,7 @@ export class TextSelectionHandler {
         //console.log('删除后的remaining长度:', Object.keys(remainingStyles).length);
       }
 
-      if (Object.keys(remainingStyles).length > 0) {
+      if (Object.keys(remainingStyles).length > 0 && overlapStart < overlapEnd) {
         newStyles.push({
           start: overlapStart,
           end: overlapEnd,
@@ -1154,7 +1154,7 @@ export class TextSelectionHandler {
     //5. 处理样式的【添加】
     // 步骤1：判断选中区域是否已存在目标样式值（兼容textDecoration多值）
     let hasTargetStyle = false;
-    // 遍历现有样式，检查选中范围内是否包含目标值
+    // 遍历现有样式，检查选中范围内是否包含目标值 valid没有进行分隔 如果仅检查下面这个范围，部分重叠的不会被检查到
     for (const style of validInlineStyles) {
       // 仅检查与选中区域重叠的样式
       if (style.start < selectionEnd && style.end > selectionStart) {
@@ -1181,14 +1181,22 @@ export class TextSelectionHandler {
       }
     }
     console.log('hasTargetStyle:', hasTargetStyle);
+
     if (toggle) {
       if (!hasTargetStyle) {
         //特殊处理textDecoration多值添加 只要有重叠就要拆【新样式】 逻辑和前面拆全局是一样的
         if (styleKey === 'textDecoration' && styleValue) {
           let isOverlapping = false; // 标记是否有重叠
-          // 遍历updatedStyles，拆分重叠部分并添加新值
+          let shouldAddLastStyle = true; // 标记是否需要添加最后一段样式
+
+          // 遍历updatedStyles，拆分新属性的重叠部分并添加
           const finalNewStyles: Array<{ start: number; end: number; styles: InlineStyleProps }> =
             [];
+          let newDecorationStyle = {
+            start: selectionStart,
+            end: selectionEnd,
+            styles: { [styleKey]: styleValue } as InlineStyleProps,
+          };
           for (const style of updatedStyles) {
             if (
               style.end <= selectionStart ||
@@ -1200,11 +1208,6 @@ export class TextSelectionHandler {
             }
             //有范围重叠 拆分要【添加】的【新样式】
             isOverlapping = true;
-            const newDecorationStyle = {
-              start: selectionStart,
-              end: selectionEnd,
-              styles: { [styleKey]: styleValue } as InlineStyleProps,
-            };
             const splitNewStyles = this.splitOverlappingStyle(
               newDecorationStyle,
               style.start,
@@ -1213,8 +1216,23 @@ export class TextSelectionHandler {
               style.styles.textDecoration as TextDecorationValue // 传入旧的textDecoration值
             );
             console.log('拆分后的新值 splitNewStyles:', JSON.stringify(splitNewStyles));
-            finalNewStyles.push(...splitNewStyles);
+            if (style.end === selectionEnd) {
+              shouldAddLastStyle = false;
+              finalNewStyles.push(...splitNewStyles);
+            } else {
+              for (let i = 0; i < splitNewStyles.length - 1; i++) {
+                const ns = splitNewStyles[i];
+                if (!ns) continue;
+                finalNewStyles.push(ns);
+              }
+              newDecorationStyle = splitNewStyles[splitNewStyles.length - 1]!;
+            }
+            //finalNewStyles.push(...splitNewStyles);
+            //这里有问题 只要遍历到有重叠的就会拆一次，存进finalNewStyles，最后会有很多重复的范围, 改成上面这样
           }
+          if (newDecorationStyle && shouldAddLastStyle && isOverlapping)
+            finalNewStyles.push(newDecorationStyle); // 添加最后剩余的部分
+          console.log('finalNewStyles before check:', JSON.stringify(finalNewStyles));
           console.log('isOverlapping:', isOverlapping);
           // 若没有重叠，直接在选中范围内添加新的textDecoration值
           if (!isOverlapping) {
@@ -1774,7 +1792,11 @@ export class TextSelectionHandler {
     // 2. 计算文本长度变化（核心依据）
     const oldLength = oldContent.length; // 旧长度（比如 "你好" → 2）
     const newLength = newContent.length; // 新长度（比如 "你好世界" → 4）
-    const lengthDiff = newLength - oldLength; // 长度差（+2 表示插入，-1 表示删除）
+    let lengthDiff = newLength - oldLength; // 长度差（+2 表示插入，-1 表示删除）
+
+    if (newContent === '\n') {
+      lengthDiff = lengthDiff > 0 ? lengthDiff + 1 : lengthDiff - 1;
+    }
 
     // 3. 无长度变化（比如只修改文字但长度不变："你好"→"哈喽"），无需调整样式
     if (lengthDiff === 0) return;
@@ -1808,7 +1830,7 @@ export class TextSelectionHandler {
     const newInlineStyles = oldInlineStyles
       .map((style) => {
         let { start, end } = style; // 每个样式的原范围（比如 start:1, end:2 → 对应旧文本第1-2个字符）
-
+        console.log('调整前样式范围：', { start, end });
         // 场景1：文本「插入」（长度增加，lengthDiff>0）—— 光标后的样式范围向后偏移
         if (lengthDiff > 0 && end > cursorPos) {
           // 比如：旧文本 "你好"（长度2），在光标Pos=2插入"世界"（长度+2）
@@ -1830,13 +1852,40 @@ export class TextSelectionHandler {
         }
 
         // 场景2：文本「删除」（长度减少，lengthDiff<0）—— 光标后的样式范围向前偏移
-        if (lengthDiff < 0 && end > cursorPos) {
-          const offset = Math.abs(lengthDiff); // 删除的字符数（比如删除1个字符，offset=1）
-          // 比如：旧文本 "你好世界"（长度4），光标Pos=2，删除"世界"（长度-2）
-          // 原样式 start:2, end:4 → 光标后，所以 start= max(0, 2-2)=0，end= max(0,4-2)=2
-          // 新样式范围 start:0, end:2 → 对应删除后的"你好"，样式不丢失
-          start = start > cursorPos ? Math.max(0, start - offset) : start;
-          end = Math.max(start, end - offset); // 避免 end < start（无效样式范围）
+        if (lengthDiff < 0 && end > start) {
+          // 先确保样式范围本身有效
+          const offset = Math.abs(lengthDiff); // 删除的字符数
+          const deleteStart = cursorPos + 1; // 删除起始位置
+          const deleteEnd = deleteStart + offset; // 删除结束位置（左闭右开）
+          console.log('长度变化：', lengthDiff);
+          console.log('删除区间：', { deleteStart, deleteEnd }, '原始样式范围：', { start, end });
+
+          // 分4种场景处理样式范围与删除区间的关系
+          if (end <= deleteStart) {
+            // 场景1：样式完全在删除区间之前 → 不调整
+            console.log('样式完全在删除区间前，不调整：', { start, end });
+          } else if (start >= deleteEnd) {
+            // 场景2：样式完全在删除区间之后 → 整体向前偏移offset
+            start = Math.max(0, start - offset);
+            end = Math.max(start, end - offset); // 避免end < start
+            console.log('样式完全在删除区间后，偏移后：', { start, end });
+          } else if (start < deleteStart && end > deleteEnd) {
+            // 场景3：样式跨删除区间（前半在删除前，后半在删除后）→ 截断为删除前的部分
+            end = Math.max(start, end - offset);
+            console.log('样式跨删除区间，截断后：', { start, end });
+          } else if (start >= deleteStart && end <= deleteEnd) {
+            // 场景4：样式完全在删除区间内 或 部分重叠 → 置为无效范围（start >= end）
+            start = end; // 标记为无效，后续过滤掉该样式
+            console.log('样式在删除区间内，置为无效：', { start, end });
+          } else if (start < deleteStart && end <= deleteEnd) {
+            //边界重叠
+            end = Math.max(start, deleteStart);
+            console.log('样式与删除区间边界左重叠，调整后：', { start, end });
+          } else {
+            //边界重叠
+            start = Math.max(0, deleteEnd);
+            console.log('样式与删除区间边界右重叠，调整后：', { start, end });
+          }
         }
 
         return { ...style, start, end }; // 返回调整后的样式
@@ -1846,6 +1895,13 @@ export class TextSelectionHandler {
     // 7. 最终：更新节点的内联样式（同步到store，视图自动刷新）
     store.updateNode(id, {
       props: { ...node.props, inlineStyles: newInlineStyles },
+    });
+  }
+  public clearPartialInlineStyle(id: string) {
+    const node = this.store.nodes[id] as TextState | undefined;
+    if (!node || node.type !== NodeType.TEXT) return;
+    this.store.updateNode(id, {
+      props: { ...node.props, inlineStyles: undefined },
     });
   }
 }

@@ -756,6 +756,10 @@ export class ToolManager {
     );
   }
 
+  clearInlineStyle(id: string) {
+    this.textSelectionHandler.clearPartialInlineStyle(id);
+  }
+
   //这里没用了
   // handleFontSizeChange(id: string, newFontSize: number) {
   //   this.textSelectionHandler.updateGlobalStyles(id, this.store, { fontSize: newFontSize });
