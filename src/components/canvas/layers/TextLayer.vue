@@ -47,10 +47,14 @@ import type { ToolManager } from '@/core/ToolManager';
 import { useCanvasStore } from '@/store/canvasStore';
 import { useSelectionStore } from '@/store/selectionStore';
 import { getCurrentInstance } from 'vue';
+import { useStyleSync } from '@/composables/useStyleSync';
 
 const props = defineProps<{
   node: TextState;
 }>();
+
+const { fillColor } = useStyleSync();
+console.log('TextLayer fillColor:', fillColor);
 
 // 1. 注入全局 ToolManager 实例（唯一依赖，不直接接触任何 Handler）
 const toolManagerRef = inject<Ref<ToolManager | null>>('toolManager');
@@ -281,7 +285,6 @@ const handleDragStart = (e: DragEvent) => {
   height: 100%;
   width: 100%;
   margin: 0;
-  background: transparent;
   cursor: move;
   user-select: none;
   -webkit-user-select: none;
@@ -293,6 +296,7 @@ const handleDragStart = (e: DragEvent) => {
   padding: 2px 4px;
   line-height: 1.6;
   font-size: v-bind('props.node.props.fontSize + "px"');
+  background-color: v-bind('fillColor || "transparent"');
 }
 
 .textBox > div,

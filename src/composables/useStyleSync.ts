@@ -157,7 +157,11 @@ export function useStyleSync() {
     },
     (node, value) => {
       // 只对矩形和圆形节点应用填充色
-      if (node.type === NodeType.RECT || node.type === NodeType.CIRCLE) {
+      if (
+        node.type === NodeType.RECT ||
+        node.type === NodeType.CIRCLE ||
+        node.type === NodeType.TEXT
+      ) {
         return { style: { ...node.style, backgroundColor: value } };
       }
       // 对于其他节点类型，不做任何修改
