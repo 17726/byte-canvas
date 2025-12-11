@@ -392,12 +392,14 @@ export class TextSelectionHandler {
       if (!child) continue;
       // 1. 文本节点：直接累加字符数（排除空文本）
       if (child.nodeType === Node.TEXT_NODE) {
-        const textLength = child.textContent?.trim() === '' ? 0 : child.textContent?.length || 0;
+        const textLength = child.textContent?.length || 0;
         totalChars += textLength;
+        console.log('遇到文本节点，累计字符数+ ', textLength);
       }
       // 2. BR节点：对应\n，累加1个字符
       else if (child.nodeName === 'BR') {
         totalChars += 1;
+        console.log('遇到BR节点，累计字符数+1');
       }
       // 3. 其他元素节点（如嵌套SPAN/DIV）：递归遍历其子节点
       else if (child.nodeType === Node.ELEMENT_NODE) {
@@ -432,14 +434,14 @@ export class TextSelectionHandler {
 
     const range = selection.getRangeAt(0);
 
-    // console.log('===== Range 关键信息 =====');
-    // console.log(
-    //   'startContainer节点类型：',
-    //   range.startContainer.nodeType === 3 ? '文本节点' : '元素节点'
-    // );
-    // console.log('startContainer节点名称：', range.startContainer.nodeName);
-    // console.log('startOffset：', range.startOffset);
-    // console.log('是否是光标（collapsed）：', range.collapsed);
+    console.log('===== Range 关键信息 =====');
+    console.log(
+      'startContainer节点类型：',
+      range.startContainer.nodeType === 3 ? '文本节点' : '元素节点'
+    );
+    console.log('startContainer节点名称：', range.startContainer);
+    console.log('startOffset：', range.startOffset);
+    console.log('是否是光标（collapsed）：', range.collapsed);
 
     // 1. 先修正getTextOffset的传参（直接传节点，而非content+parent，保证精准）
     const startTargetNode = range.startContainer;
@@ -474,14 +476,14 @@ export class TextSelectionHandler {
     const endTextOffset = endBaseOffset + endLocalOffset;
 
     // 4. 调试日志（保留并优化）
-    // console.log('===== 偏移计算详情 =====');
-    // console.log('startBaseOffset（目标节点前累计字符数）=', startBaseOffset);
-    // console.log('startLocalOffset（节点内字符数偏移）=', startLocalOffset);
-    // console.log('range.startOffset（原始offset）=', range.startOffset);
-    // console.log('endBaseOffset（目标节点前累计字符数）=', endBaseOffset);
-    // console.log('endLocalOffset（节点内字符数偏移）=', endLocalOffset);
-    // console.log('range.endOffset（原始offset）=', range.endOffset);
-    // console.log('最终保存的光标位置：', Math.max(0, startTextOffset), Math.max(0, endTextOffset));
+    console.log('===== 偏移计算详情 =====');
+    console.log('startBaseOffset（目标节点前累计字符数）=', startBaseOffset);
+    console.log('startLocalOffset（节点内字符数偏移）=', startLocalOffset);
+    console.log('range.startOffset（原始offset）=', range.startOffset);
+    console.log('endBaseOffset（目标节点前累计字符数）=', endBaseOffset);
+    console.log('endLocalOffset（节点内字符数偏移）=', endLocalOffset);
+    console.log('range.endOffset（原始offset）=', range.endOffset);
+    console.log('最终保存的光标位置：', Math.max(0, startTextOffset), Math.max(0, endTextOffset));
     return {
       isCollapsed: range.collapsed, // 是否是光标（折叠）
       startOffset: Math.max(0, startTextOffset),
@@ -514,7 +516,7 @@ export class TextSelectionHandler {
           savedData.startOffset,
           savedData.endOffset
         );
-        // console.log('到这里了newRange:', newRange);
+        console.log('到这里了newRange:', newRange);
         if (newRange) {
           // 恢复选区/光标（折叠则是光标，非折叠则是选中）
           if (savedData.isCollapsed) {
@@ -522,7 +524,7 @@ export class TextSelectionHandler {
           }
           selection.removeAllRanges();
           selection.addRange(newRange);
-          // console.log('选区恢复成功:', newRange);
+          console.log('选区恢复成功:', newRange);
         } else {
           // 降级：定位到文本末尾
           this.fallbackToTextEnd(editor, selection);
