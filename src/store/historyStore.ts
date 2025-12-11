@@ -61,7 +61,7 @@ export const useHistoryStore = defineStore('history', () => {
   const pushSnapshotData = (snapshot: CanvasSnapshot) => {
     if (isRestoring.value || isLocked.value) return;
     // 深拷贝防止外部引用被修改
-    historyStack.value.push(cloneDeep(snapshot));
+    historyStack.value.push(snapshot);
     if (historyStack.value.length > MAX_HISTORY) {
       historyStack.value.shift();
     }
