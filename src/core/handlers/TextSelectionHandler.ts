@@ -808,11 +808,57 @@ export class TextSelectionHandler {
    */
   handleGlobalMousedown(e: MouseEvent) {
     const target = e.target as HTMLElement;
-    // 查找工具栏
+    console.log('全局mousedown事件触发，目标元素：', target);
+
+    // 1. 查找工具栏主容器
     const toolbar = document.querySelector('.context-toolbar');
-    const colorPicker = document.querySelector('.text-color-picker');
-    if (!toolbar || !colorPicker) return;
-    this.isClickingToolbar = toolbar.contains(target) || colorPicker.contains(target);
+    // 如果工具栏不存在，直接判定为未点击工具栏
+    if (!toolbar) {
+      this.isClickingToolbar = false;
+      return;
+    }
+
+    // 2. 检查目标是否在工具栏内（最主要的判断）
+    if (toolbar.contains(target)) {
+      this.isClickingToolbar = true;
+      return;
+    }
+
+    // 3. 检查是否点击了工具栏相关的弹出层/下拉组件（ArcoDesign组件）
+    const relatedSelectors = [
+      // 颜色选择器相关
+      '.text-color-picker',
+      '.arco-color-picker-popup',
+      // 字体选择器相关
+      '.font-family-selector',
+      '.arco-select-popup',
+      '.font-family-dropdown',
+      // ArcoDesign下拉箭头
+      '.arco-select-view-arrow-icon',
+      // Tooltip/Popover弹出层
+      '.arco-tooltip-popup',
+      '.arco-popover-popup',
+      // 数字输入框按钮
+      '.arco-input-number-handler',
+      // 滑块组件
+      '.arco-slider-rail',
+      '.arco-slider-track',
+      '.arco-slider-handle',
+    ];
+
+    // 4. 检查目标是否是工具栏相关组件
+    const isRelatedToToolbar = relatedSelectors.some((selector) => {
+      const element = document.querySelector(selector);
+      return element && element.contains(target);
+    });
+
+    // 5. 额外检查目标元素本身是否有相关类名
+    const hasRelatedClass = target.closest(
+      '.context-toolbar, .text-color-picker, .font-family-selector, .font-family-dropdown, ' +
+        '.arco-color-picker-popup, .arco-select-popup, .arco-tooltip-popup, .arco-popover-popup'
+    );
+
+    this.isClickingToolbar = isRelatedToToolbar || !!hasRelatedClass;
   }
 
   /**

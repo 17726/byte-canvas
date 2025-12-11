@@ -89,13 +89,19 @@
         <div class="tool-item">
           <!-- 字体选择下拉菜单 -->
           <a-select
+            class="font-family-selector"
             size="mini"
             style="width: 75px"
             placeholder="字体"
             :trigger-props="{ autoFitPopupWidth: false, popupStyle: { width: '150px' } }"
             @change="handleFontFamilyChange"
           >
-            <a-option v-for="font in fontList" :key="font.value" :value="font.value">
+            <a-option
+              v-for="font in fontList"
+              :key="font.value"
+              :value="font.value"
+              class="font-family-dropdown"
+            >
               {{ font.label }}
             </a-option>
           </a-select>
