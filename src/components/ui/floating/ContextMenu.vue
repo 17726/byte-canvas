@@ -15,6 +15,16 @@
             粘贴
             <span class="label">Ctrl+V</span>
           </a-menu-item>
+          <a-menu-item key="undo" v-if="canUndo" @click="clickUndo">
+            <template #icon><icon-undo /></template>
+            撤销
+            <span class="label">Ctrl+Z</span>
+          </a-menu-item>
+          <a-menu-item key="redo" v-if="canRedo" @click="clickRedo">
+            <template #icon><icon-redo /></template>
+            重做
+            <span class="label">Ctrl+Y</span>
+          </a-menu-item>
           <a-menu-item key="selectAll" @click="handleAction(selectAll)">
             <template #icon><FullSelection /></template>
             全选
@@ -125,11 +135,14 @@
 </template>
 
 <script setup lang="ts">
+import { storeToRefs } from 'pinia';
 import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue';
 import { useNodeActions } from '@/composables/useNodeActions';
 import {
   IconCopy,
   IconPaste,
+  IconRedo,
+  IconUndo,
   IconScissor,
   IconDelete,
   IconLayers,
@@ -143,6 +156,8 @@ import {
   FullSelection,
 } from '@icon-park/vue-next';
 import { loadClipboard } from '@/store/persistence.ts';
+import { useHistoryStore } from '@/store/historyStore.ts';
+import { Notification } from '@arco-design/web-vue';
 
 const {
   hasSelection,
@@ -157,6 +172,9 @@ const {
   selectAll,
   clearCanvas,
 } = useNodeActions();
+
+const { canUndo, canRedo } = storeToRefs(useHistoryStore());
+const { undo, redo } = useHistoryStore();
 
 // 监听来自 ToolManager 的右键菜单事件
 function handleShowContextMenu(e: CustomEvent) {
@@ -238,6 +256,28 @@ function checkClipboardAvailability() {
     isClipboardAvailable.value = clipboardData.nodes.length > 0;
   } else {
     isClipboardAvailable.value = false;
+  }
+}
+
+/* ---------- 通知 ---------- */
+function clickUndo() {
+  if (canUndo.value) {
+    undo();
+    Notification.success({
+      content: '撤销成功！',
+      closable: true,
+      duration: 2000,
+    });
+  }
+}
+function clickRedo() {
+  if (canRedo.value) {
+    redo();
+    Notification.success({
+      content: '重做成功！',
+      closable: true,
+      duration: 2000,
+    });
   }
 }
 
