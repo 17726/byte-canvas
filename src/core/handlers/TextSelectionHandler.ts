@@ -1575,21 +1575,25 @@ export class TextSelectionHandler {
 
     // 判断光标是否在根节点内
     if (!editor.contains(range.startContainer)) {
-      console.error('光标不在文本组件根节点内');
+      console.log('光标不在文本组件根节点内');
       return;
     }
 
     // 获取光标前的节点（根节点的子节点）
     let previousNode: Node | null = null;
+    console.log('range.startContainer:', range.startContainer);
     if (range.startContainer === editor) {
       // 如果光标直接位于根节点，使用 startOffset 获取子节点
+      console.log('光标位于根节点内');
       previousNode = editor.childNodes[range.startOffset - 1] || null;
     } else {
       // 如果光标位于子节点内部，找到其父节点在根节点中的位置
       const parent = range.startContainer.parentNode;
+      console.log('光标所在节点的父节点:', parent);
+      console.log('editor:', editor);
       if (parent === editor) {
         previousNode = range.startContainer.previousSibling;
-      } else {
+      } else if (range.startOffset === 0) {
         // 遍历找到光标所在节点在根节点中的前一个节点
         let currentNode = range.startContainer;
         while (
@@ -1598,7 +1602,10 @@ export class TextSelectionHandler {
           currentNode.parentNode !== null
         ) {
           currentNode = currentNode.parentNode;
+          console.log('currentNode: ', currentNode);
         }
+        console.log('找到了currentNode:', currentNode);
+        console.log('currentNode的上一个节点:', currentNode?.previousSibling);
         previousNode = currentNode?.previousSibling || null;
       }
     }
