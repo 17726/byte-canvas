@@ -16,6 +16,10 @@
       <div class="selection-border"></div>
     </div>
 
+    <div v-if="editingGroupLabelStyle" class="group-edit-indicator" :style="editingGroupLabelStyle">
+      <span class="edit-label">编辑组合中</span>
+    </div>
+
     <!-- 选中子元素的操作框（带控制点） -->
     <div
       v-if="operationOverlayStyle"
@@ -63,7 +67,7 @@ import { useSelectionStore } from '@/store/selectionStore';
 import type { ToolManager } from '@/core/ToolManager';
 import type { ResizeHandle } from '@/types/editor';
 import { NodeType, type BaseNodeState, type NodeState } from '@/types/state';
-import { computeAbsoluteTransform } from '@/core/utils/geometry';
+import { computeAbsoluteTransform, computeSelectionBounds } from '@/core/utils/geometry';
 
 const store = useCanvasStore();
 const selectionStore = useSelectionStore();
@@ -153,7 +157,7 @@ const selectedNodes = computed(() => {
   return selectionStore.activeElements as BaseNodeState[];
 });
 
-// 单个元素选中框样式（使用绝对坐标）
+// 单个元素选中框样式（使用绝对坐标，考虑父组合的旋转）
 const getIndividualStyle = (node: BaseNodeState) => {
   const absTransform = computeAbsoluteTransform(node.id, store.nodes);
   const { x, y, width, height, rotation } = absTransform || node.transform;
@@ -167,7 +171,7 @@ const getIndividualStyle = (node: BaseNodeState) => {
 
 /**
  * 计算旋转后的节点边界框（AABB）
- * 使用绝对坐标，考虑父组合位置
+ * 使用绝对坐标，考虑父组合位置和旋转
  */
 const getRotatedBounds = (node: BaseNodeState) => {
   const absTransform = computeAbsoluteTransform(node.id, store.nodes);
@@ -210,23 +214,17 @@ const getRotatedBounds = (node: BaseNodeState) => {
   return { minX, maxX, minY, maxY };
 };
 
-// 组合编辑模式下：实时计算组合的整体边界框（基于所有子元素）
-// 子元素的选中框通过 selectedNodes 单独显示
-const editingGroupBounds = computed(() => {
-  const editingId = selectionStore.editingGroupId;
-  if (!editingId) return null;
-
-  const group = store.nodes[editingId];
+// 计算组合子元素的世界 AABB（考虑旋转），用于显示组合框
+const getGroupChildrenAABB = (groupId: string) => {
+  const group = store.nodes[groupId];
   if (!group || group.type !== NodeType.GROUP) return null;
 
-  // 实时计算所有子元素的边界框（使用绝对坐标）
-  const children = group.children
-    .map((id) => store.nodes[id])
+  const children = (group as NodeState & { children?: string[] }).children
+    ?.map((id: string) => store.nodes[id])
     .filter((node): node is NodeState => Boolean(node));
 
-  if (children.length === 0) {
-    // 如果没有子元素，使用组合的 transform
-    const absTransform = computeAbsoluteTransform(editingId, store.nodes);
+  if (!children || children.length === 0) {
+    const absTransform = computeAbsoluteTransform(groupId, store.nodes);
     if (!absTransform) return null;
     return {
       x: absTransform.x,
@@ -237,30 +235,32 @@ const editingGroupBounds = computed(() => {
     };
   }
 
-  // 计算所有子元素的边界（考虑旋转，使用绝对坐标）
-  let minX = Infinity,
-    maxX = -Infinity,
-    minY = Infinity,
-    maxY = -Infinity;
-
-  children.forEach((child) => {
-    const bounds = getRotatedBounds(child as BaseNodeState);
-    minX = Math.min(minX, bounds.minX);
-    maxX = Math.max(maxX, bounds.maxX);
-    minY = Math.min(minY, bounds.minY);
-    maxY = Math.max(maxY, bounds.maxY);
-  });
-
-  // 使用组合的旋转角度
-  const rotation = group.transform.rotation || 0;
-
+  // 使用通用的 selection bounds 计算以确保完全包含所有旋转子元素
+  const bounds = computeSelectionBounds(
+    children.map((c) => c.id),
+    store.nodes
+  );
   return {
-    x: minX,
-    y: minY,
-    width: maxX - minX,
-    height: maxY - minY,
-    rotation: rotation,
+    x: bounds.x,
+    y: bounds.y,
+    width: bounds.width,
+    height: bounds.height,
+    // AABB 已轴对齐，显示时不再叠加旋转
+    rotation: 0,
   };
+};
+
+// 组合编辑模式下：使用组合的 transform 作为组合框
+// 与非组合编辑模式下选中组合时的计算方式一致
+// 子元素的选中框通过 selectedNodes 单独显示
+const editingGroupBounds = computed(() => {
+  const editingId = selectionStore.editingGroupId;
+  if (!editingId) return null;
+
+  const group = store.nodes[editingId];
+  if (!group || group.type !== NodeType.GROUP) return null;
+
+  return getGroupChildrenAABB(editingId);
 });
 
 // 计算用于显示大框的包围盒
@@ -278,6 +278,9 @@ const selectionBounds = computed(() => {
   // 单选时：返回节点绝对边界（选中框会跟着旋转）
   if (nodes.length === 1) {
     const node = nodes[0];
+    if (node?.type === NodeType.GROUP) {
+      return getGroupChildrenAABB(node.id);
+    }
     const absTransform = computeAbsoluteTransform(node!.id, store.nodes);
     const transform = absTransform || node!.transform;
     return {
@@ -338,13 +341,14 @@ const operationBounds = computed(() => {
         return editingGroupBounds.value;
       }
 
-      // 单选时：使用元素的实际尺寸和旋转角度，不计算 AABB
+      // 单选时：直接使用子元素的绝对位置作为操作框
       if (nodesToCalculate.length === 1) {
         const firstNode = nodesToCalculate[0];
         if (!firstNode) return editingGroupBounds.value;
 
-        const absTransform = computeAbsoluteTransform(firstNode.id, store.nodes);
-        if (!absTransform) return editingGroupBounds.value;
+        // 直接取子元素的绝对变换（若失败则用自身 transform）
+        const absTransform =
+          computeAbsoluteTransform(firstNode.id, store.nodes) || firstNode.transform;
 
         return {
           x: absTransform.x,
@@ -398,6 +402,20 @@ const overlayStyle = computed(() => {
     transformOrigin: `${bounds.width / 2}px ${bounds.height / 2}px`,
     width: `${bounds.width}px`,
     height: `${bounds.height}px`,
+  };
+});
+
+// 组合编辑模式提示条位置（与组合 AABB 对齐，保持不随旋转倾斜）
+const editingGroupLabelStyle = computed(() => {
+  const bounds = editingGroupBounds.value;
+  if (!bounds) return null;
+
+  const scale = 1 / store.viewport.zoom;
+  const centerX = bounds.x + bounds.width / 2;
+  const topY = bounds.y;
+
+  return {
+    transform: `translate(${centerX}px, ${topY}px) translate(-50%, -100%) scale(${scale})`,
   };
 });
 
@@ -733,5 +751,21 @@ const onRotateHandleDown = (e: MouseEvent) => {
 
 .rotate-handle:active {
   cursor: grabbing;
+}
+
+.group-edit-indicator {
+  position: absolute;
+  z-index: 1001;
+  background: rgba(24, 144, 255, 0.9);
+  color: white;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.edit-label {
+  font-weight: 500;
 }
 </style>

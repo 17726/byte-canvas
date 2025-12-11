@@ -153,10 +153,19 @@ export class GroupService {
   }
 
   /**
+   * 计算节点的绝对坐标和旋转角度（考虑所有父组合的旋转和平移）
+   * 递归遍历父链，从内到外逐层应用变换
+   *
+   * @param store - Canvas Store 实例
+   * @param nodeId - 节点 ID
+   * @returns 绝对坐标和旋转角度 { x, y, rotation }
+   */
+
+  /**
    * 解散选中的组合节点
    *
    * 只解开最外层的组合，保留内部嵌套的组合结构。
-   * 将子节点的相对坐标转换为绝对坐标。
+   * 将子节点的相对坐标转换为绝对坐标（递归计算，考虑所有父组合的旋转）。
    *
    * @param store - Canvas Store 实例
    * @returns 解组合后的子节点 ID 列表
@@ -175,19 +184,29 @@ export class GroupService {
       const isNested = groupNode.parentId !== null;
 
       // 恢复子节点的parentId和坐标
+      // 使用递归计算绝对坐标和旋转角度，自动处理所有父组合的旋转和平移
       children.forEach((childId) => {
         const child = store.nodes[childId];
         if (child) {
-          // 使用 updateNode 确保响应式更新
-          store.updateNode(childId, {
-            parentId: groupNode.parentId,
-            transform: {
-              ...child.transform,
-              // 将相对坐标转换：加上组合的偏移
-              x: child.transform.x + groupNode.transform.x,
-              y: child.transform.y + groupNode.transform.y,
-            },
-          });
+          // 计算子元素的绝对坐标和旋转角度（考虑所有父组合的旋转）
+          const absoluteTransform = computeAbsoluteTransform(childId, store.nodes);
+          if (absoluteTransform) {
+            // 归一化旋转角度到 -180 ~ +180
+            let rotation = absoluteTransform.rotation;
+            if (rotation > 180) rotation -= 360;
+            else if (rotation < -180) rotation += 360;
+
+            // 使用 updateNode 确保响应式更新
+            store.updateNode(childId, {
+              parentId: groupNode.parentId,
+              transform: {
+                ...child.transform,
+                x: absoluteTransform.x,
+                y: absoluteTransform.y,
+                rotation,
+              },
+            });
+          }
           ungroupedIds.push(childId);
         }
       });
@@ -284,6 +303,9 @@ export class GroupService {
 
     const groupNode = store.nodes[editingGroupId] as GroupState;
     if (!groupNode || groupNode.type !== NodeType.GROUP) return;
+
+    // 如果组合本身有旋转，暂不调整边界，避免旋转下的边界重算导致子元素跳动
+    if (groupNode.transform.rotation) return;
 
     const children = groupNode.children
       .map((id: string) => store.nodes[id])

@@ -238,7 +238,7 @@ export const useCanvasStore = defineStore('canvas', () => {
   function deleteNode(id: string) {
     const node = nodes.value[id];
     if (!node) return;
-
+    console.log(`[CanvasStore] 删除节点 ${id} (${node.type})`);
     const history = useHistoryStore();
     const unlockHistory = history.lockHistory();
     const selectionStore = getSelectionStore();
@@ -691,7 +691,6 @@ export const useCanvasStore = defineStore('canvas', () => {
       .map((id) => nodes.value[id])
       .filter((node) => node && node.parentId === null);
   });
-
   return {
     nodes,
     nodeOrder,

@@ -85,7 +85,6 @@ const style = computed((): CSSProperties => {
   const { transform, style: nodeStyle } = text;
   const { x = 0, y = 0, width = 200, height = 80, rotation = 0 } = transform;
   const {
-    backgroundColor = 'transparent',
     borderWidth = 0,
     borderStyle = 'none',
     borderColor = 'transparent',
@@ -102,7 +101,7 @@ const style = computed((): CSSProperties => {
     transform: `rotate(${rotation}deg)`,
     transformOrigin: 'center center',
     boxSizing: 'border-box',
-    backgroundColor,
+    backgroundColor: '#ffffff00',
     borderWidth: `${borderWidth}px`,
     borderStyle,
     borderColor,
@@ -111,7 +110,6 @@ const style = computed((): CSSProperties => {
     outline: 'none !important',
     outlineOffset: '0',
     boxShadow: 'none !important',
-    overflow: 'hidden',
   };
 });
 
@@ -143,6 +141,26 @@ watch(
     }
   },
   { immediate: true, deep: true }
+);
+
+watch(
+  () => props.node.props.fontSize,
+  () => {
+    if (toolManagerRef?.value) toolManagerRef?.value.handleFontSizeChange(props.node.id);
+  },
+  { deep: true }
+);
+
+watch(
+  () => isActiveNode.value,
+  () => {
+    console.log('文本内容变化检测：', JSON.stringify(props.node.props.content));
+    console.log('当前编辑态：', isEditing.value);
+    console.log('当前激活态：', isActiveNode.value);
+    if (props.node.props.content === '\n' && !isActiveNode.value && !isEditing.value)
+      store.deleteNode(props.node.id);
+  },
+  { deep: true, flush: 'post' }
 );
 
 // 组件内定义执行锁
@@ -271,10 +289,9 @@ const handleDragStart = (e: DragEvent) => {
 <style scoped>
 /* 样式部分保持不变 */
 .textBox {
-  width: 100%;
   height: 100%;
+  width: 100%;
   margin: 0;
-  background: transparent;
   cursor: move;
   user-select: none;
   -webkit-user-select: none;
@@ -284,6 +301,22 @@ const handleDragStart = (e: DragEvent) => {
   outline: none !important;
   box-shadow: none !important;
   padding: 2px 4px;
+  line-height: 1.6;
+  font-size: v-bind('props.node.props.fontSize + "px"');
+  background-color: v-bind('props.node.style.backgroundColor || "transparent"') !important;
+  overflow: hidden;
+}
+
+.textBox > div,
+.textBox > p {
+  /* 强制继承父元素行高，覆盖默认值 */
+  line-height: inherit !important;
+  /* 清除默认边距，避免行间距变大 */
+  margin: 0 !important;
+  padding: 0 !important;
+  /* 确保块级显示，行高生效 */
+  display: block;
+  content: '';
 }
 
 /* 给编辑器内的br添加样式，让br后有光标位置 */
@@ -292,7 +325,7 @@ const handleDragStart = (e: DragEvent) => {
   content: '';
   margin: 0;
   padding: 0;
-  line-height: inherit; /* 继承编辑器行高，保证光标高度 */
+  line-height: inherit !important; /* 继承编辑器行高，保证光标高度 */
 }
 
 .textBox.is-editing {

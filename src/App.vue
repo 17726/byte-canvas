@@ -38,6 +38,23 @@ const togglePanel = () => {
 };
 
 const showPopover = computed(() => !ui.isPanelExpanded);
+
+// 计算是否应该隐藏面板（新增：处理多选情况）
+const shouldHidePanel = computed(() => {
+  // 如果处于画布设置模式，根据 isPanelExpanded 决定
+  if (ui.activePanel === 'canvas') {
+    return !ui.isPanelExpanded;
+  }
+
+  // 如果处于节点属性模式，检查是否多选
+  const isMultiSelect = selectionStore.activeElements.length > 1;
+  if (isMultiSelect) {
+    return true; // 多选时强制隐藏面板
+  }
+
+  // 单选时根据 isPanelExpanded 决定
+  return !ui.isPanelExpanded;
+});
 </script>
 
 <template>
@@ -75,7 +92,7 @@ const showPopover = computed(() => !ui.isPanelExpanded);
       <a-layout-sider
         :width="280"
         class="right-sider"
-        :collapsed="!ui.isPanelExpanded"
+        :collapsed="shouldHidePanel"
         :collapsed-width="0"
         :trigger="null"
         breakpoint="xl"

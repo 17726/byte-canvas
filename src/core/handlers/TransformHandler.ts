@@ -301,10 +301,20 @@ export class TransformHandler {
     this.store.isInteracting = true;
 
     const activeIds = Array.from(this.selectionStore.activeElementIds);
-    const isMultiDrag = activeIds.length > 1;
+    const editingGroupId = this.selectionStore.editingGroupId;
+
+    // 在组合编辑模式下，始终只拖拽当前点击的子元素，避免其他选中元素被带动
+    let dragIds = activeIds;
+    if (editingGroupId) {
+      dragIds = [nodeId];
+    } else if (dragIds.length === 0) {
+      dragIds = [nodeId];
+    }
+
+    const isMultiDrag = dragIds.length > 1;
 
     const startTransformMap: Record<string, { x: number; y: number }> = {};
-    activeIds.forEach((id) => {
+    dragIds.forEach((id) => {
       const n = this.store.nodes[id];
       if (n) {
         startTransformMap[id] = { x: n.transform.x, y: n.transform.y };
@@ -342,11 +352,37 @@ export class TransformHandler {
       const node = this.store.nodes[id];
       if (!node || node.isLocked) return;
 
+      // 如果存在父级旋转，需要将世界坐标系下的位移转换到父级局部坐标系
+      let localDx = dx;
+      let localDy = dy;
+
+      if (node.parentId) {
+        // 累计所有父级的旋转角度，使位移在父系局部坐标系中保持一致
+        let totalParentRotation = 0;
+        let parentId: string | null = node.parentId;
+        while (parentId) {
+          const parentNode = this.store.nodes[parentId] as BaseNodeState | undefined;
+          if (!parentNode) break;
+          totalParentRotation += parentNode.transform.rotation || 0;
+          parentId = parentNode.parentId ?? null;
+        }
+
+        if (totalParentRotation !== 0) {
+          const rad = (-totalParentRotation * Math.PI) / 180; // 反向旋转到累积父级局部坐标
+          const cos = Math.cos(rad);
+          const sin = Math.sin(rad);
+          const rotatedX = dx * cos - dy * sin;
+          const rotatedY = dx * sin + dy * cos;
+          localDx = rotatedX;
+          localDy = rotatedY;
+        }
+      }
+
       this.store.updateNode(id, {
         transform: {
           ...node.transform,
-          x: startPos.x + dx,
-          y: startPos.y + dy,
+          x: startPos.x + localDx,
+          y: startPos.y + localDy,
         },
       });
     });
