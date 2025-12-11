@@ -1831,24 +1831,21 @@ export class TextSelectionHandler {
       .map((style) => {
         let { start, end } = style; // 每个样式的原范围（比如 start:1, end:2 → 对应旧文本第1-2个字符）
         console.log('调整前样式范围：', { start, end });
+
         // 场景1：文本「插入」（长度增加，lengthDiff>0）—— 光标后的样式范围向后偏移
         if (lengthDiff > 0 && end > cursorPos) {
           // 比如：旧文本 "你好"（长度2），在光标Pos=2插入"世界"（长度+2）
           // 原样式 start:1, end:2 → 光标后，所以 start 不变（1），end +2 → 4
           // 新样式范围 start:1, end:4 → 依然对应 "好"（新文本第1-2个字符，插入后"世界"在后面，不影响）
-          if (cursorPos < start) {
+          if (cursorPos <= start) {
             start += lengthDiff;
           }
-          if (cursorPos < end) {
-            end += lengthDiff;
-          }
+          end += lengthDiff;
           // 如果换行符位于样式范围内，确保不扩展样式范围
           console.log('newContent: ', newContent);
           console.log('光标位置：', cursorPos);
           console.log('插入字符：', JSON.stringify(newContent[cursorPos]));
-          // if (newContent[cursorPos-1] === '\n') {
-          //   end -= 1; // 或其他逻辑，确保换行符不被包含
-          // }
+          console.log('调整后样式范围：', { start, end });
         }
 
         // 场景2：文本「删除」（长度减少，lengthDiff<0）—— 光标后的样式范围向前偏移
@@ -1860,7 +1857,7 @@ export class TextSelectionHandler {
           console.log('长度变化：', lengthDiff);
           console.log('删除区间：', { deleteStart, deleteEnd }, '原始样式范围：', { start, end });
 
-          // 分4种场景处理样式范围与删除区间的关系
+          // 分6种场景处理样式范围与删除区间的关系
           if (end <= deleteStart) {
             // 场景1：样式完全在删除区间之前 → 不调整
             console.log('样式完全在删除区间前，不调整：', { start, end });

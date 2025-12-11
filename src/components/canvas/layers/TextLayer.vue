@@ -160,7 +160,7 @@ watch(
     if (props.node.props.content === '\n' && !isActiveNode.value && !isEditing.value)
       store.deleteNode(props.node.id);
   },
-  { deep: true, flush: 'post' }
+  { flush: 'post' }
 );
 
 watch(
