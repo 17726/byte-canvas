@@ -1119,7 +1119,11 @@ export class TextSelectionHandler {
           const finalNewStyles: Array<{ start: number; end: number; styles: InlineStyleProps }> =
             [];
           for (const style of updatedStyles) {
-            if (style.end <= selectionStart || style.start >= selectionEnd) {
+            if (
+              style.end <= selectionStart ||
+              style.start >= selectionEnd ||
+              style.styles.textDecoration === undefined
+            ) {
               //旧decoratio完全不在选中范围内（无重叠） 直接添加新decoration即可
               continue;
             }
@@ -1140,6 +1144,7 @@ export class TextSelectionHandler {
             console.log('拆分后的新值 splitNewStyles:', JSON.stringify(splitNewStyles));
             finalNewStyles.push(...splitNewStyles);
           }
+          console.log('isOverlapping:', isOverlapping);
           // 若没有重叠，直接在选中范围内添加新的textDecoration值
           if (!isOverlapping) {
             finalNewStyles.push({
@@ -1148,6 +1153,7 @@ export class TextSelectionHandler {
               styles: { [styleKey]: styleValue } as InlineStyleProps,
             });
           }
+          console.log('最终要添加的newStyles:', JSON.stringify(finalNewStyles));
           // finalNewStyles加入updatedStyles中
           updatedStyles.push(...finalNewStyles);
         } else {
