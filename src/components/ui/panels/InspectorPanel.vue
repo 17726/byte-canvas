@@ -193,10 +193,6 @@
                 <a-option :value="700">Bold</a-option>
               </a-select>
             </div>
-            <div class="prop-item">
-              <div class="section-title">颜色</div>
-              <a-color-picker :value="textColor" show-text size="small" />
-            </div>
           </template>
           <!-- Image Specific -->
           <template v-if="isImage">
@@ -773,13 +769,6 @@ const fontWeight = computed({
   set: (val) => {
     if (!canEditText.value) return;
     applyTextProps({ fontWeight: val as number });
-  },
-});
-const textColor = computed({
-  get: () => primaryTextNode.value?.props.color || '#000000',
-  set: (val) => {
-    if (!canEditText.value) return;
-    applyTextProps({ color: val as string });
   },
 });
 

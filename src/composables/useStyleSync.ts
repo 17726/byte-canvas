@@ -153,23 +153,31 @@ export function useStyleSync() {
         return (node as ShapeState).style.backgroundColor || '#ffffff';
       }
       // 对于文本和图片节点，也返回它们的背景色（而不是固定返回白色）
-      return node.style?.backgroundColor || '#ffffff';
+      return node.style?.backgroundColor || '#ffffff00';
     },
     (node, value) => {
       // 只对矩形和圆形节点应用填充色
-      if (node.type === NodeType.RECT || node.type === NodeType.CIRCLE) {
+      if (
+        node.type === NodeType.RECT ||
+        node.type === NodeType.CIRCLE ||
+        node.type === NodeType.TEXT
+      ) {
         return { style: { ...node.style, backgroundColor: value } };
       }
       // 对于其他节点类型，不做任何修改
       return {};
     },
-    '#ffffff'
+    '#ffffff00'
   );
 
   const strokeColor = createBinding<string>(
     (node) => {
-      if (node.type === NodeType.RECT || node.type === NodeType.CIRCLE) {
-        return (node as ShapeState).style.borderColor || '#000000';
+      if (
+        node.type === NodeType.RECT ||
+        node.type === NodeType.CIRCLE ||
+        node.type === NodeType.TEXT
+      ) {
+        return (node as NodeState).style.borderColor || '#000000';
       }
       return '#000000';
     },
@@ -179,8 +187,12 @@ export function useStyleSync() {
 
   const strokeWidth = createBinding<number>(
     (node) => {
-      if (node.type === NodeType.RECT || node.type === NodeType.CIRCLE) {
-        return (node as ShapeState).style.borderWidth || 0;
+      if (
+        node.type === NodeType.RECT ||
+        node.type === NodeType.CIRCLE ||
+        node.type === NodeType.TEXT
+      ) {
+        return (node as NodeState).style.borderWidth || 0;
       }
       return 0;
     },

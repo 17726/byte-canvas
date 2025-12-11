@@ -129,27 +129,69 @@ export function computeAbsoluteTransform(
   const node = nodes[nodeId];
   if (!node) return null;
 
-  // 自下而上收集祖先链，再自上而下累乘矩阵
-  const chain: NodeState[] = [];
+  // 收集祖先链，从子到父
+  const parentChain: NodeState[] = [];
   let current: NodeState | undefined = node;
-  while (current) {
-    chain.unshift(current);
-    current = current.parentId ? nodes[current.parentId] : undefined;
+  while (current?.parentId) {
+    const parentNode: NodeState | undefined = nodes[current.parentId];
+    if (!parentNode) break;
+    parentChain.push(parentNode);
+    current = parentNode;
   }
 
-  let matrix = identityMatrix();
+  // 子节点的局部信息
+  const width = node.transform.width;
+  const height = node.transform.height;
+  let x = node.transform.x;
+  let y = node.transform.y;
+  let rotation = node.transform.rotation || 0;
 
-  chain.forEach((segment) => {
-    const { x, y } = segment.transform;
-    matrix = applyTranslate(matrix, x, y);
-  });
+  // 从内到外应用父级旋转和平移（旋转围绕父元素中心）
+  for (const parent of parentChain) {
+    const parentRot = parent.transform.rotation || 0;
+    const parentX = parent.transform.x;
+    const parentY = parent.transform.y;
+    const parentW = parent.transform.width;
+    const parentH = parent.transform.height;
+    const parentCX = parentW / 2;
+    const parentCY = parentH / 2;
+
+    if (parentRot === 0) {
+      x += parentX;
+      y += parentY;
+    } else {
+      // 子元素中心相对父元素中心
+      const childCenterLocalX = x + width / 2;
+      const childCenterLocalY = y + height / 2;
+      const relX = childCenterLocalX - parentCX;
+      const relY = childCenterLocalY - parentCY;
+
+      const rad = (parentRot * Math.PI) / 180;
+      const cos = Math.cos(rad);
+      const sin = Math.sin(rad);
+
+      const rotatedX = relX * cos - relY * sin;
+      const rotatedY = relX * sin + relY * cos;
+
+      const childCenterWorldX = parentX + parentCX + rotatedX;
+      const childCenterWorldY = parentY + parentCY + rotatedY;
+
+      x = childCenterWorldX - width / 2;
+      y = childCenterWorldY - height / 2;
+    }
+
+    rotation += parentRot;
+  }
+
+  // 规范化角度到 0-360
+  rotation = ((rotation % 360) + 360) % 360;
 
   return {
-    x: matrix.e,
-    y: matrix.f,
-    width: node.transform.width,
-    height: node.transform.height,
-    rotation: node.transform.rotation,
+    x,
+    y,
+    width,
+    height,
+    rotation,
   };
 }
 

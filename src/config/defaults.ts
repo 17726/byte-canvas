@@ -69,8 +69,8 @@ export const DEFAULT_TEXT_PROPS = {
 };
 
 export const DEFAULT_TEXT_SIZE = {
-  width: 160,
-  height: 40,
+  width: 110,
+  height: 36,
 };
 
 // Image Defaults
