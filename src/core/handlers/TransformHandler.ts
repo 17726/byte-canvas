@@ -246,6 +246,26 @@ export class TransformHandler {
   }
 
   /**
+   * 归一化用于缩放的旋转角度
+   *
+   * 说明：
+   * - 180° 旋转的外观与 0° 一致，但坐标系方向相反，如果直接参与反向旋转会导致拖拽方向反转
+   * - 因此将与 180° 等价的角度归一化为 0，避免缩放手柄方向被翻转
+   */
+  private normalizeResizeRotation(rotationRad: number): number {
+    const TAU = Math.PI * 2;
+    const normalized = ((rotationRad % TAU) + TAU) % TAU;
+    const EPS = 1e-4;
+
+    // 将接近 0 或 2π 的角度视为 0
+    if (Math.abs(normalized) < EPS || Math.abs(normalized - TAU) < EPS) return 0;
+    // 将接近 π 的角度视为 0（避免 180° 时方向反转）
+    if (Math.abs(normalized - Math.PI) < EPS) return 0;
+
+    return normalized;
+  }
+
+  /**
    * 计算矩形的四个顶点坐标（未旋转状态）
    */
   private getRectangleCorners(x: number, y: number, width: number, height: number) {
@@ -479,15 +499,17 @@ export class TransformHandler {
 
     // --- 1. 坐标转换：将鼠标位移转换到未旋转坐标系 ---
     // 将鼠标点反向旋转到未旋转坐标系（以节点初始中心为旋转中心）
+    const effectiveRotation = this.normalizeResizeRotation(startRotation);
+
     const startUnrotated = this.unrotatePoint(
       startMouseWorld,
       { x: startCenterX, y: startCenterY },
-      startRotation
+      effectiveRotation
     );
     const currentUnrotated = this.unrotatePoint(
       { x: currentWorldPos.x, y: currentWorldPos.y },
       { x: startCenterX, y: startCenterY },
-      startRotation
+      effectiveRotation
     );
 
     // 计算未旋转坐标系下的总位移
@@ -680,7 +702,7 @@ export class TransformHandler {
     const rotatedCenter = this.rotatePoint(
       newUnrotatedCenter,
       { x: startCenterX, y: startCenterY },
-      startRotation
+      effectiveRotation
     );
 
     // 最终渲染的左上角坐标（基于旋转后的中心点）
