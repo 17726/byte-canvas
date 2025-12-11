@@ -16,6 +16,10 @@
       <div class="selection-border"></div>
     </div>
 
+    <div v-if="editingGroupLabelStyle" class="group-edit-indicator" :style="editingGroupLabelStyle">
+      <span class="edit-label">编辑组合中</span>
+    </div>
+
     <!-- 选中子元素的操作框（带控制点） -->
     <div
       v-if="operationOverlayStyle"
@@ -401,6 +405,20 @@ const overlayStyle = computed(() => {
   };
 });
 
+// 组合编辑模式提示条位置（与组合 AABB 对齐，保持不随旋转倾斜）
+const editingGroupLabelStyle = computed(() => {
+  const bounds = editingGroupBounds.value;
+  if (!bounds) return null;
+
+  const scale = 1 / store.viewport.zoom;
+  const centerX = bounds.x + bounds.width / 2;
+  const topY = bounds.y;
+
+  return {
+    transform: `translate(${centerX}px, ${topY}px) translate(-50%, -100%) scale(${scale})`,
+  };
+});
+
 // 操作框的样式（选中子元素的边界框，带控制点）
 const operationOverlayStyle = computed(() => {
   const editingId = selectionStore.editingGroupId;
@@ -733,5 +751,21 @@ const onRotateHandleDown = (e: MouseEvent) => {
 
 .rotate-handle:active {
   cursor: grabbing;
+}
+
+.group-edit-indicator {
+  position: absolute;
+  z-index: 1001;
+  background: rgba(24, 144, 255, 0.9);
+  color: white;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.edit-label {
+  font-weight: 500;
 }
 </style>

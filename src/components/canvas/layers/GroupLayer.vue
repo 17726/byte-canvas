@@ -14,11 +14,6 @@
       :isGroupChild="true"
       @mousedown="handleChildMouseDown($event, child.id)"
     />
-
-    <!-- 组合编辑模式指示器 -->
-    <div v-if="isEditing" class="group-edit-indicator">
-      <span class="edit-label">编辑组合中</span>
-    </div>
   </div>
 </template>
 
@@ -153,23 +148,5 @@ const handleChildMouseDown = (e: MouseEvent, childId: string) => {
 
 .group-layer.editing {
   pointer-events: none;
-}
-
-.group-edit-indicator {
-  position: absolute;
-  top: -24px;
-  left: 50%;
-  transform: translateX(-50%);
-  background: rgba(24, 144, 255, 0.9);
-  color: white;
-  padding: 2px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  white-space: nowrap;
-  pointer-events: none;
-}
-
-.edit-label {
-  font-weight: 500;
 }
 </style>

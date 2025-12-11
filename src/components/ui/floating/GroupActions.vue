@@ -34,9 +34,14 @@
 import { computed } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
 import { useSelectionStore } from '@/store/selectionStore';
-import { worldToClient, computeSelectionBounds } from '@/core/utils/geometry';
+import {
+  worldToClient,
+  computeSelectionBounds,
+  computeAbsoluteTransform,
+} from '@/core/utils/geometry';
 import { Group as IconGroup, Ungroup as IconUngroup } from '@icon-park/vue-next';
 import { useNodeActions } from '@/composables/useNodeActions';
+import { NodeType, type GroupState } from '@/types/state';
 
 const store = useCanvasStore();
 const selectionStore = useSelectionStore();
@@ -57,14 +62,35 @@ const isVisible = computed(() => {
   return (showGroupButton.value || canUngroup.value) && !store.isInteracting;
 });
 
-// 计算工具栏位置：在选中区域的上方中央
-const positionStyle = computed(() => {
+// 计算用于定位浮层的目标 AABB：优先使用正在编辑的组合的整体 AABB，以便与主选框保持一致
+const toolbarBounds = computed(() => {
+  const editingId = selectionStore.editingGroupId;
+  if (editingId) {
+    const group = store.nodes[editingId];
+    if (group?.type === NodeType.GROUP) {
+      const children = (group as GroupState).children || [];
+      if (children.length > 0) {
+        return computeSelectionBounds(children, store.nodes);
+      }
+      const absTransform = computeAbsoluteTransform(editingId, store.nodes);
+      if (absTransform) {
+        return absTransform;
+      }
+    }
+  }
+
   const ids = Array.from(selectionStore.activeElementIds);
-  if (ids.length === 0) return {};
+  if (ids.length === 0) return null;
+
+  return computeSelectionBounds(ids, store.nodes);
+});
+
+// 计算工具栏位置：在目标 AABB 的上方中央
+const positionStyle = computed(() => {
+  const bounds = toolbarBounds.value;
+  if (!bounds) return {};
 
   // 计算所有选中节点的边界框
-  const bounds = computeSelectionBounds(ids, store.nodes);
-
   // 计算边界框顶部中心点的屏幕坐标
   const worldPos = {
     x: bounds.x + bounds.width / 2,
