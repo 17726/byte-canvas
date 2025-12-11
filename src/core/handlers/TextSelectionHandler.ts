@@ -808,9 +808,80 @@ export class TextSelectionHandler {
    */
   handleGlobalMousedown(e: MouseEvent) {
     const target = e.target as HTMLElement;
+    console.log('全局mousedown事件触发，目标元素：', target.className);
     // 查找工具栏
     const toolbar = document.querySelector('.context-toolbar');
-    this.isClickingToolbar = toolbar ? toolbar.contains(target) : false;
+    // 如果工具栏不存在，直接判定为未点击工具栏
+    if (!toolbar) {
+      this.isClickingToolbar = false;
+      console.log('工具栏不存在 isClickingToolbar:', this.isClickingToolbar);
+      return;
+    }
+    // 2. 检查目标是否在工具栏内（最主要的判断）
+    if (toolbar.contains(target)) {
+      this.isClickingToolbar = true;
+      console.log('目标在工具栏内 isClickingToolbar:', this.isClickingToolbar);
+      return;
+    }
+    // 3. 检查是否点击了工具栏相关的弹出层/下拉组件（ArcoDesign组件）
+    const relatedSelectors = [
+      // 颜色选择器相关
+      '.text-color-picker',
+      '.arco-color-picker-popup',
+      '.arco-color-picker-palette',
+      '.arco-color-picker-control-bar',
+      '.arco-color-picker-control-bar-alpha',
+      '.arco-color-picker-handler',
+      '.arco-color-picker-preview',
+      '.arco-color-picker-panel-control',
+      '.arco-color-picker-control-wrapper',
+      // 字体选择器相关
+      '.font-family-selector',
+      '.arco-select-popup',
+      '.arco-select-option',
+      '.arco-select-option-active',
+      '.arco-select-option-content',
+      '.font-family-dropdown',
+      '.arco-scrollbar-thumb-bar',
+      '.arco-scrollbar-track-direction-vertical',
+      '.arco-scrollbar-track',
+      // ArcoDesign下拉箭头
+      '.arco-select-view-arrow-icon',
+      // Tooltip/Popover弹出层
+      '.arco-tooltip-popup',
+      '.arco-popover-popup',
+      // 数字输入框按钮
+      '.arco-input-number-handler',
+      // 滑块组件
+      '.arco-slider-rail',
+      '.arco-slider-track',
+      '.arco-slider-handle',
+    ];
+    // 4. 检查目标是否是工具栏相关组件
+    // 关键修改：遍历所有选择器 + 所有匹配元素，检查是否包含目标
+    let isRelatedToToolbar = false;
+    for (const selector of relatedSelectors) {
+      const elements = document.querySelectorAll(selector);
+      // 遍历当前选择器下的所有元素，只要有一个包含target就判定为相关
+      const match = Array.from(elements).some((el) => el.contains(target));
+      if (match) {
+        isRelatedToToolbar = true;
+        console.log(`✅ 匹配到相关组件：${selector}`);
+        break; // 找到匹配项后提前退出循环
+      }
+    }
+    console.log('isRelatedToToolbar:', isRelatedToToolbar);
+
+    // 5. 额外检查目标元素本身是否有相关类名
+    const hasRelatedClass = target.closest(
+      '.context-toolbar, .text-color-picker, .font-family-selector, .font-family-dropdown, ' +
+        '.arco-color-picker-popup, .arco-select-popup, .arco-select-option, ' + // 补充arco-select-option
+        '.arco-tooltip-popup, .arco-popover-popup'
+    );
+    console.log('是否匹配到相关类 → hasRelatedClass:', !!hasRelatedClass);
+
+    this.isClickingToolbar = isRelatedToToolbar || !!hasRelatedClass;
+    console.log('isClickingToolbar:', this.isClickingToolbar);
   }
 
   /**

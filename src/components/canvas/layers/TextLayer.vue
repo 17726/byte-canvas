@@ -163,6 +163,14 @@ watch(
   { deep: true, flush: 'post' }
 );
 
+watch(
+  () => isEditing.value,
+  () => {
+    console.log('当前编辑态：', isEditing.value);
+  },
+  { deep: true, flush: 'post' }
+);
+
 // 组件内定义执行锁
 const isSettingActive = ref(false);
 
