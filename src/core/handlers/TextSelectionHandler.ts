@@ -807,6 +807,7 @@ export class TextSelectionHandler {
    * @param e 鼠标事件
    */
   handleGlobalMousedown(e: MouseEvent) {
+    if (!this.isEditing) return;
     const target = e.target as HTMLElement;
     console.log('全局mousedown事件触发，目标元素：', target.className);
     // 查找工具栏
@@ -1754,6 +1755,8 @@ export class TextSelectionHandler {
     // 使用时：传入target元素
     const newContent = getContentWithNewlines(target);
     if (newContent === '\n' && this.isEditing) this.clearPartialInlineStyle(id);
+    if (newContent === '\n' && !this.isEditing) store.deleteNode(id);
+
     const oldContent = node.props.content || '';
     console.log('旧内容:', JSON.stringify(oldContent));
     console.log('新内容:', JSON.stringify(newContent));
@@ -1831,13 +1834,14 @@ export class TextSelectionHandler {
       .map((style) => {
         let { start, end } = style; // 每个样式的原范围（比如 start:1, end:2 → 对应旧文本第1-2个字符）
         console.log('调整前样式范围：', { start, end });
-
+        console.log('光标位置：', cursorPos);
+        console.log('长度变化：', lengthDiff);
         // 场景1：文本「插入」（长度增加，lengthDiff>0）—— 光标后的样式范围向后偏移
-        if (lengthDiff > 0 && end > cursorPos) {
+        if (lengthDiff > 0 && end > cursorPos - lengthDiff) {
           // 比如：旧文本 "你好"（长度2），在光标Pos=2插入"世界"（长度+2）
           // 原样式 start:1, end:2 → 光标后，所以 start 不变（1），end +2 → 4
           // 新样式范围 start:1, end:4 → 依然对应 "好"（新文本第1-2个字符，插入后"世界"在后面，不影响）
-          if (cursorPos <= start) {
+          if (cursorPos - lengthDiff < start) {
             start += lengthDiff;
           }
           end += lengthDiff;
@@ -1880,7 +1884,8 @@ export class TextSelectionHandler {
             console.log('样式与删除区间边界左重叠，调整后：', { start, end });
           } else {
             //边界重叠
-            start = Math.max(0, deleteEnd);
+            start = Math.max(0, deleteStart);
+            end = Math.max(start, end - offset);
             console.log('样式与删除区间边界右重叠，调整后：', { start, end });
           }
         }

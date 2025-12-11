@@ -152,18 +152,6 @@ watch(
 );
 
 watch(
-  () => isActiveNode.value,
-  () => {
-    console.log('文本内容变化检测：', JSON.stringify(props.node.props.content));
-    console.log('当前编辑态：', isEditing.value);
-    console.log('当前激活态：', isActiveNode.value);
-    if (props.node.props.content === '\n' && !isActiveNode.value && !isEditing.value)
-      store.deleteNode(props.node.id);
-  },
-  { flush: 'post' }
-);
-
-watch(
   () => isEditing.value,
   () => {
     console.log('当前编辑态：', isEditing.value);
