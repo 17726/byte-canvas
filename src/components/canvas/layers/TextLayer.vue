@@ -47,14 +47,10 @@ import type { ToolManager } from '@/core/ToolManager';
 import { useCanvasStore } from '@/store/canvasStore';
 import { useSelectionStore } from '@/store/selectionStore';
 import { getCurrentInstance } from 'vue';
-import { useStyleSync } from '@/composables/useStyleSync';
 
 const props = defineProps<{
   node: TextState;
 }>();
-
-const { fillColor } = useStyleSync();
-console.log('TextLayer fillColor:', fillColor);
 
 // 1. 注入全局 ToolManager 实例（唯一依赖，不直接接触任何 Handler）
 const toolManagerRef = inject<Ref<ToolManager | null>>('toolManager');
@@ -89,7 +85,6 @@ const style = computed((): CSSProperties => {
   const { transform, style: nodeStyle } = text;
   const { x = 0, y = 0, width = 200, height = 80, rotation = 0 } = transform;
   const {
-    backgroundColor = 'transparent',
     borderWidth = 0,
     borderStyle = 'none',
     borderColor = 'transparent',
@@ -106,7 +101,7 @@ const style = computed((): CSSProperties => {
     transform: `rotate(${rotation}deg)`,
     transformOrigin: 'center center',
     boxSizing: 'border-box',
-    backgroundColor,
+    backgroundColor: '#ffffff00',
     borderWidth: `${borderWidth}px`,
     borderStyle,
     borderColor,
@@ -296,7 +291,7 @@ const handleDragStart = (e: DragEvent) => {
   padding: 2px 4px;
   line-height: 1.6;
   font-size: v-bind('props.node.props.fontSize + "px"');
-  background-color: v-bind('fillColor || "transparent"');
+  background-color: v-bind('props.node.style.backgroundColor || "transparent"') !important;
 }
 
 .textBox > div,

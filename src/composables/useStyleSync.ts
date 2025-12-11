@@ -153,7 +153,7 @@ export function useStyleSync() {
         return (node as ShapeState).style.backgroundColor || '#ffffff';
       }
       // 对于文本和图片节点，也返回它们的背景色（而不是固定返回白色）
-      return node.style?.backgroundColor || '#ffffff';
+      return node.style?.backgroundColor || '#ffffff00';
     },
     (node, value) => {
       // 只对矩形和圆形节点应用填充色
@@ -167,7 +167,7 @@ export function useStyleSync() {
       // 对于其他节点类型，不做任何修改
       return {};
     },
-    '#ffffff'
+    '#ffffff00'
   );
 
   const strokeColor = createBinding<string>(
