@@ -90,7 +90,7 @@ const positionStyle = computed(() => {
   const bounds = toolbarBounds.value;
   if (!bounds) return {};
 
-  // 计算所有选中节点的边界框
+  // 基于 toolbarBounds，将工具栏定位到边界框顶部中心的屏幕坐标
   // 计算边界框顶部中心点的屏幕坐标
   const worldPos = {
     x: bounds.x + bounds.width / 2,
