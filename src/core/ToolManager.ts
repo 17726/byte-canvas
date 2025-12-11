@@ -756,10 +756,6 @@ export class ToolManager {
     );
   }
 
-  //这里没用了
-  // handleFontSizeChange(id: string, newFontSize: number) {
-  //   this.textSelectionHandler.updateGlobalStyles(id, this.store, { fontSize: newFontSize });
-  // }
   /**
    * 处理文本节点鼠标抬起（供文本组件调用，内部转发给 TextSelectionHandler）
    * @param e - 鼠标事件

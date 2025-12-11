@@ -145,8 +145,8 @@ export const useHistoryStore = defineStore('history', () => {
   };
 
   return {
-    historyStack,
-    redoStack,
+    // historyStack,
+    // redoStack,
     isRestoring,
     isLocked,
     canUndo,
