@@ -18,6 +18,8 @@
               :popup-translate="[0, 50]"
               size="mini"
               v-model="fillColor"
+              @mousedown="startContinuousHistory"
+              @touchstart.prevent="startContinuousHistory"
               trigger="hover"
             />
           </a-tooltip>
@@ -37,6 +39,8 @@
                     popup-offset="60"
                     size="mini"
                     v-model="strokeColor"
+                    @mousedown="startContinuousHistory"
+                    @touchstart.prevent="startContinuousHistory"
                     trigger="hover"
                   />
                 </a-tooltip>
@@ -77,6 +81,8 @@
               :popup-offset="-150"
               :popup-translate="[-100, -160]"
               size="mini"
+              @mousedown="startContinuousHistory"
+              @touchstart.prevent="startContinuousHistory"
               @change="handleColorChange"
               trigger="hover"
             >
@@ -180,6 +186,8 @@
 
           <!-- 滑动条组件 -->
           <a-slider
+            @mousedown="startContinuousHistory"
+            @touchstart.prevent="startContinuousHistory"
             v-model="opacity"
             :min="0"
             :max="1"
@@ -230,6 +238,7 @@ import { useCanvasStore } from '@/store/canvasStore';
 import { computeAbsoluteTransform } from '@/core/utils/geometry';
 import { useSelectionStore } from '@/store/selectionStore';
 import { useStyleSync } from '@/composables/useStyleSync';
+import { useContinuousHistory } from '@/composables/useContinuousHistory';
 import { NodeType, type TextDecorationValue, type TextState } from '@/types/state';
 import { worldToClient } from '@/core/utils/geometry';
 import {
@@ -247,6 +256,7 @@ import { IconFontColors, IconSort } from '@arco-design/web-vue/es/icon';
 const store = useCanvasStore();
 const selectionStore = useSelectionStore();
 const toolManagerRef = inject<Ref<ToolManager>>('toolManager');
+const { startContinuousHistory } = useContinuousHistory();
 
 const {
   activeNode,
