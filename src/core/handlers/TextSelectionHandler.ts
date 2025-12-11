@@ -1753,7 +1753,7 @@ export class TextSelectionHandler {
 
     // 使用时：传入target元素
     const newContent = getContentWithNewlines(target);
-
+    if (newContent === '\n' && this.isEditing) this.clearPartialInlineStyle(id);
     const oldContent = node.props.content || '';
     console.log('旧内容:', JSON.stringify(oldContent));
     console.log('新内容:', JSON.stringify(newContent));

@@ -164,18 +164,6 @@ watch(
 );
 
 watch(
-  () => props.node.props.content,
-  () => {
-    console.log('111文本内容变化检测：', JSON.stringify(props.node.props.content));
-    console.log('当前编辑态：', isEditing.value);
-    console.log('当前激活态：', isActiveNode.value);
-    if (props.node.props.content === '\n' && isEditing.value && toolManagerRef?.value)
-      toolManagerRef.value.clearInlineStyle(props.node.id);
-  },
-  { flush: 'post' }
-);
-
-watch(
   () => isEditing.value,
   () => {
     console.log('当前编辑态：', isEditing.value);
