@@ -810,7 +810,9 @@ export class TextSelectionHandler {
     const target = e.target as HTMLElement;
     // 查找工具栏
     const toolbar = document.querySelector('.context-toolbar');
-    this.isClickingToolbar = toolbar ? toolbar.contains(target) : false;
+    const colorPicker = document.querySelector('.text-color-picker');
+    if (!toolbar || !colorPicker) return;
+    this.isClickingToolbar = toolbar.contains(target) || colorPicker.contains(target);
   }
 
   /**
@@ -821,7 +823,7 @@ export class TextSelectionHandler {
     const node = this.store.nodes[id];
     const editor = this.editors[id];
     if (!node || !editor) return;
-
+    console.log('isClickingToolbar:', this.isClickingToolbar);
     if (this.isClickingToolbar) {
       editor.focus();
     } else {
@@ -907,12 +909,12 @@ export class TextSelectionHandler {
 
     // 情况1：原有范围左侧有不重叠部分（如 origStart=0, targetStart=3 → 0-3 保留原样式）
     if (origStart < targetStart) {
-      console.log('添加左侧不重叠部分:', origStart, targetStart);
-      newStyles.push({
-        start: origStart,
-        end: targetStart,
-        styles: { ...origStyles }, // 保留原样式
-      });
+      // console.log('添加左侧不重叠部分:', origStart, targetStart);
+      // newStyles.push({
+      //   start: origStart,
+      //   end: targetStart,
+      //   styles: { ...origStyles }, // 保留原样式
+      // });
     }
 
     // 情况2：重叠部分（如 3-6）→ 移除目标样式属性
@@ -956,12 +958,12 @@ export class TextSelectionHandler {
           end: overlapEnd,
           styles: remainingStyles,
         });
-        console.log(
-          '添加重叠部分剩余样式:',
-          overlapStart,
-          overlapEnd,
-          JSON.stringify(remainingStyles)
-        );
+        // console.log(
+        //   '添加重叠部分剩余样式:',
+        //   overlapStart,
+        //   overlapEnd,
+        //   JSON.stringify(remainingStyles)
+        // );
       }
       // 若剩余样式为空，则不添加该范围（相当于移除重叠部分的样式）
     }
@@ -974,7 +976,7 @@ export class TextSelectionHandler {
         styles: { ...origStyles }, // 保留原样式
       });
     }
-    console.log('newStyles:', JSON.stringify(newStyles));
+    // console.log('newStyles:', JSON.stringify(newStyles));
     return newStyles;
   }
 
@@ -1076,8 +1078,8 @@ export class TextSelectionHandler {
         styleValue
       );
       updatedStyles.push(...splitStyles);
-      console.log('splitStyles:', JSON.stringify(splitStyles));
-      console.log('处理重叠范围后的updatedstyles:', JSON.stringify(updatedStyles));
+      // console.log('splitStyles:', JSON.stringify(splitStyles));
+      // console.log('处理重叠范围后的updatedstyles:', JSON.stringify(updatedStyles));
     }
 
     //5. 处理样式的【添加】
@@ -1090,9 +1092,9 @@ export class TextSelectionHandler {
         if (styleKey === 'textDecoration' && styleValue) {
           // textDecoration特判：判断是否包含目标值（而非全等）
           const targetValue = styleValue.toString().trim();
-          console.log('targetValue:', targetValue);
+          // console.log('targetValue:', targetValue);
           const currentTextDeco = style.styles.textDecoration;
-          console.log('currentTextDeco:', currentTextDeco);
+          // console.log('currentTextDeco:', currentTextDeco);
           if (currentTextDeco) {
             const currentValues = currentTextDeco.toString().split(/\s+/).filter(Boolean);
             if (currentValues.includes(targetValue)) {
@@ -1109,7 +1111,7 @@ export class TextSelectionHandler {
         }
       }
     }
-    console.log('hasTargetStyle:', hasTargetStyle);
+    // console.log('hasTargetStyle:', hasTargetStyle);
     if (toggle) {
       if (!hasTargetStyle) {
         //特殊处理textDecoration多值添加 只要有重叠就要拆【新样式】 逻辑和前面拆全局是一样的
@@ -1141,10 +1143,10 @@ export class TextSelectionHandler {
               'textDecoration',
               style.styles.textDecoration as TextDecorationValue // 传入旧的textDecoration值
             );
-            console.log('拆分后的新值 splitNewStyles:', JSON.stringify(splitNewStyles));
+            // console.log('拆分后的新值 splitNewStyles:', JSON.stringify(splitNewStyles));
             finalNewStyles.push(...splitNewStyles);
           }
-          console.log('isOverlapping:', isOverlapping);
+          // console.log('isOverlapping:', isOverlapping);
           // 若没有重叠，直接在选中范围内添加新的textDecoration值
           if (!isOverlapping) {
             finalNewStyles.push({
@@ -1153,7 +1155,7 @@ export class TextSelectionHandler {
               styles: { [styleKey]: styleValue } as InlineStyleProps,
             });
           }
-          console.log('最终要添加的newStyles:', JSON.stringify(finalNewStyles));
+          // console.log('最终要添加的newStyles:', JSON.stringify(finalNewStyles));
           // finalNewStyles加入updatedStyles中
           updatedStyles.push(...finalNewStyles);
         } else {

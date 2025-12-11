@@ -74,6 +74,7 @@
         <div class="tool-item">
           <a-tooltip content="文本颜色" :mouse-enter-delay="0.5" position="bottom">
             <a-color-picker
+              class="text-color-picker"
               :popup-offset="-150"
               :popup-translate="[-100, -160]"
               size="mini"
