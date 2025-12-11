@@ -807,6 +807,7 @@ export class TextSelectionHandler {
    * @param e 鼠标事件
    */
   handleGlobalMousedown(e: MouseEvent) {
+    if (!this.isEditing) return;
     const target = e.target as HTMLElement;
     console.log('全局mousedown事件触发，目标元素：', target.className);
     // 查找工具栏
