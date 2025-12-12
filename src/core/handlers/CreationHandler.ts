@@ -87,6 +87,7 @@ export class CreationHandler {
         // 从 store 获取图片URL
         const imageUrl = this.store.creationToolOptions.imageUrl;
         if (!imageUrl) {
+          console.error('无法创建图片节点：缺少 imageUrl');
           this.reset();
           return;
         }
