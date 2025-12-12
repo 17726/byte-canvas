@@ -129,7 +129,7 @@ npm run type-check
 npm run lint
 
 # 5. 运行单元测试 (Vitest)
-npm run test
+npm run test:unit
 
 # 6. 构建生产版本
 npm run build
