@@ -149,7 +149,7 @@ npm run build
 
 ## ❤️ 致谢 (Acknowledgements)
 
-特别感谢我们的指导老师 **尹光耀**[@yinguangyao](https://github.com/yinguangyao) 。
+特别感谢我们的指导老师 **尹光耀**[@yinguangyao](https://github.com/yinguangyao)。
 在项目开发过程中，尹老师在**架构选型**（DOM vs Canvas）、**技术难点攻坚**（富文本编辑器实现）以及**代码规范治理**等方面给予了我们极具价值的指导与建议，帮助我们少走了很多弯路。
 
 ### 👨‍💻 核心贡献者 (Contributors)
