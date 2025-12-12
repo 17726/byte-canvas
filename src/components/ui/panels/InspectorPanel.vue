@@ -235,7 +235,6 @@
                 <!-- 黑白滤镜 -->
                 <div class="filter-item" @click="selectFilter('grayscale')">
                   <div class="filter-preview" :class="{ active: selectedFilter === 'grayscale' }">
-                    <!-- 新增内部层：仅承载背景图和滤镜 -->
                     <div
                       class="filter-preview-inner"
                       :style="{
@@ -249,7 +248,6 @@
                 <!-- 模糊滤镜 -->
                 <div class="filter-item" @click="selectFilter('blur')">
                   <div class="filter-preview" :class="{ active: selectedFilter === 'blur' }">
-                    <!-- 新增内部层：仅承载背景图和滤镜 -->
                     <div
                       class="filter-preview-inner"
                       :style="{
@@ -263,7 +261,6 @@
                 <!-- 复古滤镜 -->
                 <div class="filter-item" @click="selectFilter('vintage')">
                   <div class="filter-preview" :class="{ active: selectedFilter === 'vintage' }">
-                    <!-- 新增内部层：仅承载背景图和滤镜 -->
                     <div
                       class="filter-preview-inner"
                       :style="{
@@ -278,7 +275,6 @@
                 <!-- 重置滤镜 -->
                 <div class="filter-item" @click="selectFilter('reset')">
                   <div class="filter-preview" :class="{ active: selectedFilter === 'reset' }">
-                    <!-- 新增内部层：仅承载背景图和滤镜 -->
                     <div
                       class="filter-preview-inner"
                       :style="{
@@ -614,14 +610,11 @@ const extractNumericValue = (input: unknown, fallback: number) => {
 
 // 记录最后选中的子节点ID（用于退出编辑模式时读取正确的样式）
 const lastSelectedChildId = ref<string | null>(null);
-
-// Reset lastSelectedChildId when active node changes to a different group, to null, or to a non-shape/non-group node
 watch(
   () => activeNode.value?.id,
   (newId, oldId) => {
     if (newId !== oldId) {
       const node = activeNode.value;
-      // Reset if switching groups or to non-shape/non-group nodes
       if (
         !node ||
         (node.type !== NodeType.RECT &&
@@ -936,7 +929,6 @@ const hueRotate = computed({
   },
 });
 // 滤镜透明度
-// Helper to create filter computed properties
 function createFilterComputed(
   filterKey: keyof ImageState['props']['filters'],
   defaultValue: number
@@ -1147,7 +1139,7 @@ const resetFilter = () => {
   overflow: hidden; /* 裁剪内部层的圆角，和父层保持一致 */
 }
 
-/* 新增：承载背景图和滤镜的内部层 */
+/* 承载背景图和滤镜的内部层 */
 .filter-preview-inner {
   position: absolute;
   top: 0;
@@ -1156,7 +1148,6 @@ const resetFilter = () => {
   height: 100%;
   background-size: cover;
   background-position: center;
-  /* 滤镜仅作用于这个内部层，边框层不受影响 */
 }
 
 .filter-preview.active {

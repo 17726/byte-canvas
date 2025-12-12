@@ -238,7 +238,7 @@ export const useCanvasStore = defineStore('canvas', () => {
   function deleteNode(id: string) {
     const node = nodes.value[id];
     if (!node) return;
-    console.log(`[CanvasStore] 删除节点 ${id} (${node.type})`);
+
     const history = useHistoryStore();
     const unlockHistory = history.lockHistory();
     const selectionStore = getSelectionStore();
@@ -366,7 +366,6 @@ export const useCanvasStore = defineStore('canvas', () => {
   function initFromStorage(): boolean {
     // 防止重复初始化
     if (isInitialized) {
-      console.warn('[CanvasStore] initFromStorage 已被调用过，忽略重复调用');
       return false;
     }
 
@@ -392,7 +391,6 @@ export const useCanvasStore = defineStore('canvas', () => {
       Object.assign(viewport, data.viewport);
     }
 
-    console.log('[CanvasStore] 状态已从 localStorage 恢复');
     const history = useHistoryStore();
     history.clearHistory();
     history.pushSnapshot(); // 初始化快照，保证首次撤销可返回到加载状态
@@ -420,7 +418,6 @@ export const useCanvasStore = defineStore('canvas', () => {
     version.value = 0;
     const history = useHistoryStore();
     history.clearHistory();
-    console.log('[CanvasStore] 画布已重置');
   }
 
   // 统一监听持久化条件：version 变化 + 交互状态 + 视口变化
@@ -484,7 +481,6 @@ export const useCanvasStore = defineStore('canvas', () => {
     const selectionStore = getSelectionStore();
     const selectedIds = Array.from(selectionStore.activeElementIds);
     if (selectedIds.length === 0) {
-      console.log('[Clipboard] 没有选中的元素');
       return false;
     }
 
@@ -512,7 +508,6 @@ export const useCanvasStore = defineStore('canvas', () => {
     const selectionStore = getSelectionStore();
     const selectedIds = Array.from(selectionStore.activeElementIds);
     if (selectedIds.length === 0) {
-      console.log('[Clipboard] 没有选中的元素');
       return false;
     }
 
@@ -543,7 +538,6 @@ export const useCanvasStore = defineStore('canvas', () => {
     const selectionStore = getSelectionStore();
     const clipboardData = loadClipboard();
     if (!clipboardData || clipboardData.nodes.length === 0) {
-      console.log('[Clipboard] 剪贴板为空');
       return false;
     }
 
@@ -660,8 +654,6 @@ export const useCanvasStore = defineStore('canvas', () => {
     if (clipboardData.type === 'cut') {
       clearClipboard();
     }
-
-    console.log(`[Clipboard] 粘贴 ${newIds.length} 个元素`);
     unlockHistory();
     return true;
   }
@@ -675,9 +667,7 @@ export const useCanvasStore = defineStore('canvas', () => {
   // 新增：更新全局选区（供文本组件调用）
   function updateGlobalTextSelection(selection: { start: number; end: number } | null) {
     // 响应式 ref 需通过 .value 赋值
-    //console.log('触发updateGlobalTextSelection', selection);
     globalTextSelection.value = selection;
-    //console.log('Pinia 全局选区更新：', selection); // 调试日志（可选）
   }
   // ==================== 组合相关状态（只读计算属性）====================
 

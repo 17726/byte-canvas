@@ -22,8 +22,6 @@ import { useUIStore } from '@/store/uiStore';
 import { IconSettings } from '@arco-design/web-vue/es/icon';
 
 const ui = useUIStore();
-// 点击设置按钮：激活右侧属性面板并切换到画布设置模式
-// Settings are handled via the right-hand `PropertyPanel` (canvas mode), no popover here
 
 function openSettings() {
   ui.setActivePanel('canvas');
@@ -37,7 +35,6 @@ function openSettings() {
 }
 
 .canvas-header {
-  /* subtle drop shadow to visually separate header from white canvas */
   box-shadow: 0 2px 8px rgba(16, 24, 40, 0.06);
   border-bottom: 1px solid rgba(16, 24, 40, 0.04);
 }

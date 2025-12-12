@@ -23,12 +23,10 @@ export class DomImageRenderer implements INodeRenderer<CSSProperties> {
     return {
       // --- 布局属性 ---
       position: 'absolute',
-      // NOTE: 将逻辑坐标映射为 CSS 像素值
       left: `${transform.x}px`,
       top: `${transform.y}px`,
       width: `${transform.width}px`,
       height: `${transform.height}px`,
-      // NOTE: 处理旋转，注意单位是 deg
       transform: `rotate(${transform.rotation}deg)`,
 
       // --- 外观属性 ---
@@ -40,9 +38,7 @@ export class DomImageRenderer implements INodeRenderer<CSSProperties> {
       zIndex: style.zIndex,
 
       // --- 图片容器特有属性 ---
-      // NOTE: 确保图片内容不会溢出容器
       overflow: 'hidden',
-      // NOTE: 使用 flex 布局确保图片居中 同时兼顾显隐控制
       display: node.isVisible ? 'flex' : 'none',
       alignItems: 'center',
       justifyContent: 'center',

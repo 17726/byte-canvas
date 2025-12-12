@@ -1,5 +1,3 @@
-// import { NodeType } from '@/types/state'; // Not used, remove to satisfy lint
-
 // 视口默认配置（Viewport Defaults）
 // 说明：定义画布初始的缩放/偏移/背景和网格相关的默认值
 export const DEFAULT_VIEWPORT = {
@@ -16,11 +14,9 @@ export const DEFAULT_VIEWPORT = {
   gridDotSize: 1,
 };
 
-// Common Node Defaults
 export const DEFAULT_NODE_SIZE = 100;
 export const MIN_NODE_SIZE = 20;
 
-// Rect Defaults
 export const DEFAULT_RECT_STYLE = {
   backgroundColor: '#ffccc7',
   borderWidth: 1,
@@ -33,7 +29,6 @@ export const DEFAULT_RECT_PROPS = {
   cornerRadius: 0,
 };
 
-// Circle Defaults
 export const DEFAULT_CIRCLE_STYLE = {
   backgroundColor: '#ADD8E6',
   borderWidth: 1,
@@ -46,7 +41,6 @@ export const DEFAULT_CIRCLE_PROPS = {
   cornerRadius: 0,
 };
 
-// Text Defaults
 export const DEFAULT_TEXT_STYLE = {
   backgroundColor: '#fff0',
   borderWidth: 2,
@@ -73,7 +67,6 @@ export const DEFAULT_TEXT_SIZE = {
   height: 36,
 };
 
-// Image Defaults
 export const DEFAULT_IMAGE_STYLE = {
   backgroundColor: '#fff0',
   borderWidth: 2,

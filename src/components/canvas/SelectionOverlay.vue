@@ -79,10 +79,6 @@ if (!toolManagerRef) {
 
 const handles: ResizeHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
 
-// =========================================================================================
-// 辅助函数：光标旋转逻辑
-// =========================================================================================
-
 /**
  * 获取基于 Handle 的基础光标旋转角度 (CSS角度，0=n, 45=ne, ...)
  */
@@ -115,10 +111,6 @@ const getHandleBaseAngle = (handle: ResizeHandle): number => {
 const normalizeAngle = (angle: number): number => {
   return (angle % 360) + (angle < 0 ? 360 : 0);
 };
-
-// =========================================================================================
-// 状态和计算属性
-// =========================================================================================
 
 // 是否处于组合编辑模式
 const isEditingGroup = computed(() => !!selectionStore.editingGroupId);
@@ -676,7 +668,6 @@ const onRotateHandleDown = (e: MouseEvent) => {
   border-style: dashed; /* 操作框使用虚线，与组合框区分 */
 }
 
-/* ⚠️ 注意：移除了默认的 cursor 样式，使其可以被动态覆盖 */
 .resize-handle {
   position: absolute;
   width: 8px;

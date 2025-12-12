@@ -27,7 +27,6 @@ export class ViewportHandler {
 
   /**
    * 构造视口处理器
-   *
    * @param store - Canvas Store 实例
    */
   constructor(store: ReturnType<typeof useCanvasStore>) {
@@ -36,11 +35,9 @@ export class ViewportHandler {
 
   /**
    * 处理滚轮事件
-   *
    * 根据按键组合决定行为：
    * - 无 Ctrl/Shift：触摸板双指平移
    * - Ctrl/Shift + 滚轮：缩放画布
-   *
    * @param e - 滚轮事件
    */
   onWheel(e: WheelEvent): void {
@@ -67,9 +64,7 @@ export class ViewportHandler {
 
   /**
    * 开始平移
-   *
    * 记录鼠标起始位置并设置平移状态
-   *
    * @param e - 鼠标事件
    */
   startPan(e: MouseEvent): void {
@@ -80,9 +75,7 @@ export class ViewportHandler {
 
   /**
    * 更新平移位置
-   *
    * 根据鼠标移动距离更新视口偏移
-   *
    * @param e - 鼠标事件
    */
   updatePan(e: MouseEvent): void {
@@ -100,7 +93,6 @@ export class ViewportHandler {
 
   /**
    * 结束平移
-   *
    * 重置平移状态
    */
   endPan(): void {
@@ -109,7 +101,6 @@ export class ViewportHandler {
 
   /**
    * 检查是否正在平移
-   *
    * @returns true 表示正在平移，false 表示未在平移
    */
   isPanActive(): boolean {
@@ -118,7 +109,6 @@ export class ViewportHandler {
 
   /**
    * 重置平移状态
-   *
    * 清空所有平移相关的状态
    */
   reset(): void {

@@ -488,7 +488,6 @@ export function clientToWorld(
   clientX: number,
   clientY: number
 ): { x: number; y: number } {
-  console.warn('[geometry] clientToWorld is deprecated, use eventToWorld instead');
   return containerToWorld(viewport, clientX, clientY);
 }
 
