@@ -67,7 +67,7 @@ import { useSelectionStore } from '@/store/selectionStore';
 import type { ToolManager } from '@/core/ToolManager';
 import type { ResizeHandle } from '@/types/editor';
 import { NodeType, type BaseNodeState, type NodeState } from '@/types/state';
-import { computeAbsoluteTransform, computeSelectionBounds } from '@/core/utils/geometry';
+import { computeAbsoluteTransform } from '@/core/utils/geometry';
 
 const store = useCanvasStore();
 const selectionStore = useSelectionStore();
@@ -214,39 +214,23 @@ const getRotatedBounds = (node: BaseNodeState) => {
   return { minX, maxX, minY, maxY };
 };
 
-// 计算组合子元素的世界 AABB（考虑旋转），用于显示组合框
+// 计算组合的边界框（使用组合的 transform，包括旋转）
+// 这样框会跟着组合旋转，就像单个元素那样
 const getGroupChildrenAABB = (groupId: string) => {
   const group = store.nodes[groupId];
   if (!group || group.type !== NodeType.GROUP) return null;
 
-  const children = (group as NodeState & { children?: string[] }).children
-    ?.map((id: string) => store.nodes[id])
-    .filter((node): node is NodeState => Boolean(node));
+  // 直接使用组合的绝对 transform（包括旋转）
+  // 这样框就会跟着组合旋转，完全包围所有子元素
+  const absTransform = computeAbsoluteTransform(groupId, store.nodes);
+  if (!absTransform) return null;
 
-  if (!children || children.length === 0) {
-    const absTransform = computeAbsoluteTransform(groupId, store.nodes);
-    if (!absTransform) return null;
-    return {
-      x: absTransform.x,
-      y: absTransform.y,
-      width: absTransform.width,
-      height: absTransform.height,
-      rotation: absTransform.rotation || 0,
-    };
-  }
-
-  // 使用通用的 selection bounds 计算以确保完全包含所有旋转子元素
-  const bounds = computeSelectionBounds(
-    children.map((c) => c.id),
-    store.nodes
-  );
   return {
-    x: bounds.x,
-    y: bounds.y,
-    width: bounds.width,
-    height: bounds.height,
-    // AABB 已轴对齐，显示时不再叠加旋转
-    rotation: 0,
+    x: absTransform.x,
+    y: absTransform.y,
+    width: absTransform.width,
+    height: absTransform.height,
+    rotation: absTransform.rotation || 0, // 使用组合的旋转角度，框会跟着旋转
   };
 };
 
@@ -279,6 +263,8 @@ const selectionBounds = computed(() => {
   if (nodes.length === 1) {
     const node = nodes[0];
     if (node?.type === NodeType.GROUP) {
+      // 对于组合，直接使用 getGroupChildrenAABB 返回的结果
+      // 它已经包含了组合的旋转角度，框会跟着组合旋转
       return getGroupChildrenAABB(node.id);
     }
     const absTransform = computeAbsoluteTransform(node!.id, store.nodes);

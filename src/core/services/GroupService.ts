@@ -304,16 +304,13 @@ export class GroupService {
     const groupNode = store.nodes[editingGroupId] as GroupState;
     if (!groupNode || groupNode.type !== NodeType.GROUP) return;
 
-    // 如果组合本身有旋转，暂不调整边界，避免旋转下的边界重算导致子元素跳动
-    if (groupNode.transform.rotation) return;
-
     const children = groupNode.children
       .map((id: string) => store.nodes[id])
       .filter((node): node is NodeState => Boolean(node));
 
     if (children.length === 0) return;
 
-    // 计算所有子元素的边界（考虑旋转）
+    // 计算所有子元素的边界（考虑子元素自身的旋转）
     let minX = Infinity;
     let minY = Infinity;
     let maxX = -Infinity;
@@ -356,7 +353,7 @@ export class GroupService {
       }
     });
 
-    // 计算新的组合边界
+    // 计算新的组合边界（保持组合的旋转角度不变）
     const newBoundsWidth = maxX - minX;
     const newBoundsHeight = maxY - minY;
     const newGroupX = groupNode.transform.x + minX;
@@ -389,7 +386,7 @@ export class GroupService {
       };
     });
 
-    // 更新组合的位置和尺寸
+    // 更新组合的位置和尺寸（保持旋转角度不变）
     updates[editingGroupId] = {
       transform: {
         ...groupNode.transform,
@@ -397,6 +394,8 @@ export class GroupService {
         y: newGroupY,
         width: newBoundsWidth,
         height: newBoundsHeight,
+        // 保持组合的旋转角度不变
+        rotation: groupNode.transform.rotation || 0,
       },
     };
 

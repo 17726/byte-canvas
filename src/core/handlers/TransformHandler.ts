@@ -46,7 +46,7 @@ import { useSelectionStore } from '@/store/selectionStore';
 import type { BaseNodeState } from '@/types/state';
 import { NodeType } from '@/types/state';
 import type { ResizeHandle } from '@/types/editor';
-import { eventToWorld } from '@/core/utils/geometry';
+import { eventToWorld, computeAbsoluteTransform } from '@/core/utils/geometry';
 import { GroupService } from '@/core/services/GroupService';
 
 /** 拖拽类型 */
@@ -96,6 +96,8 @@ interface InternalResizeState {
   // 新增：记录节点的初始中心点
   startCenterX: number;
   startCenterY: number;
+  // 新增：记录父组合的累计旋转角度（用于坐标转换）
+  totalParentRotation: number; // 弧度
 }
 
 /** 多选缩放时单个节点的初始状态（增强：记录相对中心的偏移） */
@@ -181,6 +183,7 @@ export class TransformHandler {
     },
     startCenterX: 0,
     startCenterY: 0,
+    totalParentRotation: 0,
   };
 
   /** 多选缩放状态 */
@@ -424,9 +427,21 @@ export class TransformHandler {
     const { transform } = node;
     const { x, y, width, height, rotation } = transform;
 
-    // 计算节点中心点（旋转中心）
+    // 计算节点中心点（在组合局部坐标系中）
     const centerX = x + width / 2;
     const centerY = y + height / 2;
+
+    // 【修复】累计所有父级的旋转角度（用于将世界坐标转换到组合局部坐标系）
+    let totalParentRotation = 0;
+    if (node.parentId) {
+      let parentId: string | null = node.parentId;
+      while (parentId) {
+        const parentNode = this.store.nodes[parentId] as BaseNodeState | undefined;
+        if (!parentNode) break;
+        totalParentRotation += parentNode.transform.rotation || 0;
+        parentId = parentNode.parentId ?? null;
+      }
+    }
 
     // 【修复】使用 eventToWorld 记录起始世界坐标
     const startWorldPos = eventToWorld(e, this.stageEl, this.store.viewport);
@@ -441,10 +456,12 @@ export class TransformHandler {
       startNodeY: y,
       startWidth: width,
       startHeight: height,
-      startRotation: rotation * (Math.PI / 180), // 转换为弧度
+      startRotation: rotation * (Math.PI / 180), // 子元素自己的旋转（弧度）
       startCorners: this.getRectangleCorners(x, y, width, height),
-      startCenterX: centerX,
+      startCenterX: centerX, // 组合局部坐标系中的中心点
       startCenterY: centerY,
+      // 新增：记录父组合的旋转角度（用于坐标转换）
+      totalParentRotation: totalParentRotation * (Math.PI / 180), // 转换为弧度
     };
   }
 
@@ -465,6 +482,7 @@ export class TransformHandler {
       startRotation,
       startCenterX,
       startCenterY,
+      totalParentRotation,
     } = this.resizeState;
 
     const node = this.store.nodes[nodeId];
@@ -477,15 +495,62 @@ export class TransformHandler {
     // 【修复】使用 eventToWorld 获取当前世界坐标
     const currentWorldPos = eventToWorld(e, this.stageEl, this.store.viewport);
 
-    // --- 1. 坐标转换：将鼠标位移转换到未旋转坐标系 ---
-    // 将鼠标点反向旋转到未旋转坐标系（以节点初始中心为旋转中心）
+    // --- 1. 坐标转换：先将世界坐标转换到组合的局部坐标系，再考虑子元素自己的旋转 ---
+    let startLocal: { x: number; y: number };
+    let currentLocal: { x: number; y: number };
+
+    if (node.parentId && totalParentRotation !== 0) {
+      // 有父组合旋转：需要先将世界坐标转换到组合的局部坐标系
+      const parentAbsTransform = computeAbsoluteTransform(node.parentId, this.store.nodes);
+      if (parentAbsTransform) {
+        // 计算父组合的中心点（世界坐标系）
+        const parentCenterWorldX = parentAbsTransform.x + parentAbsTransform.width / 2;
+        const parentCenterWorldY = parentAbsTransform.y + parentAbsTransform.height / 2;
+
+        // 将鼠标坐标从世界坐标系转换到组合的局部坐标系
+        const startOffsetX = startMouseWorld.x - parentCenterWorldX;
+        const startOffsetY = startMouseWorld.y - parentCenterWorldY;
+        const currentOffsetX = currentWorldPos.x - parentCenterWorldX;
+        const currentOffsetY = currentWorldPos.y - parentCenterWorldY;
+
+        // 反向旋转到组合的局部坐标系
+        const cos = Math.cos(-totalParentRotation);
+        const sin = Math.sin(-totalParentRotation);
+        const startLocalOffsetX = startOffsetX * cos - startOffsetY * sin;
+        const startLocalOffsetY = startOffsetX * sin + startOffsetY * cos;
+        const currentLocalOffsetX = currentOffsetX * cos - currentOffsetY * sin;
+        const currentLocalOffsetY = currentOffsetX * sin + currentOffsetY * cos;
+
+        // 转换到组合局部坐标系中的绝对坐标
+        const parentCenterLocalX = parentAbsTransform.width / 2;
+        const parentCenterLocalY = parentAbsTransform.height / 2;
+        startLocal = {
+          x: parentCenterLocalX + startLocalOffsetX,
+          y: parentCenterLocalY + startLocalOffsetY,
+        };
+        currentLocal = {
+          x: parentCenterLocalX + currentLocalOffsetX,
+          y: parentCenterLocalY + currentLocalOffsetY,
+        };
+      } else {
+        // 如果无法获取父组合的绝对变换，回退到直接使用世界坐标
+        startLocal = startMouseWorld;
+        currentLocal = currentWorldPos;
+      }
+    } else {
+      // 无父组合旋转：直接使用世界坐标
+      startLocal = startMouseWorld;
+      currentLocal = currentWorldPos;
+    }
+
+    // 现在将组合局部坐标系中的坐标转换到子元素的未旋转坐标系
     const startUnrotated = this.unrotatePoint(
-      startMouseWorld,
+      startLocal,
       { x: startCenterX, y: startCenterY },
       startRotation
     );
     const currentUnrotated = this.unrotatePoint(
-      { x: currentWorldPos.x, y: currentWorldPos.y },
+      currentLocal,
       { x: startCenterX, y: startCenterY },
       startRotation
     );
