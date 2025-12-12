@@ -110,7 +110,7 @@ src/
 
 ### 环境准备
 
-- Node.js \> 16.x
+- Node.js > 16.x
 - npm / pnpm
 
 ### 常用命令
