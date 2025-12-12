@@ -58,7 +58,6 @@ export function saveToLocalStorage(
     };
 
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    console.log('[Persistence] 状态已保存到 localStorage');
   } catch (error) {
     console.error('[Persistence] 保存状态失败:', error);
   }
@@ -71,7 +70,6 @@ export function loadFromLocalStorage(): PersistedState | null {
   try {
     const stored = localStorage.getItem(STORAGE_KEY);
     if (!stored) {
-      console.log('[Persistence] localStorage 中无保存的状态');
       return null;
     }
 
@@ -94,7 +92,6 @@ export function loadFromLocalStorage(): PersistedState | null {
       return null;
     }
 
-    console.log('[Persistence] 从 localStorage 加载状态成功');
     return state;
   } catch (error) {
     console.error('[Persistence] 加载状态失败:', error);
@@ -108,7 +105,6 @@ export function loadFromLocalStorage(): PersistedState | null {
 export function clearLocalStorage(): void {
   try {
     localStorage.removeItem(STORAGE_KEY);
-    console.log('[Persistence] localStorage 状态已清除');
   } catch (error) {
     console.error('[Persistence] 清除状态失败:', error);
   }
@@ -177,9 +173,6 @@ export interface ClipboardData {
 export function saveClipboard(data: ClipboardData): void {
   try {
     localStorage.setItem(CLIPBOARD_KEY, JSON.stringify(data));
-    console.log(
-      `[Clipboard] ${data.type === 'copy' ? '复制' : '剪切'} ${data.nodes.length} 个元素`
-    );
   } catch (error) {
     console.error('[Clipboard] 保存剪贴板失败:', error);
   }

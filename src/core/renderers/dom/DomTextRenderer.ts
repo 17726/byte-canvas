@@ -150,8 +150,6 @@ export class DomTextRenderer implements INodeRenderer<string> {
           const currentValues = (value as string).split(/\s+/);
           const combinedValues = Array.from(new Set([...existingValues, ...currentValues]));
           mergedStyles.textDecoration = combinedValues.join(' ');
-          // console.log('Merging textDecoration:', existingValue, value, '->', mergedStyles.textDecoration);
-          // console.log('Current mergedStyles:', mergedStyles);
         } else {
           mergedStyles[prop] = value;
         }

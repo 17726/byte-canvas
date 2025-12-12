@@ -56,14 +56,12 @@ export class GroupService {
     const selectionStore = getSelectionStore();
     const selectedIds = Array.from(selectionStore.activeElementIds);
     if (selectedIds.length < 2) {
-      console.log('[Group] 需要至少选中2个元素才能组合');
       return null;
     }
 
     // 过滤掉不存在的节点
     const validIds = selectedIds.filter((id) => store.nodes[id]);
     if (validIds.length < 2) {
-      console.log('[Group] 有效元素不足2个');
       return null;
     }
 
@@ -148,7 +146,6 @@ export class GroupService {
     // 解锁历史记录
     unlockHistory();
 
-    console.log(`[Group] 创建组合 ${groupId}，包含 ${validIds.length} 个元素`);
     return groupId;
   }
 
@@ -242,7 +239,6 @@ export class GroupService {
       // 选中解组合后的所有子节点
       selectionStore.setActive(ungroupedIds);
       store.version++;
-      console.log(`[Ungroup] 解组合完成，释放 ${ungroupedIds.length} 个元素`);
     }
 
     return ungroupedIds;
@@ -267,7 +263,7 @@ export class GroupService {
 
     selectionStore.setEditingGroup(groupId);
     selectionStore.clearSelection(); // 清空选中状态
-    console.log(`[Group] 进入组合编辑模式: ${groupId}`);
+
     return true;
   }
 
@@ -279,7 +275,6 @@ export class GroupService {
   static exitGroupEdit(): void {
     const selectionStore = getSelectionStore();
     if (selectionStore.editingGroupId) {
-      console.log(`[Group] 退出组合编辑模式: ${selectionStore.editingGroupId}`);
       // 选中当前编辑的组合
       selectionStore.setActive(
         selectionStore.editingGroupId ? [selectionStore.editingGroupId] : []
@@ -410,8 +405,6 @@ export class GroupService {
 
     // 解锁历史记录
     unlockHistory();
-
-    console.log(`[Group] 调整组合边界: ${editingGroupId}`);
   }
 
   /**

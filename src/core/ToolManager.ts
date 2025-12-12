@@ -261,7 +261,6 @@ export class ToolManager {
 
       // 文本处理器：点击空白处结束编辑态
       if (this.textSelectionHandler.isEditing) {
-        // console.log('结束编辑态');
         this.textSelectionHandler.exitEditing();
       }
 
@@ -469,12 +468,10 @@ export class ToolManager {
       if (!this.textSelectionHandler.canEnterEditingDirectly(id)) {
         const parentId = node.parentId;
         if (parentId) {
-          console.log('进入组合编辑');
           GroupService.enterGroupEdit(this.store, parentId);
           return;
         }
       }
-      console.log('toolmanager中进入编辑态的节点id:', id);
       this.textSelectionHandler.enterEditing(e, id);
     }
 
@@ -600,7 +597,6 @@ export class ToolManager {
     this.textSelectionHandler.handleHeightAdaptation(id);
 
     this.textSelectionHandler.restoreFullSelection(savedCursorPos, id);
-    // console.log('触发handleHeightAdaptation');
   }
 
   handleFontSizeChange(id: string) {
@@ -626,7 +622,6 @@ export class ToolManager {
     const node = this.store.nodes[id];
     if (!node || node.type !== NodeType.TEXT) return;
     this.textSelectionHandler.handleSelectionChange(id);
-    // console.log('触发handleTextSelectionChange');
   }
 
   /**
@@ -644,7 +639,6 @@ export class ToolManager {
     if (this.transformHandler.isTransforming) return;
     const id = Array.from(this.selectionStore.activeElementIds)[0];
     if (!id) return;
-    console.log('触发handleEnterKey');
     this.textSelectionHandler.handleEnterKey(id, e);
   }
 
@@ -670,7 +664,6 @@ export class ToolManager {
     }
 
     this.textSelectionHandler.handleTextBoxClick(e, id);
-    //console.log('单击文本节点');
 
     if (!this.selectionStore.activeElementIds.has(id)) {
       this.selectionStore.setActive([id]);
@@ -766,7 +759,6 @@ export class ToolManager {
     const node = this.store.nodes[id];
     if (!node || node.type !== NodeType.TEXT) return;
     this.textSelectionHandler.handleMouseUpAndSelection(e, id);
-    // console.log('触发handleTextMouseUp');
   }
 
   getTextEditingState(): boolean {
