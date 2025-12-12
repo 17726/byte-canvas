@@ -20,7 +20,7 @@ const style = computed(() => {
   // 确保圆形样式：宽高相等，border-radius 为 50%
   return {
     ...baseStyle,
-    // FIXME: 视图层不应强制修改数据表现。如果数据层 width != height，这里强制相等会导致碰撞检测（基于数据）与视觉（基于这里）不一致。
+    // TODO: 视图层不应强制修改数据表现。如果数据层 width != height，这里强制相等会导致碰撞检测（基于数据）与视觉（基于这里）不一致。
   };
 });
 
