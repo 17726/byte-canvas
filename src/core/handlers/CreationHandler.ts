@@ -107,7 +107,6 @@ export class CreationHandler {
         ...previewNode.style,
         opacity: 0.5,
       };
-      // 【修复闪烁】初始隐藏预览节点，等待首次 handleMouseMove 再显示
       previewNode.isVisible = false;
       this.hasShownPreview = false;
       this.store.setPreviewNode(previewNode);
@@ -119,8 +118,7 @@ export class CreationHandler {
    * - 悬浮阶段：更新预览节点位置（鼠标位置 = 左上角）
    * - 拖拽阶段：计算并更新预览节点的尺寸和位置
    * - 图片特殊处理：始终保持原始尺寸，只更新位置
-   *
-   * 坐标转换：使用 eventToWorld 确保精确对齐，消除 Header 偏移问题
+   * - 坐标转换：使用 eventToWorld 确保精确对齐，消除 Header 偏移问题
    */
   handleMouseMove(e: MouseEvent) {
     const previewNode = this.store.previewNode;
@@ -139,7 +137,7 @@ export class CreationHandler {
     this.isShiftPressed = e.shiftKey;
     this.isAltPressed = e.altKey;
 
-    // 【关键修复】使用 eventToWorld 直接转换，消除 DOM 偏移问题
+    // 使用 eventToWorld 直接转换，消除 DOM 偏移问题
     const worldPos = eventToWorld(e, this.stageEl, this.store.viewport);
 
     // 图片节点：只更新位置，不参与拖拽缩放
@@ -208,7 +206,6 @@ export class CreationHandler {
   /**
    * 鼠标按下处理
    * 记录起始点，开始拖拽
-   *
    * 坐标转换：使用 eventToWorld 确保起始点精确
    */
   handleMouseDown(e: MouseEvent) {
@@ -217,12 +214,12 @@ export class CreationHandler {
     // 只响应左键
     if (e.button !== 0) return;
 
-    // 【修复】使用 eventToWorld 替代手动计算
+    // 使用 eventToWorld 替代手动计算
     const worldPos = eventToWorld(e, this.stageEl, this.store.viewport);
     this.startPoint = { x: worldPos.x, y: worldPos.y };
     this.isDragging = true;
 
-    // 【修复】同步交互状态，触发 CanvasStage 渲染预览框
+    // 同步交互状态，触发 CanvasStage 渲染预览框
     this.store.isInteracting = true;
 
     e.stopPropagation();
@@ -294,7 +291,7 @@ export class CreationHandler {
     this.store.addNode(finalNode);
     this.selectionStore.setActive([finalNode.id]);
 
-    // 【修复】重置交互状态
+    // 重置交互状态
     this.store.isInteracting = false;
 
     // 重置工具为选择模式
@@ -317,7 +314,7 @@ export class CreationHandler {
     this.startPoint = null;
     this.currentNodeType = null;
     this.hasShownPreview = false;
-    // 【修复】重置交互状态
+    // 重置交互状态
     this.store.isInteracting = false;
   }
 

@@ -314,7 +314,6 @@ const positionStyle = computed<CSSProperties>(() => {
 });
 
 // 类型判断和基础属性已从 useStyleSync 导入
-
 // --- Common Actions (对选中节点的操作，例如置于最前 / 置于最底 / 删除) ---
 const bringToFront = () => {
   if (!activeNode.value) return;
@@ -354,12 +353,6 @@ const activeTextNode = computed(() => {
   }
   return null;
 });
-// const textColor = computed({
-//   //NOTE: 关于调色板图标样式的响应还有待商榷 这个get响应逻辑是错的但先不改（可画不变）
-//   get: () => activeTextNode.value?.props.color || '#000000',
-//   set: (val) =>
-//     activeTextNode.value && toolManagerRef?.value.handleColorChange(activeTextNode.value.id, val),
-// });
 
 const handleColorChange = (selectedColor: string) => {
   // 1. 过滤无效值（和你之前修复的逻辑一致）
@@ -535,8 +528,6 @@ const handleDelete = () => {
 </script>
 
 <style scoped>
-/* 注意：由于使用了 Teleport，scoped 样式依然生效，但结构上 .context-toolbar 直接位于 body 下 */
-/* merged */
 .context-toolbar {
   display: flex;
   align-items: center;
@@ -576,7 +567,6 @@ const handleDelete = () => {
   background-color: var(--color-border-2);
 }
 
-/* ... 其他样式保持不变 ... */
 .filter-options {
   display: flex;
   gap: 10px;

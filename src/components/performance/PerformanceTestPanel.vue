@@ -192,7 +192,7 @@ const create100Elements = async () => {
 
     // 选中所有元素
     selectionStore.setActive(nodeIds);
-    console.log(`✅ 成功创建 ${nodeIds.length} 个元素`);
+    console.log(`成功创建 ${nodeIds.length} 个元素`);
   } catch (error) {
     console.error('创建元素失败:', error);
   } finally {
