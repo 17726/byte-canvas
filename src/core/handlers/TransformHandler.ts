@@ -43,7 +43,7 @@
 
 import { useCanvasStore } from '@/store/canvasStore';
 import { useSelectionStore } from '@/store/selectionStore';
-import type { BaseNodeState } from '@/types/state';
+import type { BaseNodeState, NodeState } from '@/types/state';
 import { NodeType } from '@/types/state';
 import type { ResizeHandle } from '@/types/editor';
 import { eventToWorld } from '@/core/utils/geometry';
@@ -347,6 +347,8 @@ export class TransformHandler {
     const dx = currentWorldPos.x - startMouseWorld.x;
     const dy = currentWorldPos.y - startMouseWorld.y;
 
+    const updates: Record<string, Partial<NodeState>> = {};
+
     Object.entries(startTransformMap).forEach(([id, startPos]) => {
       const node = this.store.nodes[id];
       if (!node || node.isLocked) return;
@@ -377,14 +379,16 @@ export class TransformHandler {
         }
       }
 
-      this.store.updateNode(id, {
+      updates[id] = {
         transform: {
           ...node.transform,
           x: startPos.x + localDx,
           y: startPos.y + localDy,
         },
-      });
+      };
     });
+
+    this.store.batchUpdateNodes(updates);
   }
 
   /**
