@@ -84,7 +84,7 @@ src/
 │       └── common/             # 通用组件
 ├── composables/                # [L2 逻辑胶水层]
 │   ├── useContinuousHistory.ts # 历史记录钩子
-│   ├── useNodeActions.ts       # 节点操作 (删除、组合、层级)
+│   ├── useNodeActions.ts       # 节点操作 (删除、组合、层级、剪贴板)
 │   └── useStyleSync.ts         # 属性双向绑定
 ├── core/                       # [核心内核层] Pure TS
 │   ├── ToolManager.ts          # [L3] 交互事件总线

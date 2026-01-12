@@ -23,6 +23,7 @@
  * - expandGroupToFitChildren: 调整组合边界以精确适应所有子元素
  * - canGroup: 检查选中的元素是否可以组合
  * - canUngroup: 检查选中的元素是否可以解组合
+ * - updateGroupTransform: 同步更新组合的变换到所有子节点
  * - updateGroupStyle: 同步更新组合的样式到所有子节点
  */
 

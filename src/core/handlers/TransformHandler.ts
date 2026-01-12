@@ -255,7 +255,7 @@ export class TransformHandler {
       bottomLeft: { x, y: y + height },
     };
   }
-
+  //TODO:考虑使用utls中的calculateBounds方法
   /**
    * 计算多个节点的整体包围盒（修正：避免空边界框）
    * @param nodeIds 节点ID列表
