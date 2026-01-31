@@ -72,8 +72,9 @@ export class TextSelectionHandler {
 
   // 接收nodeId和对应的editor，存入映射
   init(nodeId: string, editor: HTMLElement | null) {
+    if (!editor) return; // 关键：忽略 null，等待下次传入真实 DOM
     this.editors[nodeId] = editor; // 按节点ID存储editor
-
+    console.log('init初始化editor映射:', nodeId, this.editors[nodeId]);
     // 只在第一次调用时添加全局监听器
     if (this.globalListenerRefCount === 0) {
       document.addEventListener('mousedown', this.handleGlobalMousedown, true);
@@ -404,6 +405,7 @@ export class TextSelectionHandler {
       // 3. 其他元素节点（如嵌套SPAN/DIV）：递归遍历其子节点
       else if (child.nodeType === Node.ELEMENT_NODE) {
         // 元素节点本身无字符数，但要递归计算其内部所有子节点的字符数
+        console.log('不是文本节点');
         totalChars += this.calculateInsertOffsetToChars(child, child.childNodes.length);
       }
     }
@@ -425,9 +427,15 @@ export class TextSelectionHandler {
     endOffset: number; // 选区结束的「文本逻辑索引」
     nodeText: string; // 光标/选区所在文本节点的内容（用于匹配新DOM）
   } | null {
+    console.log('保存完整选区 saveFullSelection，节点ID:', id);
     const editor = this.editors[id];
     const node = this.store.nodes[id] as TextState | undefined;
-    if (!editor || !node || !this.isEditing) return null;
+    if (!editor || !node || !this.isEditing) {
+      if (!this.isEditing) console.log('不在编辑状态，无法保存选区');
+      else if (!editor) console.log('找不到对应的editor，无法保存选区');
+      else console.log('找不到对应的文本节点，无法保存选区');
+      return null;
+    }
 
     const selection = window.getSelection();
     if (!selection || selection.rangeCount === 0) return null;
@@ -809,7 +817,10 @@ export class TextSelectionHandler {
    * @param e 鼠标事件
    */
   handleGlobalMousedown(e: MouseEvent) {
-    if (!this.isEditing) return;
+    if (!this.isEditing) {
+      console.log('未处于编辑态 直接返回');
+      return;
+    }
     const target = e.target as HTMLElement;
     console.log('全局mousedown事件触发，目标元素：', target.className);
     // 查找工具栏
