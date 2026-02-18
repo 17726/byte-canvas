@@ -279,7 +279,22 @@ export class CreationHandler {
       }
     } else {
       // 拖拽创建：使用预览节点的尺寸和位置
-      finalNode = { ...this.store.previewNode };
+      //【补丁】文本节点要重新生成纯净节点
+      if (this.currentNodeType === NodeType.TEXT) {
+        const n = NodeFactory.createText(
+          this.store.previewNode.transform.x,
+          this.store.previewNode.transform.y
+        );
+        n.transform.width = Math.max(
+          1,
+          this.store.previewNode.transform.width || n.transform.width
+        );
+        n.transform.height = Math.max(
+          1,
+          this.store.previewNode.transform.height || n.transform.height
+        );
+        finalNode = n;
+      } else finalNode = { ...this.store.previewNode };
     }
 
     // 恢复正常透明度
