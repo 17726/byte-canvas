@@ -233,7 +233,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed, inject, type Ref, type CSSProperties } from 'vue';
+import { computed, inject, type Ref, type CSSProperties, getCurrentInstance } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
 import { computeAbsoluteTransform } from '@/core/utils/geometry';
 import { useSelectionStore } from '@/store/selectionStore';
@@ -253,6 +253,29 @@ import {
 } from '@icon-park/vue-next';
 import { ToolManager } from '@/core/ToolManager';
 import { IconFontColors, IconSort } from '@arco-design/web-vue/es/icon';
+import {
+  Tooltip,
+  ColorPicker,
+  Popover,
+  Button,
+  InputNumber,
+  Select,
+  Option,
+  Slider,
+} from '@arco-design/web-vue';
+
+// ====== 局部注册 Arco 组件 ======
+const app = getCurrentInstance()?.appContext.app;
+if (app) {
+  app.component('a-tooltip', Tooltip);
+  app.component('a-color-picker', ColorPicker);
+  app.component('a-popover', Popover);
+  app.component('a-button', Button);
+  app.component('a-input-number', InputNumber);
+  app.component('a-select', Select);
+  app.component('a-option', Option);
+  app.component('a-slider', Slider);
+}
 const store = useCanvasStore();
 const selectionStore = useSelectionStore();
 const toolManagerRef = inject<Ref<ToolManager>>('toolManager');

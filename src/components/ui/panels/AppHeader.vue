@@ -20,8 +20,18 @@
 <script setup lang="ts">
 import { useUIStore } from '@/store/uiStore';
 import { IconSettings } from '@arco-design/web-vue/es/icon';
+import { PageHeader, Tooltip, Button } from '@arco-design/web-vue';
+import { getCurrentInstance } from 'vue';
 
 const ui = useUIStore();
+
+// 局部注册 Arco 组件（<script setup> 里使用 appContext 注册）
+const app = getCurrentInstance()?.appContext.app;
+if (app) {
+  app.component('a-page-header', PageHeader);
+  app.component('a-tooltip', Tooltip);
+  app.component('a-button', Button);
+}
 
 function openSettings() {
   ui.setActivePanel('canvas');

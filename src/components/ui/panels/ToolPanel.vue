@@ -43,9 +43,9 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, getCurrentInstance } from 'vue';
 import { IconPlus, IconEdit, IconDelete } from '@arco-design/web-vue/es/icon';
-//TODO：UI开发完成后优化icon-park库的导入，针对按需导入减小打包体积
+import { Menu } from '@arco-design/web-vue';
 import { Square, Round } from '@icon-park/vue-next';
 import { useCanvasStore } from '@/store/canvasStore';
 import { useNodeActions } from '@/composables/useNodeActions';
@@ -62,6 +62,14 @@ enum MenuKey {
 }
 
 const store = useCanvasStore();
+
+// 局部注册 Arco 组件
+const app = getCurrentInstance()?.appContext.app;
+if (app) {
+  app.component('a-menu', Menu);
+  app.component('a-menu-item', Menu.Item);
+  app.component('a-sub-menu', Menu.SubMenu);
+}
 
 // 高亮控制：根据当前创建工具同步高亮状态
 const selectedKeys = computed(() => {
