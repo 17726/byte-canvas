@@ -80,21 +80,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted, watch, getCurrentInstance } from 'vue';
-import { Button, Slider, Select, Option } from '@arco-design/web-vue';
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
 import { useSelectionStore } from '@/store/selectionStore';
 import { useUIStore } from '@/store/uiStore';
 import { NodeFactory } from '@/core/services/NodeFactory';
-
-// ====== 局部注册 Arco 组件 ======
-const app = getCurrentInstance()?.appContext.app;
-if (app) {
-  app.component('a-button', Button);
-  app.component('a-slider', Slider);
-  app.component('a-select', Select);
-  app.component('a-option', Option);
-}
 
 const store = useCanvasStore();
 const selectionStore = useSelectionStore();

@@ -1,19 +1,10 @@
 <script setup lang="ts">
-import { watch, computed, onMounted, ref, getCurrentInstance } from 'vue';
-import { Layout, LayoutSider, LayoutContent, Tooltip } from '@arco-design/web-vue';
+import { watch, computed, onMounted, ref } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
 import { useSelectionStore } from '@/store/selectionStore';
 import { useUIStore } from '@/store/uiStore';
 import { Left as IconLeft, Right as IconRight } from '@icon-park/vue-next';
 
-// ====== 局部注册 Arco 布局 + Tooltip 组件 ======
-const app = getCurrentInstance()?.appContext.app;
-if (app) {
-  app.component('a-layout', Layout);
-  app.component('a-layout-sider', LayoutSider);
-  app.component('a-layout-content', LayoutContent);
-  app.component('a-tooltip', Tooltip);
-}
 // =====================================
 // 优化 1：核心画布【优先加载】
 // 必须首屏渲染的只有这个

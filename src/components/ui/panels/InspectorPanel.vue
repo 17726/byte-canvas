@@ -440,22 +440,7 @@
   </div>
 </template>
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, getCurrentInstance } from 'vue';
-import {
-  RadioGroup,
-  Radio,
-  ColorPicker,
-  InputNumber,
-  Divider,
-  Button,
-  Empty,
-  Row,
-  Col,
-  Slider,
-  Textarea,
-  Select,
-  Option,
-} from '@arco-design/web-vue';
+import { ref, computed, watch, nextTick } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
 import { useSelectionStore } from '@/store/selectionStore';
 import { useUIStore } from '@/store/uiStore';
@@ -470,24 +455,6 @@ import {
 } from '@/types/state';
 import { DEFAULT_CANVAS_THEMES, DEFAULT_IMAGE_FILTERS, DEFAULT_IMAGE_URL } from '@/config/defaults';
 import { GroupService } from '@/core/services/GroupService';
-
-// ====== 局部注册 Arco 组件 ======
-const app = getCurrentInstance()?.appContext.app;
-if (app) {
-  app.component('a-radio-group', RadioGroup);
-  app.component('a-radio', Radio);
-  app.component('a-color-picker', ColorPicker);
-  app.component('a-input-number', InputNumber);
-  app.component('a-divider', Divider);
-  app.component('a-button', Button);
-  app.component('a-empty', Empty);
-  app.component('a-row', Row);
-  app.component('a-col', Col);
-  app.component('a-slider', Slider);
-  app.component('a-textarea', Textarea);
-  app.component('a-select', Select);
-  app.component('a-option', Option);
-}
 
 const store = useCanvasStore();
 const selectionStore = useSelectionStore();

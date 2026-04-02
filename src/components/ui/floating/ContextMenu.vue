@@ -136,7 +136,7 @@
 
 <script setup lang="ts">
 import { storeToRefs } from 'pinia';
-import { ref, computed, nextTick, onMounted, onUnmounted, getCurrentInstance } from 'vue';
+import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue';
 import { useNodeActions } from '@/composables/useNodeActions';
 import {
   IconCopy,
@@ -157,27 +157,7 @@ import {
 } from '@icon-park/vue-next';
 import { loadClipboard } from '@/store/persistence.ts';
 import { useHistoryStore } from '@/store/historyStore.ts';
-import {
-  Notification,
-  Menu,
-  Button,
-  ButtonGroup,
-  Divider,
-  SubMenu,
-  Modal,
-} from '@arco-design/web-vue';
-
-// ====== 这里：局部注册 Arco 组件 ======
-const app = getCurrentInstance()?.appContext.app;
-if (app) {
-  app.component('a-menu', Menu);
-  app.component('a-menu-item', Menu.Item);
-  app.component('a-sub-menu', SubMenu);
-  app.component('a-button', Button);
-  app.component('a-button-group', ButtonGroup);
-  app.component('a-divider', Divider);
-  app.component('a-modal', Modal);
-}
+import { Notification } from '@arco-design/web-vue';
 
 const {
   hasSelection,
