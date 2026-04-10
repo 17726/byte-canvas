@@ -36,18 +36,34 @@ onMounted(() => {
 
   // 2. 延迟加载所有非首屏 UI（关键优化）
   setTimeout(() => {
-    import('@/components/ui/panels/AppHeader.vue').then((mod) => {
-      CanvasHeader.value = mod.default;
-    });
-    import('@/components/ui/panels/ToolPanel.vue').then((mod) => {
-      CanvasToolbar.value = mod.default;
-    });
-    import('@/components/ui/panels/InspectorPanel.vue').then((mod) => {
-      PropertyPanel.value = mod.default;
-    });
-    import('@/components/ui/floating/ContextMenu.vue').then((mod) => {
-      ContextMenu.value = mod.default;
-    });
+    import('@/components/ui/panels/AppHeader.vue')
+      .then((mod) => {
+        CanvasHeader.value = mod.default;
+      })
+      .catch((error) => {
+        console.error('Failed to load AppHeader.vue', error);
+      });
+    import('@/components/ui/panels/ToolPanel.vue')
+      .then((mod) => {
+        CanvasToolbar.value = mod.default;
+      })
+      .catch((error) => {
+        console.error('Failed to load ToolPanel.vue', error);
+      });
+    import('@/components/ui/panels/InspectorPanel.vue')
+      .then((mod) => {
+        PropertyPanel.value = mod.default;
+      })
+      .catch((error) => {
+        console.error('Failed to load InspectorPanel.vue', error);
+      });
+    import('@/components/ui/floating/ContextMenu.vue')
+      .then((mod) => {
+        ContextMenu.value = mod.default;
+      })
+      .catch((error) => {
+        console.error('Failed to load ContextMenu.vue', error);
+      });
   }, 200); // 200ms 足够首屏渲染完成
 });
 
