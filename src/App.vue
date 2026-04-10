@@ -1,21 +1,36 @@
 <script setup lang="ts">
-import { watch, computed, onMounted } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
 import { useSelectionStore } from '@/store/selectionStore';
 import { useUIStore } from '@/store/uiStore';
 import { Left as IconLeft, Right as IconRight } from '@icon-park/vue-next';
+import { computed, defineAsyncComponent, onMounted, watch } from 'vue';
+
+// =====================================
+// 优化 1：核心画布【优先加载】
+// 必须首屏渲染的只有这个
+// =====================================
 import CanvasStage from '@/components/canvas/CanvasStage.vue';
-import CanvasHeader from '@/components/ui/panels/AppHeader.vue';
-import CanvasToolbar from '@/components/ui/panels/ToolPanel.vue';
-import PropertyPanel from '@/components/ui/panels/InspectorPanel.vue';
-import ContextMenu from '@/components/ui/floating/ContextMenu.vue';
+
+// =====================================
+// 优化 2：非首屏组件【延迟加载】
+// 这些全部不阻塞首屏
+// =====================================
+const CanvasHeader = defineAsyncComponent(() => import('@/components/ui/panels/AppHeader.vue'));
+const CanvasToolbar = defineAsyncComponent(() => import('@/components/ui/panels/ToolPanel.vue'));
+const PropertyPanel = defineAsyncComponent(
+  () => import('@/components/ui/panels/InspectorPanel.vue')
+);
+const ContextMenu = defineAsyncComponent(() => import('@/components/ui/floating/ContextMenu.vue'));
 
 const store = useCanvasStore();
 const selectionStore = useSelectionStore();
 const ui = useUIStore();
 
-// 应用启动时从 localStorage 恢复画布状态
+// =====================================
+// 优化 3：首屏仅做关键初始化
+// =====================================
 onMounted(() => {
+  // 恢复画布（必须）
   store.initFromStorage();
 });
 
@@ -39,40 +54,43 @@ const togglePanel = () => {
 
 const showPopover = computed(() => !ui.isPanelExpanded);
 
-// 计算是否应该隐藏面板（新增：处理多选情况）
+// 计算是否应该隐藏面板
 const shouldHidePanel = computed(() => {
-  // 如果处于画布设置模式，根据 isPanelExpanded 决定
   if (ui.activePanel === 'canvas') {
     return !ui.isPanelExpanded;
   }
 
-  // 如果处于节点属性模式，检查是否多选
   const isMultiSelect = selectionStore.activeElements.length > 1;
   if (isMultiSelect) {
-    return true; // 多选时强制隐藏面板
+    return true;
   }
 
-  // 单选时根据 isPanelExpanded 决定
   return !ui.isPanelExpanded;
 });
 </script>
 
 <template>
   <a-layout class="app-container">
-    <!-- 页头 -->
-    <CanvasHeader />
+    <!-- 页头占位：固定高度避免延迟加载导致 CLS -->
+    <div class="app-header-slot">
+      <Suspense>
+        <CanvasHeader />
+        <template #fallback>
+          <div class="app-header-skeleton" aria-hidden="true" />
+        </template>
+      </Suspense>
+    </div>
 
     <a-layout class="main-layout">
-      <!-- 左侧工具栏 (固定宽度) -->
+      <!-- 左侧工具栏 → 延迟渲染 -->
       <a-layout-sider :width="0" class="left-sider">
         <CanvasToolbar />
       </a-layout-sider>
 
-      <!-- 中间画布 -->
+      <!-- 中间画布 → 首屏必须渲染 -->
       <a-layout-content class="canvas-content">
         <CanvasStage />
 
-        <!-- 展开/折叠按钮 -->
         <template v-if="showPopover">
           <a-tooltip content="属性" position="left">
             <div class="panel-toggle-btn" @click="togglePanel">
@@ -85,10 +103,11 @@ const shouldHidePanel = computed(() => {
           <component :is="ui.isPanelExpanded ? IconRight : IconLeft" size="16" fill="#333" />
         </div>
 
+        <!-- 右键菜单 → 延迟渲染 -->
         <ContextMenu />
       </a-layout-content>
 
-      <!-- 右侧属性面板 (固定宽度) -->
+      <!-- 右侧属性面板 → 延迟渲染 -->
       <a-layout-sider
         :width="280"
         class="right-sider"
@@ -111,6 +130,37 @@ const shouldHidePanel = computed(() => {
   flex-direction: column;
 }
 
+.app-header-slot {
+  height: 64px;
+  min-height: 64px;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.app-header-skeleton {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    var(--color-fill-2) 0%,
+    var(--color-fill-3) 50%,
+    var(--color-fill-2) 100%
+  );
+  background-size: 200% 100%;
+  border-bottom: 1px solid rgba(16, 24, 40, 0.04);
+  box-shadow: 0 2px 8px rgba(16, 24, 40, 0.06);
+  animation: header-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes header-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
 .main-layout {
   flex: 1;
   overflow: hidden;
@@ -119,7 +169,6 @@ const shouldHidePanel = computed(() => {
 }
 
 .left-sider {
-  /* background: var(--color-bg-2); */
   border-right: 1px solid var(--color-border);
   z-index: 10;
 }
@@ -135,7 +184,7 @@ const shouldHidePanel = computed(() => {
   background: var(--color-bg-2);
   border-left: 1px solid var(--color-border);
   z-index: 10;
-  transition: all 0.3s cubic-bezier(0.34, 0.69, 0.1, 1); /* 优化动画曲线 */
+  transition: all 0.3s cubic-bezier(0.34, 0.69, 0.1, 1);
 }
 
 .panel-toggle-btn {

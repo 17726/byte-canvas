@@ -253,6 +253,7 @@ import {
 } from '@icon-park/vue-next';
 import { ToolManager } from '@/core/ToolManager';
 import { IconFontColors, IconSort } from '@arco-design/web-vue/es/icon';
+
 const store = useCanvasStore();
 const selectionStore = useSelectionStore();
 const toolManagerRef = inject<Ref<ToolManager>>('toolManager');
