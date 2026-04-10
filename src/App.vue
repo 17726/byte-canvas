@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import { watch, computed, onMounted, ref } from 'vue';
 import { useCanvasStore } from '@/store/canvasStore';
 import { useSelectionStore } from '@/store/selectionStore';
 import { useUIStore } from '@/store/uiStore';
 import { Left as IconLeft, Right as IconRight } from '@icon-park/vue-next';
+import { computed, defineAsyncComponent, onMounted, watch } from 'vue';
 
 // =====================================
 // 优化 1：核心画布【优先加载】
@@ -15,40 +15,23 @@ import CanvasStage from '@/components/canvas/CanvasStage.vue';
 // 优化 2：非首屏组件【延迟加载】
 // 这些全部不阻塞首屏
 // =====================================
-import type { Component } from 'vue';
-
-const CanvasHeader = ref<Component | null>(null);
-const CanvasToolbar = ref<Component | null>(null);
-const PropertyPanel = ref<Component | null>(null);
-const ContextMenu = ref<Component | null>(null);
+const CanvasHeader = defineAsyncComponent(() => import('@/components/ui/panels/AppHeader.vue'));
+const CanvasToolbar = defineAsyncComponent(() => import('@/components/ui/panels/ToolPanel.vue'));
+const PropertyPanel = defineAsyncComponent(
+  () => import('@/components/ui/panels/InspectorPanel.vue')
+);
+const ContextMenu = defineAsyncComponent(() => import('@/components/ui/floating/ContextMenu.vue'));
 
 const store = useCanvasStore();
 const selectionStore = useSelectionStore();
 const ui = useUIStore();
 
 // =====================================
-// 优化 3：延迟加载非首屏组件 + 延迟初始化
-// 等 Vue 首屏渲染完了再加载
+// 优化 3：首屏仅做关键初始化
 // =====================================
 onMounted(() => {
-  // 1. 先恢复画布（必须）
+  // 恢复画布（必须）
   store.initFromStorage();
-
-  // 2. 延迟加载所有非首屏 UI（关键优化）
-  setTimeout(() => {
-    import('@/components/ui/panels/AppHeader.vue').then((mod) => {
-      CanvasHeader.value = mod.default;
-    });
-    import('@/components/ui/panels/ToolPanel.vue').then((mod) => {
-      CanvasToolbar.value = mod.default;
-    });
-    import('@/components/ui/panels/InspectorPanel.vue').then((mod) => {
-      PropertyPanel.value = mod.default;
-    });
-    import('@/components/ui/floating/ContextMenu.vue').then((mod) => {
-      ContextMenu.value = mod.default;
-    });
-  }, 200); // 200ms 足够首屏渲染完成
 });
 
 // 监听选中状态，自动展开/折叠
@@ -88,13 +71,20 @@ const shouldHidePanel = computed(() => {
 
 <template>
   <a-layout class="app-container">
-    <!-- 页头 → 延迟渲染 -->
-    <CanvasHeader v-if="CanvasHeader" />
+    <!-- 页头占位：固定高度避免延迟加载导致 CLS -->
+    <div class="app-header-slot">
+      <Suspense>
+        <CanvasHeader />
+        <template #fallback>
+          <div class="app-header-skeleton" aria-hidden="true" />
+        </template>
+      </Suspense>
+    </div>
 
     <a-layout class="main-layout">
       <!-- 左侧工具栏 → 延迟渲染 -->
       <a-layout-sider :width="0" class="left-sider">
-        <CanvasToolbar v-if="CanvasToolbar" />
+        <CanvasToolbar />
       </a-layout-sider>
 
       <!-- 中间画布 → 首屏必须渲染 -->
@@ -114,7 +104,7 @@ const shouldHidePanel = computed(() => {
         </div>
 
         <!-- 右键菜单 → 延迟渲染 -->
-        <ContextMenu v-if="ContextMenu" />
+        <ContextMenu />
       </a-layout-content>
 
       <!-- 右侧属性面板 → 延迟渲染 -->
@@ -126,7 +116,7 @@ const shouldHidePanel = computed(() => {
         :trigger="null"
         breakpoint="xl"
       >
-        <PropertyPanel v-if="PropertyPanel" />
+        <PropertyPanel />
       </a-layout-sider>
     </a-layout>
   </a-layout>
@@ -138,6 +128,37 @@ const shouldHidePanel = computed(() => {
   height: 100vh;
   display: flex;
   flex-direction: column;
+}
+
+.app-header-slot {
+  height: 64px;
+  min-height: 64px;
+  flex-shrink: 0;
+  overflow: hidden;
+}
+
+.app-header-skeleton {
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    var(--color-fill-2) 0%,
+    var(--color-fill-3) 50%,
+    var(--color-fill-2) 100%
+  );
+  background-size: 200% 100%;
+  border-bottom: 1px solid rgba(16, 24, 40, 0.04);
+  box-shadow: 0 2px 8px rgba(16, 24, 40, 0.06);
+  animation: header-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes header-shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
 }
 
 .main-layout {
