@@ -45,7 +45,6 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { IconPlus, IconEdit, IconDelete } from '@arco-design/web-vue/es/icon';
-//TODO：UI开发完成后优化icon-park库的导入，针对按需导入减小打包体积
 import { Square, Round } from '@icon-park/vue-next';
 import { useCanvasStore } from '@/store/canvasStore';
 import { useNodeActions } from '@/composables/useNodeActions';
