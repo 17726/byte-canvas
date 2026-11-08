@@ -10,7 +10,7 @@
       <!-- 画布右键菜单 -->
       <div v-if="!hasSelection">
         <a-menu mode="pop" style="min-width: 180px">
-          <a-menu-item key="paste" v-if="isClipboardAvailable" @click="handleAction(paste)">
+          <a-menu-item key="paste" v-if="isClipboardAvailable" @click="handleAction(pasteAtCursor)">
             <template #icon><icon-paste /></template>
             粘贴
             <span class="label">Ctrl+V</span>
@@ -57,7 +57,7 @@
               :disabled="!isClipboardAvailable"
               key="paste"
               title="粘贴"
-              @click="handleAction(paste)"
+              @click="handleAction(pasteAtCursor)"
             >
               <template #icon><icon-paste /></template>
             </a-button>
@@ -178,8 +178,8 @@ const { undo, redo } = useHistoryStore();
 
 // 监听来自 ToolManager 的右键菜单事件
 function handleShowContextMenu(e: CustomEvent) {
-  const { x, y } = e.detail;
-  openAt(x, y);
+  const { x, y, canvasPosition } = e.detail;
+  openAt(x, y, canvasPosition);
   // 检测粘贴板可用性
   checkClipboardAvailability();
 }
@@ -198,6 +198,8 @@ function handleKeyDown(e: KeyboardEvent) {
 
 /* ---------- 状态 ---------- */
 const pos = ref({ x: 0, y: 0 });
+// 独立保存右键画布坐标，避免菜单为适应窗口边缘而移动时改变粘贴位置。
+const pastePosition = ref<{ x: number; y: number }>();
 const visible = ref(false);
 const menuRef = ref<HTMLDivElement | null>(null);
 const clearModalVisible = ref(false);
@@ -212,7 +214,8 @@ const menuStyle = computed(() => ({
 }));
 
 /* ---------- 打开/关闭 ---------- */
-function openAt(clientX: number, clientY: number) {
+function openAt(clientX: number, clientY: number, canvasPosition?: { x: number; y: number }) {
+  pastePosition.value = canvasPosition;
   pos.value = { x: clientX, y: clientY };
   visible.value = true;
   nextTick(() => {
@@ -232,6 +235,10 @@ function close() {
 }
 
 /* ---------- 操作包装函数 ---------- */
+function pasteAtCursor() {
+  return paste(pastePosition.value);
+}
+
 function handleAction(action: () => boolean | void) {
   action();
   close();

@@ -534,7 +534,7 @@ export const useCanvasStore = defineStore('canvas', () => {
   /**
    * 粘贴元素
    */
-  function paste(): boolean {
+  function paste(position?: { x: number; y: number }): boolean {
     const selectionStore = getSelectionStore();
     const clipboardData = loadClipboard();
     if (!clipboardData || clipboardData.nodes.length === 0) {
@@ -547,8 +547,15 @@ export const useCanvasStore = defineStore('canvas', () => {
       lastClipboardTimestamp = clipboardData.timestamp;
     }
 
-    pasteCount++;
+    // 快捷键粘贴继续递增偏移；右键粘贴将所选节点整体的左上角放到目标位置。
+    if (!position) pasteCount++;
     const offset = PASTE_OFFSET * pasteCount;
+    const offsetX = position
+      ? position.x - Math.min(...clipboardData.nodes.map((node) => node.transform.x))
+      : offset;
+    const offsetY = position
+      ? position.y - Math.min(...clipboardData.nodes.map((node) => node.transform.y))
+      : offset;
 
     const newIds: string[] = [];
     const history = useHistoryStore();
@@ -566,7 +573,7 @@ export const useCanvasStore = defineStore('canvas', () => {
       clipboardNodeMap.set(n.id, n);
     });
 
-    const cloneGroupWithChildren = (sourceNode: NodeState, rootOffset: number): string | null => {
+    const cloneGroupWithChildren = (sourceNode: NodeState): string | null => {
       if (sourceNode.type !== NodeType.GROUP) return null;
 
       const idMap = new Map<string, string>();
@@ -589,8 +596,8 @@ export const useCanvasStore = defineStore('canvas', () => {
           parentId: parentNewId,
           transform: {
             ...original.transform,
-            x: original.transform.x + (shouldApplyOffset ? rootOffset : 0),
-            y: original.transform.y + (shouldApplyOffset ? rootOffset : 0),
+            x: original.transform.x + (shouldApplyOffset ? offsetX : 0),
+            y: original.transform.y + (shouldApplyOffset ? offsetY : 0),
           },
         };
 
@@ -630,8 +637,8 @@ export const useCanvasStore = defineStore('canvas', () => {
           id: newId,
           transform: {
             ...node.transform,
-            x: node.transform.x + offset,
-            y: node.transform.y + offset,
+            x: node.transform.x + offsetX,
+            y: node.transform.y + offsetY,
           },
         };
 
@@ -641,7 +648,7 @@ export const useCanvasStore = defineStore('canvas', () => {
       }
 
       // 情况2：组合节点 —— 深拷贝整棵子树，避免共享子节点
-      const rootNewId = cloneGroupWithChildren(node, offset);
+      const rootNewId = cloneGroupWithChildren(node);
       if (rootNewId) {
         newIds.push(rootNewId);
       }
