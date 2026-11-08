@@ -59,6 +59,52 @@ describe('paste position', () => {
     expect(firstPosition()).toMatchObject({ x: 140, y: 240 });
   });
 
+  it.each([
+    { rotation: 90, x: 250, y: 450 },
+    { rotation: -90, x: 250, y: 450 },
+    { rotation: 180, x: 300, y: 400 },
+    { rotation: 45, x: 200 + 75 * Math.SQRT2, y: 350 + 75 * Math.SQRT2 },
+  ])(
+    'anchors a rectangle rotated $rotation degrees by its visible bounds',
+    ({ rotation, x, y }) => {
+      const store = useCanvasStore();
+      const selection = useSelectionStore();
+      const source = NodeFactory.createRect(100, 200);
+      Object.assign(source.transform, { width: 200, height: 100, rotation });
+      store.addNode(source);
+      selection.setActive([source.id]);
+      store.copySelected();
+
+      expect(store.paste({ x: 300, y: 400 })).toBe(true);
+      const pasted = store.nodes[[...selection.activeElementIds][0]!]!;
+      expect(pasted.transform.x).toBeCloseTo(x);
+      expect(pasted.transform.y).toBeCloseTo(y);
+      expect(pasted.transform).toMatchObject({ width: 200, height: 100, rotation });
+      expect(store.nodes[source.id]!.transform).toEqual(source.transform);
+      expect(loadClipboard()!.nodes[0]!.transform).toEqual(source.transform);
+    }
+  );
+
+  it('anchors a mixed selection by its combined rotated bounds', () => {
+    const store = useCanvasStore();
+    const selection = useSelectionStore();
+    const rotated = NodeFactory.createRect(100, 200);
+    Object.assign(rotated.transform, { width: 200, height: 100, rotation: 90 });
+    const unrotated = NodeFactory.createRect(20, 300);
+    store.addNode(rotated);
+    store.addNode(unrotated);
+    selection.setActive([rotated.id, unrotated.id]);
+    store.copySelected();
+
+    store.paste({ x: 500, y: 600 });
+    const pasted = [...selection.activeElementIds].map((id) => store.nodes[id]!);
+    expect(pasted[0]!.transform.x).toBeCloseTo(580);
+    expect(pasted[0]!.transform.y).toBeCloseTo(650);
+    expect(pasted[1]!.transform.x).toBeCloseTo(500);
+    expect(pasted[1]!.transform.y).toBeCloseTo(750);
+    expect(pasted[0]!.transform.rotation).toBe(90);
+  });
+
   it('pastes a cut node at the target only once', () => {
     const { store, selection, first } = copyNodes();
     selection.setActive([first.id]);

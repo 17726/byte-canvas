@@ -67,6 +67,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { cloneDeep } from 'lodash-es';
 import { useSelectionStore } from './selectionStore';
 import { useHistoryStore } from './historyStore';
+import { calculateBounds } from '@/core/utils/geometry';
 
 /**
  * Canvas Store
@@ -550,12 +551,14 @@ export const useCanvasStore = defineStore('canvas', () => {
     // 快捷键粘贴继续递增偏移；右键粘贴将所选节点整体的左上角放到目标位置。
     if (!position) pasteCount++;
     const offset = PASTE_OFFSET * pasteCount;
-    const offsetX = position
-      ? position.x - Math.min(...clipboardData.nodes.map((node) => node.transform.x))
-      : offset;
-    const offsetY = position
-      ? position.y - Math.min(...clipboardData.nodes.map((node) => node.transform.y))
-      : offset;
+    const bounds = position
+      ? calculateBounds(
+          Object.fromEntries(clipboardData.nodes.map((node) => [node.id, node])),
+          clipboardData.nodes.map((node) => node.id)
+        )
+      : null;
+    const offsetX = position && bounds ? position.x - bounds.x : offset;
+    const offsetY = position && bounds ? position.y - bounds.y : offset;
 
     const newIds: string[] = [];
     const history = useHistoryStore();
