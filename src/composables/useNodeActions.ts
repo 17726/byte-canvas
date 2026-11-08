@@ -142,8 +142,8 @@ export function useNodeActions() {
   /**
    * 粘贴节点
    */
-  function paste(): boolean {
-    const success = store.paste();
+  function paste(position?: { x: number; y: number }): boolean {
+    const success = store.paste(position);
 
     if (success) {
       Notification.success({

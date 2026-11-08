@@ -66,6 +66,7 @@ import { TextSelectionHandler } from './handlers/TextSelectionHandler';
 import { TransformHandler } from './handlers/TransformHandler';
 import { ViewportHandler } from './handlers/ViewportHandler';
 import { GroupService } from './services/GroupService';
+import { eventToWorld } from './utils/geometry';
 
 /**
  * 工具管理器类
@@ -792,7 +793,7 @@ export class ToolManager {
     if (!this.stageEl?.contains(e.target as Node)) return;
 
     // 显示右键菜单
-    this.showContextMenu(e.clientX, e.clientY);
+    this.showContextMenu(e);
   }
 
   /**
@@ -804,20 +805,20 @@ export class ToolManager {
     if (!this.stageEl?.contains(e.target as Node)) return;
 
     // 显示右键菜单
-    this.showContextMenu(e.clientX, e.clientY);
+    this.showContextMenu(e);
   }
 
   /**
    * 显示右键菜单
-   * @param x - 菜单位置 X 坐标
-   * @param y - 菜单位置 Y 坐标
+   * @param e - 右键鼠标事件
    */
-  private showContextMenu(x: number, y: number) {
+  private showContextMenu(e: MouseEvent) {
     // 创建自定义事件，将右键菜单信息发送到应用
     const contextMenuEvent = new CustomEvent('showContextMenu', {
       detail: {
-        x,
-        y,
+        x: e.clientX,
+        y: e.clientY,
+        canvasPosition: eventToWorld(e, this.stageEl, this.store.viewport),
         hasSelection: this.selectionStore.activeElementIds.size > 0,
       },
       bubbles: true,
